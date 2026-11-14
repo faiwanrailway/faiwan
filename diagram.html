@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>飛灣鐵道｜列車運行圖</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    :root {
+      --bg-panel: rgba(255, 255, 255, 0.96);
+      --border-soft: rgba(15, 23, 42, 0.12);
+    }
+    body.diagram-page {
+      background: #f4f7fb;
+      color: #0f172a;
+      margin: 0;
+    }
+    .diagram-shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 1rem 1.25rem 2rem;
+    }
+    .diagram-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem 1.25rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .diagram-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .diagram-sub {
+      margin: 0.25rem 0 0;
+      font-size: 0.9rem;
+      color: #475569;
+    }
+    .toolbar {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      align-items: center;
+      margin-bottom: 0.85rem;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    }
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .ctrl-group label.ctrl-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      white-space: nowrap;
+    }
+    .ctrl-group select,
+    .ctrl-group input[type="text"] {
+      padding: 0.4rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+      background: #fff;
+      color: #0f172a;
+    }
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.82rem;
+      cursor: pointer;
+      background: #fff;
+      user-select: none;
+    }
+    .type-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .btn-sm {
+      padding: 0.38rem 0.7rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #0f172a;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-sm:hover {
+      background: #f1f5f9;
+    }
+    .btn-sm.primary {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #fff;
+    }
+    .btn-sm.primary:hover {
+      background: #0369a1;
+    }
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 1080px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .canvas-card {
+      background: #fff;
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+      position: relative;
+    }
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 74vh;
+      min-height: 520px;
+      cursor: grab;
+      user-select: none;
+    }
+    .canvas-wrap.dragging {
+      cursor: grabbing;
+    }
+    canvas#diagramCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.5rem 0.9rem;
+      font-size: 0.82rem;
+      color: #475569;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-soft);
+    }
+    .inspector-card {
+      background: #fff;
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+      max-height: calc(74vh + 40px);
+      overflow-y: auto;
+    }
+    .inspector-card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.05rem;
+      border-bottom: 1px solid var(--border-soft);
+      padding-bottom: 0.45rem;
+    }
+    .inspector-empty {
+      color: #64748b;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .train-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.3rem 0.75rem;
+      font-size: 0.88rem;
+      margin-bottom: 0.75rem;
+    }
+    .train-meta dt {
+      color: #64748b;
+      font-weight: 600;
+    }
+    .train-meta dd {
+      margin: 0;
+      font-weight: 500;
+    }
+    .stop-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+    .stop-table th,
+    .stop-table td {
+      padding: 0.3rem 0.35rem;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    .stop-table th {
+      color: #475569;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+    .stop-table tr.is-pass td {
+      color: #94a3b8;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="diagram-page">
+  <div class="diagram-shell">
+    <header class="diagram-header">
+      <div>
+        <h1>列車運行圖（Train Diagram）</h1>
+        <p class="diagram-sub" id="subtitleText">飛灣鐵道全線運行圖・可切換班表、縮放時間軸與點選列車檢視時刻</p>
+      </div>
+      <div class="ctrl-group">
+        <a href="timetable_sheet.html?mode=working&dir=down" class="btn-sm" target="_blank" rel="noopener noreferrer">下行運轉時刻表</a>
+        <a href="timetable_sheet.html?mode=working&dir=up" class="btn-sm" target="_blank" rel="noopener noreferrer">上行運轉時刻表</a>
+        <a href="extras.html" class="btn-sm">返回其他資料</a>
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="運行圖控制列">
+      <div class="ctrl-group">
+        <label class="ctrl-label" for="schedSelect">班表：</label>
+        <select id="schedSelect">
+          <option value="weekday">平日</option>
+          <option value="holiday">假日</option>
+          <option value="holiday_long">連續假日</option>
+          <option value="weekday_to_long">平日接連假</option>
+          <option value="long_to_weekday">連假接平日</option>
+        </select>
+      </div>
+
+      <div class="ctrl-group">
+        <label class="ctrl-label" for="dirSelect">方向：</label>
+        <select id="dirSelect">
+          <option value="both">上下行全部</option>
+          <option value="down">僅下行（工業區 → 全京大道）</option>
+          <option value="up">僅上行（全京大道 → 工業區）</option>
+        </select>
+      </div>
+
+      <div class="ctrl-group" id="typeFilters">
+        <span class="ctrl-label" style="font-size:0.85rem;font-weight:600;color:#334155;">車種：</span>
+      </div>
+
+      <div class="ctrl-group">
+        <label class="ctrl-label" for="searchInput">搜尋：</label>
+        <input id="searchInput" type="text" placeholder="車次或運用 (如 1012, 01)" style="width: 165px;">
+      </div>
+
+      <div class="ctrl-group" style="margin-left:auto;">
+        <button type="button" class="btn-sm" id="zoomOutBtn" title="縮小時間軸">－</button>
+        <span id="zoomLabel" style="font-size:0.85rem;min-width:44px;text-align:center;font-weight:600;">1.5x</span>
+        <button type="button" class="btn-sm" id="zoomInBtn" title="放大時間軸">＋</button>
+        <button type="button" class="btn-sm primary" id="resetViewBtn">重設視圖</button>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <div class="canvas-card">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="diagramCanvas"></canvas>
+        </div>
+        <div class="status-bar">
+          <span id="statusCount">載入中...</span>
+          <span>提示：滾輪可縮放時間軸，左鍵拖曳平移，點選任一列車線檢視詳細時刻</span>
+        </div>
+      </div>
+
+      <aside class="inspector-card" aria-label="列車詳細資訊">
+        <h2>列車資訊</h2>
+        <div id="inspectorBody" class="inspector-empty">
+          請在左側運行圖中將滑鼠移至或點選任一條列車線，即可檢視該列車之車次、車種、運用番号與各站通過／停靠時刻。
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="timetable_data.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const SCHEDULE_LABELS = {
+        weekday: '平日',
+        holiday: '假日',
+        holiday_long: '連續假日',
+        weekday_to_long: '平日接連假',
+        long_to_weekday: '連假接平日'
+      };
+
+      const TRAIN_TYPES = [
+        { key: '普通', label: '普通', color: '#334155' },
+        { key: '通勤', label: '通勤', color: '#0284c7' },
+        { key: '快速', label: '快速', color: '#16a34a' },
+        { key: '特別快速', label: '特別快速', color: '#dc2626' },
+        { key: '回送', label: '回送', color: '#9333ea' }
+      ];
+
+      const TYPE_COLOR_MAP = Object.fromEntries(TRAIN_TYPES.map(t => [t.key, t.color]));
+
+      const STATION_KM = {
+        '飛灣工業區': 0.0,
+        '飛灣車輛基地': 1.5,
+        '飛灣港': 7.3,
+        '物流中心': 8.6,
+        '飛灣郵輪港': 9.8,
+        '濱江商務區': 17.0,
+        '市民廣場': 18.5,
+        '文化中心': 19.8,
+        '飛灣新站': 21.7,
+        '科創園': 24.0,
+        '飛灣學區': 25.2,
+        '飛灣大道': 26.9,
+        '飛灣公園': 28.5,
+        '錦湖': 29.9,
+        '鷺島': 30.4,
+        '空港新城': 33.2,
+        '飛灣機場': 38.1,
+        '翡翠花園': 43.3,
+        '紫荊苑': 46.5,
+        '御景新村': 54.7,
+        '自然保育中心': 56.1,
+        '綾路北站': 57.9,
+        '全京大道': 59.1,
+        '全京車輛基地': 60.2
+      };
+
+      const AXIS_NODES = Object.entries(STATION_KM)
+        .map(([name, km]) => ({ name, km, isDepot: name.includes('基地') }))
+        .sort((a, b) => a.km - b.km);
+      const MIN_KM = AXIS_NODES[0].km;
+      const MAX_KM = AXIS_NODES[AXIS_NODES.length - 1].km;
+
+      function parseCSVRows(text) {
+        if (!text) return [];
+        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+        return lines.map(line => line.split(','));
+      }
+
+      function normalizeTrainType(raw) {
+        if (!raw) return '普通';
+        const s = raw.trim();
+        if (s.includes('回送')) return '回送';
+        if (s.includes('特別快速') || s.includes('特快')) return '特別快速';
+        if (s.includes('快速')) return '快速';
+        if (s.includes('通勤')) return '通勤';
+        return '普通';
+      }
+
+      function parseTimeToSec(tok, prevSec) {
+        if (!tok) return null;
+        const clean = tok.trim().replace(/\?$/, '');
+        let h, min, s = 0;
+        let m = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (m) {
+          h = parseInt(m[1], 10);
+          min = parseInt(m[2], 10);
+          s = m[3] ? parseInt(m[3], 10) : 0;
+        } else {
+          m = clean.match(/^(\d{1,2})(\d{2})(\d{2})$/);
+          if (!m) return null;
+          h = parseInt(m[1], 10);
+          min = parseInt(m[2], 10);
+          s = parseInt(m[3], 10);
+        }
+        if (Number.isNaN(h) || Number.isNaN(min) || Number.isNaN(s)) return null;
+        let sec = h * 3600 + min * 60 + s;
+        if (prevSec !== null && sec < prevSec - 3600) {
+          sec += 86400;
+        }
+        return sec;
+      }
+
+      function formatSec(sec) {
+        if (sec === null || sec === undefined) return '';
+        const totalMin = Math.floor(sec / 60);
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        const s = sec % 60;
+        const base = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        return s ? base + ':' + String(s).padStart(2, '0') : base;
+      }
+
+      function classifyStationName(raw) {
+        const s = (raw || '').trim();
+        if (!s) return '';
+        if (s.startsWith('飛灣車輛基地')) return '飛灣車輛基地';
+        if (s.startsWith('全京車輛基地')) return '全京車輛基地';
+        if (s.startsWith('飛灣新站')) return '飛灣新站';
+        if (s.startsWith('飛灣機場')) return '飛灣機場';
+        if (s.startsWith('全京大道')) return '全京大道';
+        return s.replace(/(著|着|発|發|到|開)$/, '');
+      }
+
+      function parseOuDiaCSV(csvText, dir, shiftMidnightPlus24) {
+        const rows = parseCSVRows(csvText);
+        if (rows.length < 5) return [];
+
+        let trainNoRow = -1;
+        let typeRow = -1;
+        let opRow = -1;
+        let firstStationRow = -1;
+
+        for (let r = 0; r < Math.min(25, rows.length); r++) {
+          const c0 = (rows[r][0] || '').trim();
+          if (c0 === '列車番号' || c0 === '車次') trainNoRow = r;
+          else if (c0 === '列車種別' || c0 === '車種') typeRow = r;
+          else if (c0 === '運用番号' || c0 === '運用') opRow = r;
+          else if (STATION_KM[classifyStationName(c0)] !== undefined && firstStationRow === -1) {
+            firstStationRow = r;
+          }
+        }
+        if (trainNoRow === -1) trainNoRow = 4;
+        if (typeRow === -1) typeRow = 6;
+        if (firstStationRow === -1) {
+          for (let r = 0; r < rows.length; r++) {
+            const c0 = (rows[r][0] || '').trim();
+            if (STATION_KM[classifyStationName(c0)] !== undefined) {
+              firstStationRow = r;
+              break;
+            }
+          }
+        }
+        if (firstStationRow === -1) return [];
+
+        const colCount = Math.max(
+          rows[trainNoRow] ? rows[trainNoRow].length : 0,
+          rows[typeRow] ? rows[typeRow].length : 0
+        );
+
+        const trains = [];
+        for (let c = 2; c < colCount; c++) {
+          const rawNo = (rows[trainNoRow]?.[c] || '').trim();
+          const rawType = (rows[typeRow]?.[c] || '').trim();
+          const rawOp = opRow >= 0 ? (rows[opRow]?.[c] || '').trim() : '';
+
+          const stationEvents = new Map();
+          const orderedStops = [];
+          let prevSec = null;
+          let firstSec = null;
+
+          for (let r = firstStationRow; r < rows.length; r++) {
+            const label = (rows[r]?.[0] || '').trim();
+            const subLabel = (rows[r]?.[1] || '').trim();
+            const cell = (rows[r]?.[c] || '').trim();
+            if (!label || !cell) continue;
+            if (subLabel === '番線' || label.includes('番線') || label.includes('作業')) continue;
+
+            const stName = classifyStationName(label);
+            const km = STATION_KM[stName];
+            if (km === undefined) continue;
+
+            const isPass = cell.includes('?') || cell.includes('レ') || cell.includes('ﾚ') || cell.includes('↓') || cell.includes('||');
+            const sec = parseTimeToSec(cell, prevSec);
+            if (sec === null) {
+              if ((cell === '↓' || cell === 'レ' || cell === 'ﾚ') && !stationEvents.has(stName)) {
+                const ev = { station: stName, km, arrSec: null, depSec: null, isPass: true };
+                stationEvents.set(stName, ev);
+                orderedStops.push(ev);
+              }
+              continue;
+            }
+
+            let adjSec = sec;
+            if (shiftMidnightPlus24 && firstSec === null && adjSec < 4 * 3600) {
+              adjSec += 86400;
+            }
+            if (firstSec === null) firstSec = adjSec;
+            prevSec = adjSec;
+
+            let ev = stationEvents.get(stName);
+            if (!ev) {
+              ev = { station: stName, km, arrSec: null, depSec: null, isPass };
+              stationEvents.set(stName, ev);
+              orderedStops.push(ev);
+            }
+            if (subLabel === '着' || subLabel === '著' || label.endsWith('著') || label.endsWith('着') || label.endsWith('到')) {
+              ev.arrSec = adjSec;
+            } else if (subLabel === '発' || subLabel === '發' || label.endsWith('発') || label.endsWith('發') || label.endsWith('開')) {
+              ev.depSec = adjSec;
+            } else {
+              if (ev.arrSec === null) ev.arrSec = adjSec;
+              else ev.depSec = adjSec;
+            }
+            if (!isPass) ev.isPass = false;
+          }
+
+          const points = [];
+          for (const ev of orderedStops) {
+            if (ev.arrSec !== null) points.push({ t: ev.arrSec, km: ev.km, station: ev.station, isPass: ev.isPass });
+            if (ev.depSec !== null && ev.depSec !== ev.arrSec) {
+              points.push({ t: ev.depSec, km: ev.km, station: ev.station, isPass: ev.isPass });
+            }
+          }
+
+          if (points.length < 2) continue;
+
+          trains.push({
+            trainNo: rawNo,
+            type: normalizeTrainType(rawType),
+            rawType,
+            opNo: rawOp,
+            dir,
+            points,
+            stops: orderedStops,
+            startSec: points[0].t,
+            endSec: points[points.length - 1].t
+          });
+        }
+        return trains;
+      }
+
+      function buildSignature(tr) {
+        const timed = tr.points.slice(0, 4).map(p => p.station + '@' + (p.t % 86400)).join('|');
+        return tr.dir + '|' + tr.type + '|' + timed;
+      }
+
+      function resolveTransitionTrainNumbers(trains, holidayLongTrains) {
+        const hlMap = new Map();
+        for (const hl of holidayLongTrains) {
+          hlMap.set(buildSignature(hl), hl.trainNo);
+        }
+        for (const tr of trains) {
+          if (!tr.trainNo) {
+            const matched = hlMap.get(buildSignature(tr));
+            if (matched) tr.trainNo = matched;
+          }
+        }
+      }
+
+      function loadScheduleTrains(sched) {
+        const csvs = window.EMBEDDED_TIMETABLE_CSVS || {};
+        const hlDown = parseOuDiaCSV(csvs.holiday_long_down || '', 'down', false);
+        const hlUp = parseOuDiaCSV(csvs.holiday_long_up || '', 'up', false);
+
+        if (sched === 'weekday') {
+          return [
+            ...parseOuDiaCSV(csvs.weekday_down || '', 'down', true),
+            ...parseOuDiaCSV(csvs.weekday_up || '', 'up', true)
+          ];
+        }
+        if (sched === 'holiday') {
+          return [
+            ...parseOuDiaCSV(csvs.holiday_down || '', 'down', true),
+            ...parseOuDiaCSV(csvs.holiday_up || '', 'up', true)
+          ];
+        }
+        if (sched === 'holiday_long') {
+          return [...hlDown, ...hlUp];
+        }
+        if (sched === 'weekday_to_long') {
+          const wDown = parseOuDiaCSV(csvs.weekday_to_long_down || '', 'down', true);
+          const wUp = parseOuDiaCSV(csvs.weekday_to_long_up || '', 'up', true);
+          resolveTransitionTrainNumbers(wDown, hlDown);
+          resolveTransitionTrainNumbers(wUp, hlUp);
+          const extraDown = hlDown
+            .filter(t => t.startSec < 4 * 3600)
+            .map(t => ({
+              ...t,
+              points: t.points.map(p => ({ ...p, t: p.t + 86400 })),
+              stops: t.stops.map(s => ({
+                ...s,
+                arrSec: s.arrSec !== null ? s.arrSec + 86400 : null,
+                depSec: s.depSec !== null ? s.depSec + 86400 : null
+              })),
+              startSec: t.startSec + 86400,
+              endSec: t.endSec + 86400
+            }));
+          const extraUp = hlUp
+            .filter(t => t.startSec < 4 * 3600)
+            .map(t => ({
+              ...t,
+              points: t.points.map(p => ({ ...p, t: p.t + 86400 })),
+              stops: t.stops.map(s => ({
+                ...s,
+                arrSec: s.arrSec !== null ? s.arrSec + 86400 : null,
+                depSec: s.depSec !== null ? s.depSec + 86400 : null
+              })),
+              startSec: t.startSec + 86400,
+              endSec: t.endSec + 86400
+            }));
+          const seen = new Set([...wDown, ...wUp].map(t => t.dir + ':' + t.trainNo + ':' + t.startSec));
+          const merged = [...wDown, ...wUp];
+          for (const t of [...extraDown, ...extraUp]) {
+            const key = t.dir + ':' + t.trainNo + ':' + t.startSec;
+            if (!seen.has(key)) merged.push(t);
+          }
+          return merged;
+        }
+        if (sched === 'long_to_weekday') {
+          const lDown = parseOuDiaCSV(csvs.long_to_weekday_down || '', 'down', true);
+          const lUp = parseOuDiaCSV(csvs.long_to_weekday_up || '', 'up', true);
+          resolveTransitionTrainNumbers(lDown, hlDown);
+          resolveTransitionTrainNumbers(lUp, hlUp);
+          const earlyDown = hlDown.filter(t => t.startSec < 5 * 3600 + 50 * 60);
+          const earlyUp = hlUp.filter(t => t.startSec < 5 * 3600 + 50 * 60);
+          const seen = new Set([...lDown, ...lUp].map(t => t.dir + ':' + t.trainNo + ':' + t.startSec));
+          const merged = [...lDown, ...lUp];
+          for (const t of [...earlyDown, ...earlyUp]) {
+            const key = t.dir + ':' + t.trainNo + ':' + t.startSec;
+            if (!seen.has(key)) merged.push(t);
+          }
+          return merged;
+        }
+        return [];
+      }
+
+      // UI & Canvas state
+      const params = new URLSearchParams(window.location.search);
+      const state = {
+        sched: SCHEDULE_LABELS[params.get('sched')] ? params.get('sched') : 'weekday',
+        dir: ['both', 'down', 'up'].includes(params.get('dir')) ? params.get('dir') : 'both',
+        enabledTypes: new Set(TRAIN_TYPES.map(t => t.key)),
+        search: '',
+        zoomX: 1.5,
+        panX: 0,
+        minHour: 4,
+        maxHour: 26,
+        allTrains: [],
+        visibleTrains: [],
+        hoveredTrain: null,
+        selectedTrain: null
+      };
+
+      const schedSelect = document.getElementById('schedSelect');
+      const dirSelect = document.getElementById('dirSelect');
+      const searchInput = document.getElementById('searchInput');
+      const typeFilters = document.getElementById('typeFilters');
+      const zoomLabel = document.getElementById('zoomLabel');
+      const canvasWrap = document.getElementById('canvasWrap');
+      const canvas = document.getElementById('diagramCanvas');
+      const ctx = canvas.getContext('2d');
+      const statusCount = document.getElementById('statusCount');
+      const inspectorBody = document.getElementById('inspectorBody');
+
+      schedSelect.value = state.sched;
+      dirSelect.value = state.dir;
+
+      for (const t of TRAIN_TYPES) {
+        const lbl = document.createElement('label');
+        lbl.className = 'type-pill';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.addEventListener('change', () => {
+          if (cb.checked) state.enabledTypes.add(t.key);
+          else state.enabledTypes.delete(t.key);
+          applyFilters();
+        });
+        const dot = document.createElement('span');
+        dot.className = 'type-dot';
+        dot.style.background = t.color;
+        lbl.appendChild(cb);
+        lbl.appendChild(dot);
+        lbl.appendChild(document.createTextNode(t.label));
+        typeFilters.appendChild(lbl);
+      }
+
+      function computeHourBounds(sched) {
+        if (sched === 'holiday_long' || sched === 'long_to_weekday') {
+          state.minHour = 0;
+          state.maxHour = 26;
+        } else if (sched === 'weekday_to_long') {
+          state.minHour = 4;
+          state.maxHour = 28;
+        } else {
+          state.minHour = 4;
+          state.maxHour = 26;
+        }
+      }
+
+      function reloadSchedule() {
+        computeHourBounds(state.sched);
+        state.allTrains = loadScheduleTrains(state.sched);
+        state.selectedTrain = null;
+        state.hoveredTrain = null;
+        renderInspector(null);
+        applyFilters();
+      }
+
+      function applyFilters() {
+        const q = state.search.trim().toLowerCase();
+        state.visibleTrains = state.allTrains.filter(tr => {
+          if (state.dir !== 'both' && tr.dir !== state.dir) return false;
+          if (!state.enabledTypes.has(tr.type)) return false;
+          if (q) {
+            const hitNo = (tr.trainNo || '').toLowerCase().includes(q);
+            const hitOp = (tr.opNo || '').toLowerCase().includes(q);
+            if (!hitNo && !hitOp) return false;
+          }
+          return true;
+        });
+        statusCount.textContent =
+          `班表：${SCHEDULE_LABELS[state.sched]} ｜ 顯示列車：${state.visibleTrains.length} / ${state.allTrains.length} 班`;
+        drawDiagram();
+      }
+
+      const PAD_LEFT = 128;
+      const PAD_RIGHT = 24;
+      const PAD_TOP = 34;
+      const PAD_BOTTOM = 26;
+
+      function getLayout() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        const plotW = Math.max(100, w - PAD_LEFT - PAD_RIGHT);
+        const plotH = Math.max(100, h - PAD_TOP - PAD_BOTTOM);
+        const totalSec = (state.maxHour - state.minHour) * 3600;
+        const contentW = plotW * state.zoomX;
+        const maxPan = Math.max(0, contentW - plotW);
+        state.panX = Math.max(0, Math.min(state.panX, maxPan));
+        return { w, h, plotW, plotH, totalSec, contentW };
+      }
+
+      function secToX(sec, layout) {
+        const ratio = (sec - state.minHour * 3600) / layout.totalSec;
+        return PAD_LEFT + ratio * layout.contentW - state.panX;
+      }
+
+      function kmToY(km, layout) {
+        const ratio = (km - MIN_KM) / (MAX_KM - MIN_KM);
+        return PAD_TOP + ratio * layout.plotH;
+      }
+
+      function drawDiagram() {
+        const dpr = window.devicePixelRatio || 1;
+        const layout = getLayout();
+        if (canvas.width !== Math.floor(layout.w * dpr) || canvas.height !== Math.floor(layout.h * dpr)) {
+          canvas.width = Math.floor(layout.w * dpr);
+          canvas.height = Math.floor(layout.h * dpr);
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, layout.w, layout.h);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, layout.w, layout.h);
+
+        // Clip plot region for vertical time grid & train paths
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(PAD_LEFT, PAD_TOP, layout.plotW, layout.plotH);
+        ctx.clip();
+
+        // 10-minute / 30-minute / 1-hour vertical grid lines
+        const startSec = state.minHour * 3600;
+        const endSec = state.maxHour * 3600;
+        for (let s = startSec; s <= endSec; s += 600) {
+          const x = secToX(s, layout);
+          if (x < PAD_LEFT - 1 || x > PAD_LEFT + layout.plotW + 1) continue;
+          const isHour = s % 3600 === 0;
+          const isHalf = s % 1800 === 0;
+          if (!isHour && !isHalf && state.zoomX < 2.2) continue;
+          ctx.beginPath();
+          ctx.moveTo(x, PAD_TOP);
+          ctx.lineTo(x, PAD_TOP + layout.plotH);
+          ctx.strokeStyle = isHour ? '#cbd5e1' : isHalf ? '#e2e8f0' : '#f1f5f9';
+          ctx.lineWidth = isHour ? 1.2 : 0.8;
+          ctx.stroke();
+        }
+
+        // Horizontal station lines
+        for (const node of AXIS_NODES) {
+          const y = kmToY(node.km, layout);
+          ctx.beginPath();
+          ctx.moveTo(PAD_LEFT, y);
+          ctx.lineTo(PAD_LEFT + layout.plotW, y);
+          ctx.strokeStyle = node.isDepot ? '#e9d5ff' : '#e2e8f0';
+          ctx.lineWidth = node.isDepot ? 1 : 0.9;
+          ctx.stroke();
+        }
+
+        // Draw train stringlines
+        const activeTrain = state.selectedTrain || state.hoveredTrain;
+        for (const tr of state.visibleTrains) {
+          const isHighlighted = tr === activeTrain;
+          const color = TYPE_COLOR_MAP[tr.type] || '#334155';
+          ctx.beginPath();
+          tr.points.forEach((pt, idx) => {
+            const x = secToX(pt.t, layout);
+            const y = kmToY(pt.km, layout);
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = activeTrain ? (isHighlighted ? 1 : 0.25) : 0.88;
+          ctx.lineWidth = isHighlighted ? 3.2 : (tr.type === '特別快速' ? 2.1 : 1.45);
+          if (tr.type === '回送') ctx.setLineDash([5, 4]);
+          else ctx.setLineDash([]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Draw train number label near midpoint when zoomed in or highlighted
+          if ((state.zoomX >= 2.4 || isHighlighted) && tr.trainNo) {
+            const mid = tr.points[Math.floor(tr.points.length / 2)];
+            const lx = secToX(mid.t, layout);
+            const ly = kmToY(mid.km, layout);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = color;
+            ctx.font = isHighlighted ? 'bold 11px sans-serif' : '10px sans-serif';
+            ctx.fillText(tr.trainNo, lx + 3, ly - 3);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // Top time axis labels
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(PAD_LEFT, 0, layout.plotW + PAD_RIGHT, PAD_TOP);
+        ctx.fillStyle = '#334155';
+        ctx.font = '600 11px sans-serif';
+        ctx.textAlign = 'center';
+        for (let h = state.minHour; h <= state.maxHour; h++) {
+          const x = secToX(h * 3600, layout);
+          if (x < PAD_LEFT - 12 || x > PAD_LEFT + layout.plotW + 12) continue;
+          const labelH = String(h).padStart(2, '0') + ':00';
+          ctx.fillText(labelH, x, PAD_TOP - 10);
+        }
+
+        // Left station labels
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, PAD_TOP - 6, PAD_LEFT - 2, layout.plotH + 14);
+        ctx.textAlign = 'right';
+        ctx.font = '11px sans-serif';
+        for (const node of AXIS_NODES) {
+          const y = kmToY(node.km, layout);
+          ctx.fillStyle = node.isDepot ? '#7e22ce' : '#1e293b';
+          ctx.fillText(node.name, PAD_LEFT - 8, y + 4);
+        }
+
+        // Border around plot
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(PAD_LEFT, PAD_TOP, layout.plotW, layout.plotH);
+      }
+
+      function distToSegment(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      }
+
+      function hitTestTrain(mouseX, mouseY) {
+        const layout = getLayout();
+        if (mouseX < PAD_LEFT || mouseX > PAD_LEFT + layout.plotW) return null;
+        if (mouseY < PAD_TOP || mouseY > PAD_TOP + layout.plotH) return null;
+
+        let best = null;
+        let bestDist = 8;
+        for (const tr of state.visibleTrains) {
+          for (let i = 0; i < tr.points.length - 1; i++) {
+            const p1 = tr.points[i];
+            const p2 = tr.points[i + 1];
+            const d = distToSegment(
+              mouseX,
+              mouseY,
+              secToX(p1.t, layout),
+              kmToY(p1.km, layout),
+              secToX(p2.t, layout),
+              kmToY(p2.km, layout)
+            );
+            if (d < bestDist) {
+              bestDist = d;
+              best = tr;
+            }
+          }
+        }
+        return best;
+      }
+
+      function renderInspector(tr) {
+        if (!tr) {
+          inspectorBody.className = 'inspector-empty';
+          inspectorBody.innerHTML =
+            '請在左側運行圖中將滑鼠移至或點選任一條列車線，即可檢視該列車之車次、車種、運用番号與各站通過／停靠時刻。';
+          return;
+        }
+        inspectorBody.className = '';
+        const color = TYPE_COLOR_MAP[tr.type] || '#334155';
+        const dirText = tr.dir === 'down' ? '下行（工業區 → 全京大道）' : '上行（全京大道 → 工業區）';
+        const rowsHtml = tr.stops.map(s => {
+          const arr = s.arrSec !== null ? formatSec(s.arrSec) : (s.isPass ? '通過' : '—');
+          const dep = s.depSec !== null ? formatSec(s.depSec) : (s.isPass ? '↓' : '—');
+          return `<tr class="${s.isPass ? 'is-pass' : ''}"><td>${s.station}</td><td>${arr}</td><td>${dep}</td></tr>`;
+        }).join('');
+
+        inspectorBody.innerHTML = `
+          <dl class="train-meta">
+            <dt>車次</dt><dd>${tr.trainNo || '（未編碼）'}</dd>
+            <dt>車種</dt><dd><span class="badge" style="background:${color}">${tr.rawType || tr.type}</span></dd>
+            <dt>方向</dt><dd>${dirText}</dd>
+            <dt>運用番号</dt><dd>${tr.opNo || '—'}</dd>
+            <dt>運行區間</dt><dd>${formatSec(tr.startSec)} ～ ${formatSec(tr.endSec)}</dd>
+          </dl>
+          <table class="stop-table">
+            <thead><tr><th>站名 / 基地</th><th>到 / 通</th><th>發</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `;
+      }
+
+      // Events
+      schedSelect.addEventListener('change', () => {
+        state.sched = schedSelect.value;
+        reloadSchedule();
+      });
+      dirSelect.addEventListener('change', () => {
+        state.dir = dirSelect.value;
+        applyFilters();
+      });
+      searchInput.addEventListener('input', () => {
+        state.search = searchInput.value;
+        applyFilters();
+      });
+
+      function setZoom(nextZoom, anchorX) {
+        const clamped = Math.max(1, Math.min(8, Number(nextZoom.toFixed(2))));
+        const layout = getLayout();
+        const relX = anchorX !== undefined ? anchorX - PAD_LEFT : layout.plotW / 2;
+        const contentRatio = (state.panX + relX) / layout.contentW;
+        state.zoomX = clamped;
+        const newContentW = layout.plotW * state.zoomX;
+        state.panX = Math.max(0, contentRatio * newContentW - relX);
+        zoomLabel.textContent = state.zoomX.toFixed(1) + 'x';
+        drawDiagram();
+      }
+
+      document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(state.zoomX * 1.25));
+      document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(state.zoomX / 1.25));
+      document.getElementById('resetViewBtn').addEventListener('click', () => {
+        state.zoomX = 1.5;
+        state.panX = 0;
+        zoomLabel.textContent = '1.5x';
+        drawDiagram();
+      });
+
+      let dragStartX = null;
+      let dragStartPan = 0;
+      let didDrag = false;
+
+      canvasWrap.addEventListener('mousedown', e => {
+        dragStartX = e.clientX;
+        dragStartPan = state.panX;
+        didDrag = false;
+        canvasWrap.classList.add('dragging');
+      });
+
+      window.addEventListener('mousemove', e => {
+        if (dragStartX !== null) {
+          const dx = e.clientX - dragStartX;
+          if (Math.abs(dx) > 3) didDrag = true;
+          state.panX = dragStartPan - dx;
+          drawDiagram();
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        if (mx < 0 || my < 0 || mx > rect.width || my > rect.height) return;
+        const hit = hitTestTrain(mx, my);
+        if (hit !== state.hoveredTrain) {
+          state.hoveredTrain = hit;
+          if (!state.selectedTrain) renderInspector(hit);
+          drawDiagram();
+        }
+      });
+
+      window.addEventListener('mouseup', e => {
+        if (dragStartX !== null) {
+          canvasWrap.classList.remove('dragging');
+          if (!didDrag) {
+            const rect = canvas.getBoundingClientRect();
+            const hit = hitTestTrain(e.clientX - rect.left, e.clientY - rect.top);
+            state.selectedTrain = hit;
+            renderInspector(hit);
+            drawDiagram();
+          }
+          dragStartX = null;
+        }
+      });
+
+      canvasWrap.addEventListener('wheel', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        setZoom(state.zoomX * factor, mx);
+      }, { passive: false });
+
+      window.addEventListener('resize', drawDiagram);
+
+      if (typeof window.__TEST_HOOK__ === 'function') {
+        window.__TEST_HOOK__({ loadScheduleTrains, parseOuDiaCSV });
+      }
+      reloadSchedule();
+    })();
+  </script>
+</body>
+</html>
