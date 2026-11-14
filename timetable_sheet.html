@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>完整時刻表檢視｜飛灣鐵路公司</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="timetable_data.js"></script>
+  <style>
+    body {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    .sheet-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: #ffffff;
+      border-bottom: 1px solid #cbd5e1;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      padding: 12px 20px;
+    }
+    .sheet-toolbar-inner {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .toolbar-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .page-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mode-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .mode-badge.working {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .chip-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip-btn:hover {
+      background: #e2e8f0;
+    }
+    .chip-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+    .chip-btn.sched-w2l.active {
+      background: #7c3aed;
+      border-color: #7c3aed;
+    }
+    .chip-btn.sched-l2w.active {
+      background: #0d9488;
+      border-color: #0d9488;
+    }
+    .chip-btn.sched-hl.active {
+      background: #db2777;
+      border-color: #db2777;
+    }
+    .chip-btn.sched-hol.active {
+      background: #d97706;
+      border-color: #d97706;
+    }
+    .filter-input, .filter-select {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #ffffff;
+      color: #0f172a;
+    }
+    .stats-bar {
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }
+    .sheet-container {
+      max-width: 1600px;
+      margin: 14px auto 24px;
+      padding: 0 16px;
+    }
+    .table-scroll {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 185px);
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    }
+    table.oudia-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      width: max-content;
+      min-width: 100%;
+    }
+    table.oudia-table th,
+    table.oudia-table td {
+      border-right: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 4px 7px;
+      text-align: center;
+      white-space: nowrap;
+      background: #ffffff;
+    }
+    /* 左側固定欄 (車站名 + 着/発/番線) */
+    table.oudia-table th.st-col,
+    table.oudia-table td.st-col {
+      position: sticky;
+      left: 0;
+      z-index: 15;
+      min-width: 118px;
+      text-align: left;
+      font-weight: 700;
+      background: #f8fafc;
+      color: #1e293b;
+      border-right: 1px solid #cbd5e1;
+    }
+    table.oudia-table th.sub-col,
+    table.oudia-table td.sub-col {
+      position: sticky;
+      left: 118px;
+      z-index: 15;
+      min-width: 44px;
+      font-weight: 600;
+      background: #f8fafc;
+      color: #64748b;
+      border-right: 2px solid #94a3b8;
+    }
+    /* 頂端固定車次表頭 */
+    table.oudia-table thead th {
+      position: sticky;
+      z-index: 20;
+      background: #f8fafc;
+    }
+    table.oudia-table thead tr.row-num th { top: 0; height: 28px; font-weight: 800; color: #0f172a; }
+    table.oudia-table thead tr.row-type th { top: 28px; height: 26px; font-weight: 700; }
+    table.oudia-table thead tr.row-op th { top: 54px; height: 24px; font-size: 11px; color: #475569; background: #f1f5f9; }
+    table.oudia-table thead tr.row-note th { top: 78px; height: 22px; font-size: 10px; color: #0f766e; background: #f0fdfa; }
+
+    table.oudia-table thead th.st-col,
+    table.oudia-table thead th.sub-col {
+      z-index: 30;
+    }
+    table.oudia-table tr.depot-row td {
+      background: #f8fafc;
+      color: #475569;
+    }
+    table.oudia-table tr.arr-row td:not(.st-col):not(.sub-col) {
+      color: #334155;
+      border-bottom-style: dashed;
+    }
+    table.oudia-table tr.plat-row td:not(.st-col):not(.sub-col) {
+      font-size: 11px;
+      color: #0369a1;
+      background: #f8fafc;
+    }
+    table.oudia-table tr.opnote-row td:not(.st-col):not(.sub-col) {
+      font-size: 11px;
+      color: #b45309;
+      background: #fffbeb;
+    }
+    table.oudia-table tr.station-end td {
+      border-bottom: 2px solid #cbd5e1;
+    }
+    .type-pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .t-local { background: #008080; }
+    .t-commuter { background: #006400; }
+    .t-express { background: #0080FF; }
+    .t-special { background: #d97706; }
+    .t-deadhead { background: #64748b; }
+
+    .cell-pass-arrow { color: #94a3b8; font-weight: 700; }
+    .cell-pass-time { color: #64748b; font-style: italic; }
+    .cell-empty { color: #cbd5e1; }
+    .cell-stop { font-weight: 700; color: #0f172a; }
+    .col-highlight { background: #fef9c3 !important; }
+    .conn-tag {
+      display: inline-block;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      background: #ccfbf1;
+      color: #0f766e;
+    }
+    .conn-tag.w2l {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    @media print {
+      .sheet-toolbar { display: none; }
+      .table-scroll { max-height: none; overflow: visible; border: none; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="sheet-toolbar">
+  <div class="sheet-toolbar-inner">
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <h1 class="page-title">
+          <span id="titleText">飛灣線時刻表</span>
+          <span id="modeBadge" class="mode-badge">旅客時刻表</span>
+        </h1>
+      </div>
+      <div class="toolbar-group">
+        <button class="chip-btn" id="btnModePassenger" onclick="setMode('passenger')">旅客時刻表</button>
+        <button class="chip-btn" id="btnModeWorking" onclick="setMode('working')">運轉（作業）時刻表</button>
+        <a href="diagram.html" target="_blank" rel="noopener noreferrer" class="chip-btn" style="text-decoration:none;">列車運行圖 ↗</a>
+        <button class="chip-btn" onclick="window.print()">列印 / 另存 PDF</button>
+      </div>
+    </div>
+
+    <div class="toolbar-row">
+      <div class="toolbar-group" id="schedButtons">
+        <span style="font-size:12px;font-weight:700;color:#475569;">時刻表：</span>
+        <button class="chip-btn active" data-sched="weekday" onclick="setSched('weekday')">平日</button>
+        <button class="chip-btn sched-hol" data-sched="holiday" onclick="setSched('holiday')">假日</button>
+        <button class="chip-btn sched-hl" data-sched="holiday_long" onclick="setSched('holiday_long')">連續假日</button>
+        <button class="chip-btn sched-w2l" data-sched="weekday_to_long" onclick="setSched('weekday_to_long')">平日接連假</button>
+        <button class="chip-btn sched-l2w" data-sched="long_to_weekday" onclick="setSched('long_to_weekday')">連假接平日</button>
+      </div>
+
+      <div class="toolbar-group">
+        <span style="font-size:12px;font-weight:700;color:#475569;">方向：</span>
+        <button class="chip-btn" id="btnDirDown" onclick="setDir('down')">下行（往 全京大道）</button>
+        <button class="chip-btn" id="btnDirUp" onclick="setDir('up')">上行（往 飛灣工業區）</button>
+      </div>
+    </div>
+
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <select id="filterType" class="filter-select" onchange="renderTable()">
+          <option value="all">車種：全部</option>
+          <option value="普通">普通</option>
+          <option value="通勤">通勤</option>
+          <option value="快速">快速</option>
+          <option value="特別快速">特別快速</option>
+          <option value="回送" id="optDeadhead">回送</option>
+        </select>
+        <select id="filterTime" class="filter-select" onchange="renderTable()">
+          <option value="all">時段：全天</option>
+          <option value="00-06">凌晨 00:00–05:59</option>
+          <option value="06-12">上午 06:00–11:59</option>
+          <option value="12-18">下午 12:00–17:59</option>
+          <option value="18-24">晚間 18:00–23:59</option>
+          <option value="24-28">跨夜 24:00–27:59</option>
+        </select>
+        <input type="text" id="searchInput" class="filter-input" placeholder="搜尋車次 / 運用番号..." oninput="renderTable()" style="width:170px;">
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;" id="secToggleWrap">
+          <input type="checkbox" id="chkShowSeconds" onchange="renderTable()"> 顯示秒數
+        </label>
+      </div>
+      <div class="stats-bar" id="statsBar">載入中...</div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-container">
+  <div class="table-scroll" id="tableScroll">
+    <table class="oudia-table" id="oudiaTable"></table>
+  </div>
+</div>
+
+<script>
+const STATION_ORDER_DOWN = [
+  '飛灣工業區', '飛灣車輛基地', '飛灣港', '物流中心', '飛灣郵輪港',
+  '濱江商務區', '市民廣場', '文化中心', '飛灣新站', '科創園', '飛灣學區',
+  '飛灣大道', '飛灣公園', '錦湖', '鷺島', '空港新城', '飛灣機場',
+  '翡翠花園', '紫荊苑', '御景新村', '自然保育中心', '綾路北站', '全京大道', '全京車輛基地'
+];
+const PASSENGER_STATION_ORDER_DOWN = STATION_ORDER_DOWN.filter(n => !n.includes('車輛基地'));
+
+const SCHED_LABEL = {
+  weekday: '平日',
+  holiday: '假日',
+  holiday_long: '連續假日',
+  weekday_to_long: '平日接連假',
+  long_to_weekday: '連假接平日'
+};
+
+const params = new URLSearchParams(window.location.search);
+let currentMode = (params.get('mode') === 'working') ? 'working' : 'passenger';
+let currentDir = (params.get('dir') === 'up') ? 'up' : 'down';
+let currentSched = SCHED_LABEL[params.get('sched')] ? params.get('sched') : 'weekday';
+let highlightedCol = null;
+
+const parsedBySched = {};
+
+function ouDiaTimeToSec(timeStr) {
+  if (!timeStr) return null;
+  let clean = String(timeStr).replace(/[^\d]/g, '');
+  if (!clean) return null;
+  if (clean.length <= 2) return null;
+  if (clean.length <= 4) clean = clean.padStart(4, '0') + '00';
+  else if (clean.length === 5) clean = '0' + clean;
+  else if (clean.length > 6) clean = clean.slice(0, 6);
+  const h = parseInt(clean.slice(0, 2), 10) || 0;
+  const m = parseInt(clean.slice(2, 4), 10) || 0;
+  const s = parseInt(clean.slice(4, 6), 10) || 0;
+  return h * 3600 + m * 60 + s;
+}
+
+function formatSec(sec, showSeconds) {
+  if (sec == null || isNaN(sec)) return '';
+  let s = Math.floor(sec);
+  let h = Math.floor(s / 3600);
+  let rem = s % 3600;
+  if (rem < 0) rem += 3600;
+  let m = Math.floor(rem / 60);
+  let ss = rem % 60;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  if (!showSeconds) return `${hh}:${mm}`;
+  return `${hh}:${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+function classifyOuDiaCell(rawCell) {
+  if (!rawCell) return { kind: 'empty', time: '', raw: '' };
+  const s = String(rawCell).trim();
+  if (!s) return { kind: 'empty', time: '', raw: '' };
+  if (['ﾚ', '↓', '↑', '⇡', '⇓', '⇑', '｜', '|'].includes(s)) {
+    return { kind: 'pass_arrow', time: '', raw: s };
+  }
+  const digits = s.replace(/[^\d]/g, '');
+  if (digits.length >= 3 && digits.length <= 6) {
+    if (s.includes('?') || s.includes('？')) return { kind: 'pass_time', time: digits, raw: s };
+    return { kind: 'stop', time: digits, raw: s };
+  }
+  return { kind: 'empty', time: '', raw: s };
+}
+
+function parseWorkingCSV(csvText, direction, schedType) {
+  if (!csvText) return [];
+  const rawLines = csvText.split(/\r?\n/);
+  const parsedRows = rawLines.map(l => l.split(',').map(c => c.trim()));
+  let trainNumRow = -1, trainTypeRow = -1, opNumRow = -1;
+  let startOpRow = -1, endOpRow = -1;
+  const rowEntries = [];
+
+  const skipNames = new Set([
+    'FileType', '時刻表', '假日時刻表', '連續假日時刻表',
+    '連続假日接平日時刻表', '連續假日接平日時刻表', '連假接平日時刻表',
+    '平日接連続假日時刻表', '平日接連續假日時刻表', '平日接連假時刻表',
+    '上り', '下り', '運用番号', '列車名', '号数', '備考',
+    '終着駅', '始發駅', '始発駅', '始劃駅', '列車番号', '列車種別'
+  ]);
+
+  for (let i = 0; i < parsedRows.length; i++) {
+    const row = parsedRows[i];
+    const name = row[0] || '';
+    const sub = row[1] || '';
+    if (name === '列車番号') trainNumRow = i;
+    else if (name === '列車種別') trainTypeRow = i;
+    else if (name === '運用番号') opNumRow = i;
+    else if (name === '始発駅作業' || name === '始發駅作業') startOpRow = i;
+    else if (name === '終着駅作業') endOpRow = i;
+    else if (sub.includes('番線') || name.includes('番線')) {
+      rowEntries.push({ rIdx: i, stName: name.replace('番線', '').replace(/(着|発)$/, '').trim(), subType: 'plat' });
+    } else if (name && !skipNames.has(name) && !name.includes('作業')) {
+      const cleanName = name.replace(/(着|発)$/, '').trim();
+      const subType = (sub === '着' || name.endsWith('着')) ? 'arr' : 'dep';
+      rowEntries.push({ rIdx: i, stName: cleanName, subType });
+    }
+  }
+
+  if (trainNumRow === -1) return [];
+  const colCount = Math.max(
+    parsedRows[trainNumRow].length,
+    trainTypeRow >= 0 ? parsedRows[trainTypeRow].length : 0,
+    opNumRow >= 0 ? parsedRows[opNumRow].length : 0
+  );
+  const fullOrder = (direction === 'down') ? STATION_ORDER_DOWN : [...STATION_ORDER_DOWN].reverse();
+  const results = [];
+
+  for (let col = 2; col < colCount; col++) {
+    const num = (parsedRows[trainNumRow][col] || '').trim();
+    const rawType = (trainTypeRow >= 0 ? parsedRows[trainTypeRow][col] : '') || '';
+    const opNum = (opNumRow >= 0 ? parsedRows[opNumRow][col] : '') || '';
+    if (!num && !rawType && !opNum) continue;
+    let type = rawType || '普通';
+    if (type === '特快') type = '特別快速';
+
+    const startOp = (startOpRow >= 0 ? parsedRows[startOpRow][col] : '') || '';
+    const endOp = (endOpRow >= 0 ? parsedRows[endOpRow][col] : '') || '';
+
+    const stops = {};
+    for (const entry of rowEntries) {
+      const val = (parsedRows[entry.rIdx] && parsedRows[entry.rIdx][col]) || '';
+      if (!val) continue;
+      if (!stops[entry.stName]) {
+        stops[entry.stName] = { name: entry.stName, status: 'none', arrSec: null, depSec: null, plat: '' };
+      }
+      const st = stops[entry.stName];
+      if (entry.subType === 'plat') {
+        st.plat = val;
+      } else {
+        const cl = classifyOuDiaCell(val);
+        const sec = ouDiaTimeToSec(cl.time);
+        if (cl.kind === 'stop') {
+          st.status = 'stop';
+          if (entry.subType === 'arr') st.arrSec = sec;
+          else st.depSec = sec;
+        } else if (cl.kind === 'pass_time') {
+          if (st.status !== 'stop') {
+            st.status = 'pass_time';
+            st.depSec = sec;
+          }
+        } else if (cl.kind === 'pass_arrow') {
+          if (st.status === 'none') st.status = 'pass_arrow';
+        }
+      }
+    }
+
+    let prevSec = null;
+    let firstStation = '', lastStation = '', firstSec = null, lastSec = null;
+    let firstPassSt = '', firstPassSec = null;
+    for (const sName of fullOrder) {
+      const s = stops[sName];
+      if (!s) continue;
+      if (s.arrSec != null) {
+        while (prevSec != null && s.arrSec < prevSec) s.arrSec += 86400;
+        prevSec = s.arrSec;
+      }
+      if (s.depSec != null) {
+        while (prevSec != null && s.depSec < prevSec) s.depSec += 86400;
+        prevSec = s.depSec;
+      }
+      if (s.status === 'stop' && (s.depSec != null || s.arrSec != null)) {
+        if (!firstStation) {
+          firstStation = sName;
+          firstSec = s.depSec != null ? s.depSec : s.arrSec;
+        }
+        lastStation = sName;
+        lastSec = s.arrSec != null ? s.arrSec : s.depSec;
+      }
+      if (!firstPassSt && (s.depSec != null || s.arrSec != null)) {
+        firstPassSt = sName;
+        firstPassSec = s.depSec != null ? s.depSec : s.arrSec;
+      }
+    }
+
+    if (!firstStation && firstPassSt) {
+      firstStation = firstPassSt;
+      firstSec = firstPassSec;
+      lastStation = firstPassSt;
+      lastSec = firstPassSec;
+    }
+    if (firstSec == null) continue;
+
+    // 計算「旅客起訖」（不含車輛基地），供銜接列車比對使用
+    let paxOrigin = '', paxFirstSec = null;
+    for (const sName of fullOrder) {
+      if (sName.includes('車輛基地')) continue;
+      const s = stops[sName];
+      if (s && s.status === 'stop' && (s.depSec != null || s.arrSec != null)) {
+        paxOrigin = sName;
+        paxFirstSec = s.depSec != null ? s.depSec : s.arrSec;
+        break;
+      }
+    }
+
+    let isPostMidnight = false;
+    if (schedType !== 'holiday_long' && firstSec < 4 * 3600) {
+      isPostMidnight = true;
+      firstSec += 86400;
+      if (lastSec != null) lastSec += 86400;
+      if (paxFirstSec != null) paxFirstSec += 86400;
+      for (const sName of fullOrder) {
+        const s = stops[sName];
+        if (!s) continue;
+        if (s.arrSec != null) s.arrSec += 86400;
+        if (s.depSec != null) s.depSec += 86400;
+      }
+    }
+
+    results.push({
+      num,
+      isTransitionTrain: !num,
+      type, opNum, startOp, endOp,
+      direction, schedType,
+      origin: firstStation, dest: lastStation,
+      paxOrigin: paxOrigin || firstStation,
+      paxFirstSec: paxFirstSec != null ? paxFirstSec : firstSec,
+      startSec: firstSec, endSec: lastSec,
+      isPostMidnight,
+      connectBadge: '',
+      stops
+    });
+  }
+
+  results.sort((a, b) => a.startSec - b.startSec);
+  return results;
+}
+
+function getTrainMatchKey(t) {
+  const orig = t.paxOrigin || t.origin || '';
+  const sec = t.paxFirstSec != null ? t.paxFirstSec : t.startSec;
+  return `${orig}|${((sec % 86400) + 86400) % 86400}`;
+}
+
+function resolveAllTransitions() {
+  for (const sched of ['weekday_to_long', 'long_to_weekday']) {
+    for (const dir of ['up', 'down']) {
+      const list = parsedBySched[sched] && parsedBySched[sched][dir];
+      const hlList = parsedBySched.holiday_long && parsedBySched.holiday_long[dir];
+      if (!list || !hlList) continue;
+      const hlMap = new Map();
+      for (const h of hlList) {
+        const k = getTrainMatchKey(h);
+        if (!hlMap.has(k)) hlMap.set(k, h);
+      }
+      const badge = (sched === 'weekday_to_long') ? '跨日接連假' : '連假跨日銜接';
+      for (const t of list) {
+        if (!t.num || t.isTransitionTrain) {
+          const m = hlMap.get(getTrainMatchKey(t));
+          if (m && m.num) {
+            t.num = m.num;
+            if (!t.connectBadge) t.connectBadge = badge;
+          }
+        }
+      }
+    }
+  }
+}
+
+function cloneTrainWithShift(t, shiftSec, badge) {
+  const newStops = {};
+  for (const k in t.stops) {
+    const s = t.stops[k];
+    newStops[k] = {
+      ...s,
+      arrSec: s.arrSec != null ? s.arrSec + shiftSec : null,
+      depSec: s.depSec != null ? s.depSec + shiftSec : null
+    };
+  }
+  return {
+    ...t,
+    startSec: t.startSec + shiftSec,
+    endSec: t.endSec != null ? t.endSec + shiftSec : null,
+    paxFirstSec: t.paxFirstSec != null ? t.paxFirstSec + shiftSec : null,
+    connectBadge: badge,
+    stops: newStops
+  };
+}
+
+function getEffectiveTrains(schedType, direction) {
+  const base = (parsedBySched[schedType] && parsedBySched[schedType][direction]) || [];
+  const hl = (parsedBySched.holiday_long && parsedBySched.holiday_long[direction]) || [];
+  if (schedType !== 'weekday_to_long' && schedType !== 'long_to_weekday') return base;
+
+  const seenKeys = new Set(base.map(getTrainMatchKey));
+  const combined = base.map(t => ({ ...t }));
+
+  if (schedType === 'long_to_weekday') {
+    for (const h of hl) {
+      if (h.startSec >= 0 && h.startSec < 5 * 3600 + 50 * 60) {
+        const k = getTrainMatchKey(h);
+        if (seenKeys.has(k)) continue;
+        seenKeys.add(k);
+        combined.push(cloneTrainWithShift(h, 0, '連假跨日銜接'));
+      }
+    }
+  } else if (schedType === 'weekday_to_long') {
+    for (const h of hl) {
+      if (h.startSec >= 0 && h.startSec < 4 * 3600) {
+        const k = getTrainMatchKey(h);
+        if (seenKeys.has(k)) continue;
+        seenKeys.add(k);
+        combined.push(cloneTrainWithShift(h, 86400, '跨日接連假'));
+      }
+    }
+  }
+
+  combined.sort((a, b) => a.startSec - b.startSec);
+  return combined;
+}
+
+function getTypeClass(type) {
+  if (type === '回送') return 't-deadhead';
+  if (type.includes('特')) return 't-special';
+  if (type.includes('快') && !type.includes('通勤')) return 't-express';
+  if (type.includes('通勤')) return 't-commuter';
+  return 't-local';
+}
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('chkShowSeconds').checked = (m === 'working');
+  updateUrl();
+  renderTable();
+}
+
+function setSched(s) {
+  currentSched = s;
+  updateUrl();
+  renderTable();
+}
+
+function setDir(d) {
+  currentDir = d;
+  updateUrl();
+  renderTable();
+}
+
+function updateUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', currentMode);
+  url.searchParams.set('dir', currentDir);
+  url.searchParams.set('sched', currentSched);
+  window.history.replaceState({}, '', url.toString());
+}
+
+function syncToolbarUI() {
+  document.getElementById('btnModePassenger').classList.toggle('active', currentMode === 'passenger');
+  document.getElementById('btnModeWorking').classList.toggle('active', currentMode === 'working');
+  document.getElementById('btnDirDown').classList.toggle('active', currentDir === 'down');
+  document.getElementById('btnDirUp').classList.toggle('active', currentDir === 'up');
+
+  document.querySelectorAll('#schedButtons .chip-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sched === currentSched);
+  });
+
+  const dirTxt = (currentDir === 'down') ? '下行' : '上行';
+  const modeTxt = (currentMode === 'working') ? '運轉（作業）時刻表' : '時刻表';
+  document.getElementById('titleText').textContent = `飛灣線 ${dirTxt}${modeTxt}`;
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = (currentMode === 'working') ? '作業模式（含回送 / 運用 / 番線）' : '旅客模式';
+  badge.classList.toggle('working', currentMode === 'working');
+  document.title = `飛灣線${dirTxt}${modeTxt}（${SCHED_LABEL[currentSched]}）｜飛灣鐵路公司`;
+
+  const deadOpt = document.getElementById('optDeadhead');
+  deadOpt.style.display = (currentMode === 'working') ? '' : 'none';
+  if (currentMode === 'passenger' && document.getElementById('filterType').value === '回送') {
+    document.getElementById('filterType').value = 'all';
+  }
+}
+
+function renderTable() {
+  syncToolbarUI();
+  const showSeconds = document.getElementById('chkShowSeconds').checked;
+  const fType = document.getElementById('filterType').value;
+  const fTime = document.getElementById('filterTime').value;
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let trains = getEffectiveTrains(currentSched, currentDir);
+  if (currentMode === 'passenger') {
+    trains = trains.filter(t => t.type !== '回送');
+  }
+  if (fType !== 'all') {
+    trains = trains.filter(t => t.type === fType);
+  }
+  if (fTime !== 'all') {
+    const [h1, h2] = fTime.split('-').map(Number);
+    trains = trains.filter(t => t.startSec >= h1 * 3600 && t.startSec < h2 * 3600);
+  }
+  if (query) {
+    trains = trains.filter(t =>
+      (t.num && t.num.toLowerCase().includes(query)) ||
+      (t.opNum && t.opNum.toLowerCase().includes(query))
+    );
+  }
+
+  document.getElementById('statsBar').innerHTML =
+    `<span>班表：<strong>${SCHED_LABEL[currentSched]}</strong></span>` +
+    `<span>方向：<strong>${currentDir === 'down' ? '下行（飛灣工業區 ➔ 全京大道）' : '上行（全京大道 ➔ 飛灣工業區）'}</strong></span>` +
+    `<span>顯示班次：<strong>${trains.length}</strong> 班</span>`;
+
+  const table = document.getElementById('oudiaTable');
+  if (trains.length === 0) {
+    table.innerHTML = '<tbody><tr><td style="padding:36px;color:#64748b;">無符合條件之車次</td></tr></tbody>';
+    return;
+  }
+
+  let html = '<thead>';
+  // Row 1: 列車番号
+  html += '<tr class="row-num"><th class="st-col">列車編號</th><th class="sub-col">車次</th>';
+  trains.forEach((t, idx) => {
+    const hlCls = (highlightedCol === idx) ? ' col-highlight' : '';
+    html += `<th class="${hlCls}" onclick="toggleHighlight(${idx})" style="cursor:pointer;">${t.num || '---'}</th>`;
+  });
+  html += '</tr>';
+
+  // Row 2: 種別
+  html += '<tr class="row-type"><th class="st-col">車種</th><th class="sub-col">種別</th>';
+  trains.forEach((t, idx) => {
+    const shortType = (t.type === '特別快速') ? '特快' : t.type;
+    html += `<th><span class="type-pill ${getTypeClass(t.type)}">${shortType}</span></th>`;
+  });
+  html += '</tr>';
+
+  // Row 3 (working): 運用番号
+  if (currentMode === 'working') {
+    html += '<tr class="row-op"><th class="st-col">運用編號</th><th class="sub-col">運用</th>';
+    trains.forEach(t => {
+      html += `<th>${t.opNum || ''}</th>`;
+    });
+    html += '</tr>';
+  }
+
+  // Row 4: 銜接標記
+  const hasAnyConn = trains.some(t => !!t.connectBadge);
+  if (hasAnyConn) {
+    html += '<tr class="row-note"><th class="st-col">銜接備註</th><th class="sub-col">跨日</th>';
+    trains.forEach(t => {
+      if (t.connectBadge) {
+        const cls = t.connectBadge.includes('接連假') ? 'conn-tag w2l' : 'conn-tag';
+        html += `<th><span class="${cls}">${t.connectBadge}</span></th>`;
+      } else {
+        html += '<th></th>';
+      }
+    });
+    html += '</tr>';
+  }
+  html += '</thead><tbody>';
+
+  // Working mode: 始發駅作業
+  if (currentMode === 'working') {
+    html += '<tr class="opnote-row"><td class="st-col">始發站作業</td><td class="sub-col">作業</td>';
+    trains.forEach(t => html += `<td>${t.startOp || ''}</td>`);
+    html += '</tr>';
+  }
+
+  const stList = (currentMode === 'working')
+    ? ((currentDir === 'down') ? STATION_ORDER_DOWN : [...STATION_ORDER_DOWN].reverse())
+    : ((currentDir === 'down') ? PASSENGER_STATION_ORDER_DOWN : [...PASSENGER_STATION_ORDER_DOWN].reverse());
+
+  // Determine which stations need arr/plat rows
+  for (let sIdx = 0; sIdx < stList.length; sIdx++) {
+    const stName = stList[sIdx];
+    const isDepot = stName.includes('車輛基地');
+    const rowBaseCls = isDepot ? 'depot-row' : '';
+    const hasAnyArr = trains.some(t => t.stops[stName] && t.stops[stName].arrSec != null);
+    const hasAnyPlat = (currentMode === 'working') && trains.some(t => t.stops[stName] && t.stops[stName].plat);
+
+    const subRows = [];
+    if (hasAnyArr) subRows.push('arr');
+    if (hasAnyPlat) subRows.push('plat');
+    subRows.push('dep');
+
+    subRows.forEach((sr, rPos) => {
+      const isLastSub = (rPos === subRows.length - 1);
+      const clsList = [rowBaseCls];
+      if (sr === 'arr') clsList.push('arr-row');
+      if (sr === 'plat') clsList.push('plat-row');
+      if (isLastSub) clsList.push('station-end');
+
+      html += `<tr class="${clsList.join(' ')}">`;
+      if (rPos === 0) {
+        html += `<td class="st-col" rowspan="${subRows.length}">${stName}</td>`;
+      }
+      const subLabel = sr === 'arr' ? '着' : (sr === 'plat' ? '番線' : '発');
+      html += `<td class="sub-col">${subLabel}</td>`;
+
+      trains.forEach((t, idx) => {
+        const hlCls = (highlightedCol === idx) ? ' col-highlight' : '';
+        const st = t.stops[stName];
+        if (!st) {
+          html += `<td class="cell-empty${hlCls}">..</td>`;
+          return;
+        }
+        if (sr === 'plat') {
+          html += `<td class="${hlCls}">${st.plat || ''}</td>`;
+          return;
+        }
+        if (sr === 'arr') {
+          if (st.arrSec != null) {
+            html += `<td class="cell-stop${hlCls}">${formatSec(st.arrSec, showSeconds)}</td>`;
+          } else {
+            html += `<td class="cell-empty${hlCls}"></td>`;
+          }
+          return;
+        }
+        // dep row
+        if (st.status === 'stop' && st.depSec != null) {
+          html += `<td class="cell-stop${hlCls}">${formatSec(st.depSec, showSeconds)}</td>`;
+        } else if (st.status === 'stop' && st.arrSec != null && !hasAnyArr) {
+          html += `<td class="cell-stop${hlCls}">${formatSec(st.arrSec, showSeconds)}</td>`;
+        } else if (st.status === 'pass_time' && st.depSec != null) {
+          if (currentMode === 'working') {
+            html += `<td class="cell-pass-time${hlCls}">${formatSec(st.depSec, showSeconds)}?</td>`;
+          } else {
+            html += `<td class="cell-pass-arrow${hlCls}">↓</td>`;
+          }
+        } else if (st.status === 'pass_arrow') {
+          html += `<td class="cell-pass-arrow${hlCls}">↓</td>`;
+        } else {
+          html += `<td class="cell-empty${hlCls}"></td>`;
+        }
+      });
+      html += '</tr>';
+    });
+  }
+
+  // Working mode: 終着駅作業
+  if (currentMode === 'working') {
+    html += '<tr class="opnote-row"><td class="st-col">終點站作業</td><td class="sub-col">作業</td>';
+    trains.forEach(t => html += `<td>${t.endOp || ''}</td>`);
+    html += '</tr>';
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function toggleHighlight(idx) {
+  highlightedCol = (highlightedCol === idx) ? null : idx;
+  renderTable();
+}
+
+(function init() {
+  const emb = window.EMBEDDED_TIMETABLE_CSVS || {};
+  const map = [
+    ['weekday', 'up', 'weekday_up'], ['weekday', 'down', 'weekday_down'],
+    ['holiday', 'up', 'holiday_up'], ['holiday', 'down', 'holiday_down'],
+    ['holiday_long', 'up', 'holiday_long_up'], ['holiday_long', 'down', 'holiday_long_down'],
+    ['weekday_to_long', 'up', 'weekday_to_long_up'], ['weekday_to_long', 'down', 'weekday_to_long_down'],
+    ['long_to_weekday', 'up', 'long_to_weekday_up'], ['long_to_weekday', 'down', 'long_to_weekday_down'],
+  ];
+  for (const [st, dir, k] of map) {
+    if (!parsedBySched[st]) parsedBySched[st] = { up: [], down: [] };
+    parsedBySched[st][dir] = parseWorkingCSV(emb[k] || '', dir, st);
+  }
+  resolveAllTransitions();
+  document.getElementById('chkShowSeconds').checked = (currentMode === 'working');
+  renderTable();
+})();
+</script>
+</body>
+</html>

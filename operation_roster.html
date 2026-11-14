@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>列車運用表｜飛灣鐵路公司</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="timetable_data.js"></script>
+  <style>
+    body { background: #f1f5f9; color: #0f172a; }
+    .roster-toolbar {
+      position: sticky; top: 0; z-index: 40;
+      background: #ffffff; border-bottom: 1px solid #cbd5e1;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      padding: 12px 20px;
+    }
+    .roster-toolbar-inner {
+      max-width: 1500px; margin: 0 auto;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .toolbar-row {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .page-title { margin: 0; font-size: 20px; font-weight: 800; color: #064663; display: flex; align-items: center; gap: 8px; }
+    .chip-btn {
+      padding: 6px 12px; border-radius: 8px; border: 1px solid #cbd5e1;
+      background: #f8fafc; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .chip-btn:hover { background: #e2e8f0; }
+    .chip-btn.active { background: #0284c7; color: #ffffff; border-color: #0284c7; }
+    .chip-btn.sched-hol.active { background: #d97706; border-color: #d97706; }
+    .chip-btn.sched-hl.active { background: #db2777; border-color: #db2777; }
+    .chip-btn.sched-w2l.active { background: #7c3aed; border-color: #7c3aed; }
+    .chip-btn.sched-l2w.active { background: #0d9488; border-color: #0d9488; }
+    .filter-input, .filter-select {
+      padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+      font-size: 13px; background: #ffffff; color: #0f172a;
+    }
+    .roster-container { max-width: 1500px; margin: 16px auto 32px; padding: 0 16px; }
+    .roster-card {
+      background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px;
+      margin-bottom: 14px; overflow: hidden; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    .roster-header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    }
+    .roster-id-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 16px; font-weight: 800; color: #0f172a;
+    }
+    .fleet-tag {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    }
+    .fleet-c { background: #dcfce7; color: #166534; }
+    .fleet-e { background: #dbeafe; color: #1e40af; }
+    .roster-summary { font-size: 13px; color: #475569; display: flex; flex-wrap: wrap; gap: 14px; }
+    .legs-wrap {
+      padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    }
+    .leg-chip {
+      border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px;
+      background: #ffffff; font-size: 12px; line-height: 1.45; min-width: 175px;
+    }
+    .leg-chip.type-普通 { border-left: 4px solid #64748b; }
+    .leg-chip.type-通勤 { border-left: 4px solid #16a34a; }
+    .leg-chip.type-快速 { border-left: 4px solid #0284c7; }
+    .leg-chip.type-特別快速 { border-left: 4px solid #dc2626; }
+    .leg-chip.type-回送 { border-left: 4px solid #9333ea; background: #faf5ff; }
+    .leg-top { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
+    .leg-route { color: #334155; margin-top: 2px; }
+    .leg-arrow { color: #94a3b8; font-weight: 700; }
+    @media print {
+      .roster-toolbar { display: none; }
+      .roster-card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="roster-toolbar">
+  <div class="roster-toolbar-inner">
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <h1 class="page-title">🚆 飛灣線列車運用表（CSV 即時合成）</h1>
+      </div>
+      <div class="toolbar-group">
+        <a href="extras.html" class="chip-btn" style="text-decoration:none;">← 返回其他資料</a>
+        <a href="timetable_sheet.html?mode=working" target="_blank" rel="noopener noreferrer" class="chip-btn" style="text-decoration:none;">運轉時刻表 ↗</a>
+        <button class="chip-btn" onclick="window.print()">列印 / 另存 PDF</button>
+      </div>
+    </div>
+
+    <div class="toolbar-row">
+      <div class="toolbar-group" id="schedButtons">
+        <span style="font-size:12px;font-weight:700;color:#475569;">時刻表別：</span>
+        <button class="chip-btn active" data-sched="weekday" onclick="setSched('weekday')">平日</button>
+        <button class="chip-btn sched-hol" data-sched="holiday" onclick="setSched('holiday')">假日</button>
+        <button class="chip-btn sched-hl" data-sched="holiday_long" onclick="setSched('holiday_long')">連續假日</button>
+        <button class="chip-btn sched-w2l" data-sched="weekday_to_long" onclick="setSched('weekday_to_long')">平日接連假</button>
+        <button class="chip-btn sched-l2w" data-sched="long_to_weekday" onclick="setSched('long_to_weekday')">連假接平日</button>
+      </div>
+      <div class="toolbar-group">
+        <select id="filterFleet" class="filter-select" onchange="renderRosters()">
+          <option value="all">編組：全部運用</option>
+          <option value="C">C 編組 (4輛・普通/通勤)</option>
+          <option value="E">E 編組 (6輛・快速/特快)</option>
+        </select>
+        <input type="text" id="searchInput" class="filter-input" placeholder="搜尋運用番號 / 車次 / 站名..." oninput="renderRosters()" style="width:210px;">
+        <span id="statsBar" style="font-size:12px;color:#475569;font-weight:600;">載入中...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="roster-container" id="rosterContainer">
+  <p style="color:#64748b;">正在解析時刻表 CSV 產生運用表...</p>
+</div>
+
+<script>
+const STATION_DIST_KM = {
+  '飛灣工業區': 0.0, '飛灣車輛基地': 1.0, '飛車': 1.0,
+  '飛灣港': 7.3, '物流中心': 8.6, '飛灣郵輪港': 9.8,
+  '濱江商務區': 17.0, '市民廣場': 18.5, '文化中心': 19.8,
+  '飛灣新站': 21.7, '科創園': 24.0, '飛灣學區': 25.2,
+  '飛灣大道': 26.9, '飛灣公園': 28.5, '錦湖': 29.9,
+  '鷺島': 30.4, '空港新城': 33.2, '飛灣機場': 38.1,
+  '翡翠花園': 43.3, '紫荊苑': 46.5, '御景新村': 54.7,
+  '自然保育中心': 56.1, '綾路北站': 57.9, '全京大道': 59.1,
+  '全京車輛基地': 60.0, '全車': 60.0
+};
+
+const SCHED_META = {
+  weekday: { upKey: 'weekday_up', downKey: 'weekday_down', label: '平日' },
+  holiday: { upKey: 'holiday_up', downKey: 'holiday_down', label: '假日' },
+  holiday_long: { upKey: 'holiday_long_up', downKey: 'holiday_long_down', label: '連續假日' },
+  weekday_to_long: { upKey: 'weekday_to_long_up', downKey: 'weekday_to_long_down', label: '平日接連假' },
+  long_to_weekday: { upKey: 'long_to_weekday_up', downKey: 'long_to_weekday_down', label: '連假接平日' }
+};
+
+let currentSched = 'weekday';
+let rostersBySched = {};
+
+function parseOuDiaTime(str) {
+  if (!str) return null;
+  let clean = str.trim().replace(/\?$/, '');
+  if (!clean || clean === 'ﾚ' || clean === 'レ' || clean === '||' || clean === '＝') return null;
+  let m = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) {
+    return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + (m[3] ? parseInt(m[3], 10) : 0);
+  }
+  if (/^\d{5,6}$/.test(clean)) {
+    const raw = clean.padStart(6, '0');
+    const h = parseInt(raw.slice(0, 2), 10);
+    const min = parseInt(raw.slice(2, 4), 10);
+    const sec = parseInt(raw.slice(4, 6), 10);
+    return h * 3600 + min * 60 + sec;
+  }
+  if (/^\d{3,4}$/.test(clean)) {
+    const raw = clean.padStart(4, '0');
+    return parseInt(raw.slice(0, 2), 10) * 3600 + parseInt(raw.slice(2, 4), 10) * 60;
+  }
+  return null;
+}
+
+function fmtSec(sec) {
+  if (sec === null || sec === undefined) return '--:--';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function parseCSVTrains(csvText, dir, sched) {
+  if (!csvText) return [];
+  const lines = csvText.replace(/^\uFEFF/, '').split(/\r?\n/);
+  let headerRow = -1, typeRow = -1, unyouRow = -1;
+  for (let i = 0; i < Math.min(20, lines.length); i++) {
+    const first = lines[i].split(',')[0].trim();
+    if (first === '列車番号') headerRow = i;
+    if (first === '列車種別') typeRow = i;
+    if (first === '運用番号') unyouRow = i;
+  }
+  if (headerRow === -1 || unyouRow === -1) return [];
+
+  const headerCols = lines[headerRow].split(',');
+  const typeCols = typeRow !== -1 ? lines[typeRow].split(',') : [];
+  const unyouCols = lines[unyouRow].split(',');
+  const trains = {};
+  const colCount = Math.max(headerCols.length, typeCols.length, unyouCols.length);
+
+  for (let c = 2; c < colCount; c++) {
+    const id = (headerCols[c] || '').trim();
+    const unyou = (unyouCols[c] || '').trim();
+    const type = (typeCols[c] || '普通').trim() || '普通';
+    if (!unyou) continue;
+    trains[c] = {
+      id: id || '(接續)',
+      unyou,
+      type,
+      dir,
+      firstSec: null,
+      lastSec: -1,
+      origin: '',
+      dest: ''
+    };
+  }
+
+  const metaNames = new Set([
+    'FileType', '時刻表', '上り', '下り', '下行', '上行', '駅名',
+    '列車番号', '列車種別', '運用番号', '列車名', '号数', '備考',
+    '終着駅', '始発駅作業', '終着駅作業',
+    '平日時刻表', '休日時刻表', '連續假日時刻表', '連続假日時刻表',
+    '平日接連續假日時刻表', '平日接連続假日時刻表',
+    '連續假日接平日時刻表', '連続假日接平日時刻表'
+  ]);
+
+  const startRow = Math.max(headerRow, typeRow, unyouRow) + 1;
+  for (let i = startRow; i < lines.length; i++) {
+    const row = lines[i].split(',');
+    if (row.length < 2) continue;
+    const stName = row[0].trim();
+    const action = (row[1] || '').trim();
+    if (!stName || metaNames.has(stName) || stName.includes('番線') || stName.includes('作業')) continue;
+    if (action && action !== '着' && action !== '発') continue;
+
+    Object.keys(trains).forEach(c => {
+      const secRaw = parseOuDiaTime(row[c]);
+      if (secRaw === null) return;
+      const tr = trains[c];
+      let sec = secRaw;
+      while (tr.lastSec !== -1 && sec < tr.lastSec) sec += 86400;
+      if (tr.firstSec === null) {
+        tr.firstSec = sec;
+        tr.origin = stName;
+      }
+      tr.lastSec = sec;
+      tr.dest = stName;
+    });
+  }
+
+  const list = Object.values(trains).filter(t => t.firstSec !== null);
+  if (sched !== 'holiday_long') {
+    list.forEach(t => {
+      if (t.firstSec < 4 * 3600) {
+        t.firstSec += 86400;
+        t.lastSec += 86400;
+      }
+    });
+  }
+  return list;
+}
+
+function buildRosters(sched) {
+  if (rostersBySched[sched]) return rostersBySched[sched];
+  const meta = SCHED_META[sched];
+  const csvs = window.EMBEDDED_TIMETABLE_CSVS || {};
+  const upTrains = parseCSVTrains(csvs[meta.upKey], '上行', sched);
+  const downTrains = parseCSVTrains(csvs[meta.downKey], '下行', sched);
+  const all = [...downTrains, ...upTrains];
+
+  const map = new Map();
+  all.forEach(t => {
+    if (!map.has(t.unyou)) map.set(t.unyou, []);
+    map.get(t.unyou).push(t);
+  });
+
+  const rosters = Array.from(map.entries()).map(([unyou, legs]) => {
+    legs.sort((a, b) => a.firstSec - b.firstSec);
+    let totalKm = 0;
+    legs.forEach(l => {
+      const k1 = STATION_DIST_KM[l.origin];
+      const k2 = STATION_DIST_KM[l.dest];
+      if (k1 !== undefined && k2 !== undefined) {
+        l.km = Math.abs(k2 - k1);
+        totalKm += l.km;
+      } else {
+        l.km = 0;
+      }
+    });
+    return {
+      unyou,
+      fleet: unyou.startsWith('E') ? 'E' : 'C',
+      legs,
+      startStation: legs[0].origin,
+      startTime: legs[0].firstSec,
+      endStation: legs[legs.length - 1].dest,
+      endTime: legs[legs.length - 1].lastSec,
+      totalKm
+    };
+  });
+
+  rosters.sort((a, b) => a.unyou.localeCompare(b.unyou, 'en', { numeric: true }));
+  rostersBySched[sched] = rosters;
+  return rosters;
+}
+
+function setSched(sched) {
+  currentSched = sched;
+  document.querySelectorAll('#schedButtons .chip-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sched === sched);
+  });
+  renderRosters();
+}
+
+function renderRosters() {
+  const container = document.getElementById('rosterContainer');
+  const fleetFilter = document.getElementById('filterFleet').value;
+  const kw = document.getElementById('searchInput').value.trim().toLowerCase();
+  const rosters = buildRosters(currentSched);
+
+  const filtered = rosters.filter(r => {
+    if (fleetFilter !== 'all' && r.fleet !== fleetFilter) return false;
+    if (!kw) return true;
+    if (r.unyou.toLowerCase().includes(kw)) return true;
+    return r.legs.some(l =>
+      l.id.toLowerCase().includes(kw) ||
+      l.origin.toLowerCase().includes(kw) ||
+      l.dest.toLowerCase().includes(kw) ||
+      l.type.toLowerCase().includes(kw)
+    );
+  });
+
+  document.getElementById('statsBar').textContent =
+    `${SCHED_META[currentSched].label}｜共 ${filtered.length} 組運用 / ${filtered.reduce((s, r) => s + r.legs.length, 0)} 趟次`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p style="color:#64748b;">查無符合條件的列車運用資料。</p>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(r => {
+    const fleetLabel = r.fleet === 'E' ? 'E 編組・6輛快速' : 'C 編組・4輛通勤';
+    const fleetCls = r.fleet === 'E' ? 'fleet-e' : 'fleet-c';
+    const legsHtml = r.legs.map((l, idx) => `
+      <div class="leg-chip type-${l.type}">
+        <div class="leg-top">
+          <span>${l.id}次 (${l.type})</span>
+          <span style="color:#64748b;">${l.dir}</span>
+        </div>
+        <div class="leg-route">
+          ${l.origin} ${fmtSec(l.firstSec)} ➔ ${l.dest} ${fmtSec(l.lastSec)}
+        </div>
+      </div>
+      ${idx < r.legs.length - 1 ? '<span class="leg-arrow">➔</span>' : ''}
+    `).join('');
+
+    return `
+      <article class="roster-card">
+        <div class="roster-header">
+          <div class="roster-id-badge">
+            <span>運用番號：${r.unyou}</span>
+            <span class="fleet-tag ${fleetCls}">${fleetLabel}</span>
+          </div>
+          <div class="roster-summary">
+            <span><strong>出庫／始發：</strong>${r.startStation} (${fmtSec(r.startTime)})</span>
+            <span><strong>入庫／終着：</strong>${r.endStation} (${fmtSec(r.endTime)})</span>
+            <span><strong>運用車次：</strong>${r.legs.length} 趟</span>
+            <span><strong>合計里程：</strong>${r.totalKm.toFixed(1)} km</span>
+          </div>
+        </div>
+        <div class="legs-wrap">${legsHtml}</div>
+      </article>
+    `;
+  }).join('');
+}
+
+window.addEventListener('load', renderRosters);
+</script>
+</body>
+</html>

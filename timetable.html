@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+
+  <meta charset="UTF-8">
+  <title>時刻表｜飛灣鐵路公司</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="papaparse.min.js"></script>
+  <!-- 內嵌飛灣鐵路 10 份官方運轉時刻表 CSV 資料 -->
+  <script src="timetable_data.js"></script>
+  <style>
+    /* 現代化查詢介面與標籤樣式 */
+    .tab-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .tab-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .tab-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .sched-type-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .sched-chip-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      font-size: 12px;
+      font-weight: bold;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sched-chip-btn.active {
+      background: #0f172a;
+      color: #fff;
+      border-color: #0f172a;
+    }
+    .sched-chip-btn.holiday_long.active {
+      background: #db2777;
+      border-color: #db2777;
+    }
+    .sched-chip-btn.holiday.active {
+      background: #d97706;
+      border-color: #d97706;
+    }
+    .sched-chip-btn.weekday.active {
+      background: #0284c7;
+      border-color: #0284c7;
+    }
+    .sched-chip-btn.weekday_to_long.active {
+      background: #7c3aed;
+      border-color: #7c3aed;
+    }
+    .sched-chip-btn.long_to_weekday.active {
+      background: #0d9488;
+      border-color: #0d9488;
+    }
+    .cross-day-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 4px;
+    }
+    .connect-badge {
+      display: inline-block;
+      background: #ede9fe;
+      color: #6d28d9;
+      border: 1px solid #ddd6fe;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 4px;
+    }
+    .calendar-badge-bar {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #0369a1;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      align-items: flex-end;
+    }
+    .form-col {
+      flex: 1;
+    }
+    .form-col label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .swap-btn {
+      padding: 10px 14px;
+      background: #e2e8f0;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #334155;
+      font-weight: bold;
+      transition: background 0.2s;
+      height: 42px;
+      margin-bottom: 15px;
+    }
+    .swap-btn:hover {
+      background: #cbd5e1;
+    }
+    .transfer-option-box {
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #334155;
+    }
+    .transfer-option-box input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .result-summary-bar {
+      background: #f1f5f9;
+      border-left: 4px solid #0284c7;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #1e293b;
+      font-weight: bold;
+      margin-bottom: 15px;
+      border-radius: 0 6px 6px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .plan-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+      transition: all 0.2s;
+    }
+    .plan-card:hover {
+      border-color: #38bdf8;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+    }
+    .plan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .plan-time-main {
+      font-size: 20px;
+      font-weight: bold;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .plan-duration {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: normal;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .tag-pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      display: inline-block;
+    }
+    /* 種別顏色統一使用 LIVE 中的標準配色 */
+    .tag-local { background-color: #008080; color: #ffffff; } /* 普通 */
+    .tag-rapid { background-color: #0080FF; color: #ffffff; } /* 快速 */
+    .tag-express { background-color: #eab308; color: #000000; font-weight: bold; } /* 特別快速 / 特快 */
+    .tag-commute { background-color: #006400; color: #ffffff; } /* 通勤 */
+    .tag-deadhead { background-color: #94a3b8; color: #ffffff; } /* 回送 */
+    
+    .transfer-badge {
+      background: #fef08a;
+      color: #854d0e;
+      border: 1px solid #facc15;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .direct-badge {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .transfer-step-box {
+      background: #f8fafc;
+      border-left: 3px solid #f59e0b;
+      padding: 8px 12px;
+      border-radius: 0 6px 6px 0;
+      margin: 8px 0;
+      font-size: 12px;
+      color: #475569;
+    }
+    .stop-detail-toggle {
+      background: none;
+      border: none;
+      color: #0284c7;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+      margin-top: 6px;
+    }
+    .train-vertical-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    .train-vertical-table th, .train-vertical-table td {
+      border: 1px solid #e2e8f0;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    .train-vertical-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: bold;
+    }
+    .train-vertical-table tr.stop-row {
+      background: #ffffff;
+      font-weight: bold;
+    }
+    .train-vertical-table tr.pass-row {
+      background: #f8fafc;
+      color: #94a3b8;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #64748b;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container navbar">
+    <div class="brand">
+      <span class="brand-subtitle">FLYWAN RAILWAY COMPANY</span>
+      <span class="brand-title">飛灣鐵路公司</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">首頁</a>
+      <a href="news.html">公告資訊</a>
+      <a href="stations.html">車站資訊</a>
+      <a href="timetable.html" class="active">時刻表</a>
+      <a href="tickets.html">票務資訊</a>
+      <a href="company.html">公司介紹</a>
+      <a href="extras.html">其他資料</a>
+      <a href="game.html" target="_blank" rel="noopener noreferrer">小遊戲</a>
+      <a href="contact.html">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <!-- 即時運行圖嵌入 -->
+  <section id="live-map-section" style="margin-bottom: 30px;">
+    <h2>列車即時運行狀態</h2>
+    <div style="width: 100%; height: 480px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+      <iframe 
+        src="live.html" 
+        style="width: 100%; height: 100%; border: none;"
+        title="飛灣鐵路即時動態">
+      </iframe>
+    </div>
+  </section>
+
+  <!-- 時刻表查詢主功能區 -->
+  <section style="margin-bottom: 40px;">
+    <h2>官方運轉時刻表查詢系統</h2>
+    <p>全線 10 大官方運轉時刻表（平日 / 假日 / 連續假日 / 平日接連假 / 連假接平日 × 上行 / 下行）完整收錄，支援起訖站乘車指南（含中途轉乘、跨日班次與班表銜接）、車次全線停靠表與車站發車表查詢。</p>
+
+    <div class="schedule-box">
+      <!-- 飛灣新曆法行事曆與自動時刻表提示列 -->
+      <div class="calendar-badge-bar">
+        <div>
+          <strong>📅 系統日期：</strong>
+          <span id="cal-info-text">正在讀取飛灣曆中...</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="cal-sched-badge" style="background:#0284c7; color:#fff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:12px;">平日時刻表</span>
+        </div>
+      </div>
+
+      <!-- 時刻表類型切換列 -->
+      <div style="margin-bottom: 15px;">
+        <label style="display:block; font-size:13px; font-weight:bold; color:#475569; margin-bottom:6px;">選擇適用時刻表：</label>
+        <div class="sched-type-selector">
+          <button type="button" class="sched-chip-btn active" id="btn-sched-auto" onclick="setScheduleType('auto')">⚡ 自動 (依今日行事曆)</button>
+          <button type="button" class="sched-chip-btn weekday" id="btn-sched-weekday" onclick="setScheduleType('weekday')">平日時刻表</button>
+          <button type="button" class="sched-chip-btn holiday" id="btn-sched-holiday" onclick="setScheduleType('holiday')">假日時刻表</button>
+          <button type="button" class="sched-chip-btn holiday_long" id="btn-sched-holiday_long" onclick="setScheduleType('holiday_long')">連續假日時刻表</button>
+          <button type="button" class="sched-chip-btn weekday_to_long" id="btn-sched-weekday_to_long" onclick="setScheduleType('weekday_to_long')">🔄 平日接連假</button>
+          <button type="button" class="sched-chip-btn long_to_weekday" id="btn-sched-long_to_weekday" onclick="setScheduleType('long_to_weekday')">🔄 連假接平日</button>
+        </div>
+      </div>
+
+      <!-- 三大查詢模式分頁切換 -->
+      <div class="tab-container">
+        <button type="button" class="tab-btn active" id="tab-btn-od" onclick="switchQueryTab('od')">
+          🚉 依起訖站查詢 (含轉乘)
+        </button>
+        <button type="button" class="tab-btn" id="tab-btn-train" onclick="switchQueryTab('train')">
+          🚆 依車次查詢全站時刻
+        </button>
+        <button type="button" class="tab-btn" id="tab-btn-station" onclick="switchQueryTab('station')">
+          🕒 依出發車站時刻表
+        </button>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- 分頁 1：依起訖站查詢 (可選是否接受轉乘，限1小時內出發) -->
+      <!-- ============================================== -->
+      <div class="tab-panel active" id="tab-panel-od">
+        <div class="control-group">
+          <div class="form-row">
+            <div class="form-col">
+              <label for="odStartStation">出發站 (起點)：</label>
+              <select id="odStartStation" class="login-input" onchange="onOdStationChanged()"></select>
+            </div>
+            <div>
+              <button type="button" class="swap-btn" onclick="swapOdStations()" title="互換起訖站">⇄ 對調</button>
+            </div>
+            <div class="form-col">
+              <label for="odEndStation">抵達站 (訖點)：</label>
+              <select id="odEndStation" class="login-input" onchange="onOdStationChanged()"></select>
+            </div>
+          </div>
+
+          <!-- 出發時段：限查詢 1 小時內出發班次 (可選現在或自行輸入) -->
+          <div class="form-row">
+            <div class="form-col" style="flex: 1.2;">
+              <label>出發時段 (僅查詢指定時間起 1 小時內出發班次)：</label>
+              <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:normal; margin:0; font-size:13px; color:#1e293b;">
+                  <input type="radio" name="odTimeMode" value="now" id="odTimeModeNow" checked onchange="onOdTimeModeChanged()">
+                  目前現在時間起算 (自動讀取)
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:normal; margin:0; font-size:13px; color:#1e293b;">
+                  <input type="radio" name="odTimeMode" value="custom" id="odTimeModeCustom" onchange="onOdTimeModeChanged()">
+                  自行指定出發時間
+                </label>
+              </div>
+              <div id="customTimeInputContainer" style="display:none; align-items:center; gap:8px;">
+                <input type="time" id="odCustomTime" class="login-input" style="width:140px; padding:8px 12px; margin-bottom:0;" step="60" onchange="searchOdSchedule()">
+                <span style="font-size:12px; color:#64748b;">將精確搜尋此時間起 1 小時內之發車方案</span>
+              </div>
+            </div>
+
+            <div class="form-col" style="flex: 0.8;">
+              <label for="odTypeFilter">車種篩選：</label>
+              <select id="odTypeFilter" class="login-input" onchange="searchOdSchedule()">
+                <option value="all">所有車種 (普通、快速、特快、通勤)</option>
+                <option value="rapid">僅快速 / 特別快速</option>
+                <option value="local">僅普通列車</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 接受轉乘選項 -->
+          <div class="transfer-option-box">
+            <input type="checkbox" id="allowTransferCheckbox" checked onchange="searchOdSchedule()">
+            <label for="allowTransferCheckbox" style="cursor:pointer; font-weight:bold;">
+              接受中途轉乘方案 (若無直達車或透過轉乘能更快/更彈性抵達時自動規劃)
+            </label>
+          </div>
+
+          <button type="button" class="search-btn" onclick="searchOdSchedule()">🔍 查詢乘車時刻方案</button>
+        </div>
+
+        <div id="odResultArea"></div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- 分頁 2：依車次查詢全站時刻 (無快捷鍵) -->
+      <!-- ============================================== -->
+      <div class="tab-panel" id="tab-panel-train">
+        <div class="control-group">
+          <label for="trainNoInput">請輸入欲查詢之車次編號：</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="trainNoInput" placeholder="例如: 102, 1002, 2002, 7002, 3002, 4002..."
+                   style="flex:1; padding:12px; border:1px solid #ccc; border-radius:6px; font-size:14px; font-weight:bold; font-family:monospace;"
+                   onkeydown="if(event.key==='Enter') searchTrainByNo()">
+            <button type="button" class="search-btn" style="width:auto; padding:0 24px;" onclick="searchTrainByNo()">查詢車次</button>
+          </div>
+        </div>
+
+        <div id="trainResultArea"></div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- 分頁 3：依出發車站發車時刻表 -->
+      <!-- ============================================== -->
+      <div class="tab-panel" id="tab-panel-station">
+        <div class="control-group">
+          <label>1. 行車方向：</label>
+          <div class="direction-toggle">
+            <button type="button" class="dir-btn active" onclick="switchDirection('down')" id="btnDown">下行 (往 全京大道)</button>
+            <button type="button" class="dir-btn" onclick="switchDirection('up')" id="btnUp">上行 (往 飛灣工業區)</button>
+          </div>
+
+          <label for="stationSelect">2. 出發車站：</label>
+          <select id="stationSelect" onchange="searchStationSchedule()"><option value="">正在載入資料...</option></select>
+
+          <button type="button" class="search-btn" onclick="searchStationSchedule()">查詢站別完整發車時刻表</button>
+
+          <button type="button" class="search-btn" style="background-color: #e67e22; margin-top: 10px;" onclick="showNextTrain()">
+            ⏱️ 顯示下一班發車資訊 (倒數計時)
+          </button>
+
+          <div id="nextTrainDisplay" style="display:none; margin-top: 15px; background: #fff3cd; border: 2px solid #ffeeba; padding: 15px; border-radius: 8px; color: #856404;"></div>
+        </div>
+
+        <div id="stationResultArea"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 時刻表檢視區 -->
+  <section>
+    <h2>上下行時刻表 Timetables</h2>
+    <p>以下提供飛灣鐵道全線上下行網頁版時刻表，點擊後將於新分頁開啟，並可自由切換平日、假日與連假等班表。</p>
+    <div class="grid grid-2">
+      <article class="card">
+        <h3>下行時刻表</h3>
+        <p>全線下行方向完整時刻表（支援班表切換與車次搜尋）。</p>
+        <a href="timetable_sheet.html?mode=passenger&dir=down" class="btn btn-primary" target="_blank" rel="noopener noreferrer">開啟下行時刻表</a>
+      </article>
+      <article class="card">
+        <h3>上行時刻表</h3>
+        <p>全線上行方向完整時刻表（支援班表切換與車次搜尋）。</p>
+        <a href="timetable_sheet.html?mode=passenger&dir=up" class="btn btn-primary" target="_blank" rel="noopener noreferrer">開啟上行時刻表</a>
+      </article>
+    </div>
+  </section>
+
+  <!-- 路線圖與列車種別停靠站 -->
+  <section>
+    <h2>列車種別停靠站</h2>
+    <div class="route-map-container" style="margin-top: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+      <img src="路線圖.PNG" alt="飛灣線路線圖" style="width: 100%; height: auto; display: block;">
+    </div>
+    <p class="meta" style="margin-top: 15px;">註：實際停靠站資訊，依照本公司公告運轉時刻表為主。</p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>本網站及「飛灣鐵路公司」為虛構設定，僅供娛樂與創作使用。</p>
+  </div>
+</footer>
+
+<script>
+// ========================================================
+// 飛灣鐵路全線 22 車站資料 (含公里里程)
+// ========================================================
+const ALL_STATIONS = [
+  { code: 'FR01', name: '飛灣工業區', km: 0.0 },
+  { code: 'FR02', name: '飛灣港', km: 7.3 },
+  { code: 'FR03', name: '物流中心', km: 8.5 },
+  { code: 'FR04', name: '飛灣郵輪港', km: 9.7 },
+  { code: 'FR05', name: '濱江商務區', km: 16.9 },
+  { code: 'FR06', name: '市民廣場', km: 18.4 },
+  { code: 'FR07', name: '文化中心', km: 19.7 },
+  { code: 'FR08', name: '飛灣新站', km: 21.6 },
+  { code: 'FR09', name: '科創園', km: 23.9 },
+  { code: 'FR10', name: '飛灣學區', km: 25.1 },
+  { code: 'FR11', name: '飛灣大道', km: 26.8 },
+  { code: 'FR12', name: '飛灣公園', km: 28.4 },
+  { code: 'FR13', name: '錦湖', km: 29.8 },
+  { code: 'FR14', name: '鷺島', km: 30.3 },
+  { code: 'FR15', name: '空港新城', km: 33.1 },
+  { code: 'FR16', name: '飛灣機場', km: 38.0 },
+  { code: 'FR17', name: '翡翠花園', km: 43.2 },
+  { code: 'FR18', name: '紫荊苑', km: 45.6 },
+  { code: 'FR19', name: '御景新村', km: 47.0 },
+  { code: 'FR20', name: '自然保育中心', km: 49.0 },
+  { code: 'FR21', name: '綾路北站', km: 52.2 },
+  { code: 'FR22', name: '全京大道', km: 55.4 }
+];
+
+const STATION_NAMES = ALL_STATIONS.map(s => s.name);
+
+// ========================================================
+// 飛灣新曆法行事曆與節日邏輯
+// ========================================================
+function isFlywanLeapYear(year) {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+function getFlywanFestival(m, d) {
+  if (m === 1 && d === 1) return { name: '建國紀念日', scheduleType: 'holiday_long' };
+  if (m === 2 && d === 1) return { name: '情人日', scheduleType: 'holiday' };
+  if (m === 3 && d === 1) return { name: '宗教日', scheduleType: 'holiday' };
+  if (m === 4 && d === 1) return { name: '兒童日', scheduleType: 'holiday' };
+  if (m === 5 && d === 1) return { name: '職業紀念日', scheduleType: 'holiday' };
+  if (m === 6 && d >= 26 && d <= 30) return { name: '家庭周', scheduleType: 'holiday_long' };
+  if (m === 7 && d >= 1 && d <= 5) return { name: '旅遊周', scheduleType: 'holiday_long' };
+  if (m === 8 && d === 1) return { name: '親人節', scheduleType: 'holiday' };
+  if (m === 9 && d === 1) return { name: '性別平等日', scheduleType: 'holiday' };
+  if (m === 10 && d === 1) return { name: '和平日', scheduleType: 'holiday' };
+  if (m === 11 && d === 1) return { name: '自然日', scheduleType: 'holiday' };
+  if (m === 12 && d === 30) return { name: '年尾紀念日', scheduleType: 'holiday_long' };
+  return null;
+}
+
+function getBaseFlywanCalendarDate(dateObj) {
+  const year = dateObj.getFullYear();
+  const leap = isFlywanLeapYear(year);
+  const holidayDays = leap ? 6 : 5;
+  const start = new Date(year, 0, 1);
+  const dNoon = new Date(year, dateObj.getMonth(), dateObj.getDate(), 12, 0, 0);
+  const sNoon = new Date(year, 0, 1, 12, 0, 0);
+  const dayOfYear = Math.round((dNoon - sNoon) / (1000 * 60 * 60 * 24)) + 1;
+
+  if (dayOfYear <= holidayDays) {
+    return {
+      year, month: 0, day: dayOfYear, isHolidayWeek: true,
+      festival: { name: '年初假期週', scheduleType: 'holiday_long' },
+      baseType: 'holiday_long',
+      text: `飛灣曆 ${year}年 年初假期週 第${dayOfYear}天 (連假)`
+    };
+  }
+
+  const regDay = dayOfYear - holidayDays;
+  const m = Math.floor((regDay - 1) / 30) + 1;
+  const d = ((regDay - 1) % 30) + 1;
+  const weekInMonth = Math.floor((d - 1) / 5) + 1;
+  const dayInWeek = ((d - 1) % 5) + 1;
+  const wNames = ['週一', '週二', '週三', '週四', '休息日'];
+  const wName = wNames[dayInWeek - 1];
+  const isRestDay = (dayInWeek === 5);
+
+  const fest = getFlywanFestival(m, d);
+  let baseType = 'weekday';
+  if (fest) baseType = fest.scheduleType;
+  else if (isRestDay) baseType = 'holiday';
+
+  const festTag = fest ? `・${fest.name}` : (isRestDay ? '・休息日' : '');
+  return {
+    year, month: m, day: d, weekInMonth, dayInWeek, weekDayName: wName,
+    isHolidayWeek: false, isRestDay, festival: fest, baseType,
+    text: `飛灣曆 ${year}年 第${m}月 第${weekInMonth}週 第${dayInWeek}天 (${m}月${d}日・${wName}${festTag})`
+  };
+}
+
+function getScheduleDisplayName(schedType) {
+  const map = {
+    weekday: '平日時刻表',
+    holiday: '假日時刻表',
+    holiday_long: '連續假日時刻表',
+    weekday_to_long: '平日接連假時刻表',
+    long_to_weekday: '連假接平日時刻表'
+  };
+  return map[schedType] || '平日時刻表';
+}
+
+function getScheduleBadgeColor(schedType) {
+  const map = {
+    weekday: '#0284c7',
+    holiday: '#d97706',
+    holiday_long: '#db2777',
+    weekday_to_long: '#7c3aed',
+    long_to_weekday: '#0d9488'
+  };
+  return map[schedType] || '#0284c7';
+}
+
+function getFlywanDateScheduleInfo(dateObj) {
+  const cur = getBaseFlywanCalendarDate(dateObj);
+  const prevDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() - 1, 12, 0, 0);
+  const nextDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1, 12, 0, 0);
+  const prev = getBaseFlywanCalendarDate(prevDate);
+  const next = getBaseFlywanCalendarDate(nextDate);
+
+  let schedType = cur.baseType;
+  if (cur.baseType !== 'holiday_long' && next.baseType === 'holiday_long') {
+    schedType = 'weekday_to_long';
+  } else if (cur.baseType !== 'holiday_long' && prev.baseType === 'holiday_long') {
+    schedType = 'long_to_weekday';
+  }
+
+  return {
+    ...cur,
+    scheduleType: schedType,
+    scheduleLabel: getScheduleDisplayName(schedType),
+    badgeColor: getScheduleBadgeColor(schedType)
+  };
+}
+
+function getTodayFlywanInfo() {
+  const now = new Date();
+  const calNow = getBaseFlywanCalendarDate(now);
+  const serviceDate = new Date(now.getTime());
+  // 非連續假日若為凌晨 00:00~03:59，仍屬前一日營業日（04:00 換日）
+  if (now.getHours() < 4 && calNow.baseType !== 'holiday_long') {
+    serviceDate.setDate(serviceDate.getDate() - 1);
+  }
+  return getFlywanDateScheduleInfo(serviceDate);
+}
+
+// ========================================================
+// 時刻表資料快取與解析模組
+// ========================================================
+let rawCsvs = {
+  weekday_up: '', weekday_down: '',
+  holiday_up: '', holiday_down: '',
+  holiday_long_up: '', holiday_long_down: '',
+  weekday_to_long_up: '', weekday_to_long_down: '',
+  long_to_weekday_up: '', long_to_weekday_down: ''
+};
+
+// 解析後的列車物件儲存庫：parsedTimetables[schedType][dir] -> Array of trains
+let parsedTimetables = {
+  weekday: { up: [], down: [] },
+  holiday: { up: [], down: [] },
+  holiday_long: { up: [], down: [] },
+  weekday_to_long: { up: [], down: [] },
+  long_to_weekday: { up: [], down: [] }
+};
+
+let currentSchedSetting = 'auto'; // 'auto' | 'weekday' | 'holiday' | 'holiday_long' | 'weekday_to_long' | 'long_to_weekday'
+let activeSchedType = 'weekday';
+let currentDirection = 'down';
+
+function ouDiaTimeToSec(raw) {
+  if (!raw) return null;
+  let digits = String(raw).replace(/[^\d]/g, '');
+  if (digits.length === 3) digits = '0' + digits[0] + digits.substr(1,2) + '00';
+  else if (digits.length === 4) digits = digits.substr(0,2) + digits.substr(2,2) + '00';
+  else if (digits.length === 5) digits = '0' + digits;
+  if (digits.length === 6) {
+    let h = parseInt(digits.substr(0,2), 10);
+    let m = parseInt(digits.substr(2,2), 10);
+    let s = parseInt(digits.substr(4,2), 10);
+    return h * 3600 + m * 60 + s;
+  }
+  return null;
+}
+
+function secToTimeStr(sec, includeSec = false) {
+  if (sec == null) return '--:--';
+  sec = ((sec % 86400) + 86400) % 86400;
+  let h = Math.floor(sec / 3600);
+  let m = Math.floor((sec % 3600) / 60);
+  let s = sec % 60;
+  let hh = String(h).padStart(2, '0');
+  let mm = String(m).padStart(2, '0');
+  if (includeSec) {
+    return `${hh}:${mm}:${String(s).padStart(2, '0')}`;
+  }
+  return `${hh}:${mm}`;
+}
+
+function classifyOuDiaCell(rawCell) {
+  if (!rawCell) return { kind: 'empty', time: '', raw: '' };
+  let s = String(rawCell).trim();
+  if (!s) return { kind: 'empty', time: '', raw: '' };
+  if (s === 'ﾚ' || s === '↓' || s === '↑' || s === '⇡' || s === '⇓' || s === '⇑' || s === '｜' || s === '|') {
+    return { kind: 'pass_arrow', time: '', raw: s };
+  }
+  let digits = s.replace(/[^\d]/g, '');
+  if (digits.length >= 3 && digits.length <= 6) {
+    if (s.includes('?') || s.includes('？')) {
+      return { kind: 'pass_time', time: digits, raw: s };
+    } else {
+      return { kind: 'stop', time: digits, raw: s };
+    }
+  }
+  return { kind: 'empty', time: '', raw: s };
+}
+
+function parseOuDiaCSV(csvText, direction, schedType = 'weekday') {
+  if (!csvText) return [];
+  let lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  let trainNumRow = -1;
+  let trainTypeRow = -1;
+  let opNumRow = -1;
+  let stationEntries = [];
+
+  const metaNames = [
+    'FileType', '時刻表', '假日時刻表', '連續假日時刻表',
+    '連続假日接平日時刻表', '連續假日接平日時刻表', '連假接平日時刻表',
+    '平日接連続假日時刻表', '平日接連續假日時刻表', '平日接連假時刻表',
+    '上り', '下り', '運用番号', '列車名', '号数', '備考',
+    '終着駅', '始發駅', '始発駅', '始劃駅', '列車番号', '列車種別',
+    '始発駅作業', '終着駅作業', '始發駅作業'
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    let row = lines[i].split(',');
+    let name = row[0] ? row[0].trim() : '';
+    let subName = row[1] ? row[1].trim() : '';
+    if (name === '列車番号') trainNumRow = i;
+    else if (name === '列車種別') trainTypeRow = i;
+    else if (name === '運用番号') opNumRow = i;
+    else if (subName.includes('番線') || name.includes('番線')) {
+      let cleanStName = name.replace('番線', '').replace(/(着|発)$/, '').trim();
+      stationEntries.push({ rIdx: i, cleanStName, subType: 'plat' });
+    } else if (name && !metaNames.includes(name) && !name.includes('作業') && !name.includes('車輛基地')) {
+      let cleanStName = name.replace(/(着|発)$/, '').trim();
+      let subType = 'dep';
+      if (subName === '着' || name.endsWith('着')) subType = 'arr';
+      else if (subName === '発' || name.endsWith('発')) subType = 'dep';
+      stationEntries.push({ rIdx: i, cleanStName, subType });
+    }
+  }
+
+  if (trainNumRow === -1) return [];
+
+  let trainNums = lines[trainNumRow].split(',').map(s => s.trim());
+  let trainTypes = (trainTypeRow !== -1) ? lines[trainTypeRow].split(',').map(s => s.trim()) : [];
+  let opNums = (opNumRow !== -1) ? lines[opNumRow].split(',').map(s => s.trim()) : [];
+  let parsedRows = lines.map(l => l.split(',').map(s => s.trim()));
+  let results = [];
+  let orderedStNames = (direction === 'down') ? STATION_NAMES : [...STATION_NAMES].reverse();
+
+  let colCount = Math.max(trainNums.length, trainTypes.length, opNums.length);
+  for (let col = 2; col < colCount; col++) {
+    let num = (trainNums[col] || '').trim();
+    let rawType = (trainTypes[col] || '').trim();
+    let opNum = (opNums[col] || '').trim();
+    if (!num && !rawType && !opNum) continue;
+    let type = rawType || '普通';
+    if (type === '特快') type = '特別快速';
+
+    let stops = {};
+    let firstStation = '';
+    let lastStation = '';
+    let firstSec = null;
+    let lastSec = null;
+
+    for (let entry of stationEntries) {
+      let stName = entry.cleanStName;
+      let cellVal = (parsedRows[entry.rIdx] && parsedRows[entry.rIdx][col]) ? parsedRows[entry.rIdx][col] : '';
+      if (!cellVal) continue;
+
+      if (!stops[stName]) {
+        stops[stName] = {
+          name: stName,
+          status: 'none',
+          arrStr: '', depStr: '',
+          arrSec: null, depSec: null,
+          plat: ''
+        };
+      }
+      let stObj = stops[stName];
+
+      if (entry.subType === 'plat') {
+        stObj.plat = cellVal;
+      } else {
+        let classified = classifyOuDiaCell(cellVal);
+        let sec = ouDiaTimeToSec(classified.time);
+        if (classified.kind === 'stop') {
+          stObj.status = 'stop';
+          if (entry.subType === 'arr') {
+            stObj.arrStr = secToTimeStr(sec, true);
+            stObj.arrSec = sec;
+          } else {
+            stObj.depStr = secToTimeStr(sec, true);
+            stObj.depSec = sec;
+          }
+        } else if (classified.kind === 'pass_time') {
+          if (stObj.status !== 'stop') {
+            stObj.status = 'pass_time';
+            stObj.depStr = secToTimeStr(sec, true);
+            stObj.depSec = sec;
+          }
+        } else if (classified.kind === 'pass_arrow') {
+          if (stObj.status === 'none') {
+            stObj.status = 'pass_arrow';
+          }
+        }
+      }
+    }
+
+    // 依行車順序單調遞增正規化各站秒數（解決 23:xx -> 00:xx 跨午夜問題）
+    let prevTrackSec = null;
+    for (let sName of orderedStNames) {
+      let s = stops[sName];
+      if (!s) continue;
+      if (s.arrSec != null) {
+        while (prevTrackSec != null && s.arrSec < prevTrackSec) s.arrSec += 86400;
+        prevTrackSec = s.arrSec;
+      }
+      if (s.depSec != null) {
+        while (prevTrackSec != null && s.depSec < prevTrackSec) s.depSec += 86400;
+        prevTrackSec = s.depSec;
+      }
+      if (s.status === 'stop' && (s.depSec != null || s.arrSec != null)) {
+        if (!firstStation) {
+          firstStation = sName;
+          firstSec = s.depSec != null ? s.depSec : s.arrSec;
+        }
+        lastStation = sName;
+        lastSec = s.arrSec != null ? s.arrSec : s.depSec;
+      }
+    }
+
+    if (firstStation && lastStation && firstStation !== lastStation) {
+      let isPostMidnight = false;
+      // 非連續假日之 00:00~03:59 發車班次屬於該營業日之跨午夜延續 (+86400)
+      if (schedType !== 'holiday_long' && firstSec < 4 * 3600) {
+        isPostMidnight = true;
+        firstSec += 86400;
+        lastSec += 86400;
+        for (let sName of orderedStNames) {
+          let s = stops[sName];
+          if (!s) continue;
+          if (s.arrSec != null) s.arrSec += 86400;
+          if (s.depSec != null) s.depSec += 86400;
+        }
+      }
+      results.push({
+        num,
+        isTransitionTrain: !num,
+        type, opNum, direction, schedType,
+        origin: firstStation, dest: lastStation,
+        startSec: firstSec, endSec: lastSec,
+        isPostMidnight,
+        connectBadge: '',
+        stops
+      });
+    }
+  }
+
+  // 依起點發車時刻排序
+  results.sort((a, b) => (a.startSec || 0) - (b.startSec || 0));
+  return results;
+}
+
+// 依連續假日班表為準，補全銜接時刻表（平日接連假、連假接平日）中空白車次之列車編號
+function resolveTransitionTrainNumbers() {
+  for (const sched of ['weekday_to_long', 'long_to_weekday']) {
+    for (const dir of ['up', 'down']) {
+      const list = parsedTimetables[sched] && parsedTimetables[sched][dir];
+      const hlList = parsedTimetables.holiday_long && parsedTimetables.holiday_long[dir];
+      if (!list || !hlList || hlList.length === 0) continue;
+
+      const hlMap = new Map();
+      for (const h of hlList) {
+        const modSec = ((h.startSec % 86400) + 86400) % 86400;
+        hlMap.set(`${h.origin}|${modSec}`, h);
+      }
+      const badge = (sched === 'weekday_to_long') ? '跨日接連假' : '連假跨日銜接';
+      for (const t of list) {
+        if (!t.num || t.isTransitionTrain) {
+          const modSec = ((t.startSec % 86400) + 86400) % 86400;
+          const match = hlMap.get(`${t.origin}|${modSec}`);
+          if (match && match.num) {
+            t.num = match.num;
+            if (!t.connectBadge) t.connectBadge = badge;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 取得含班表銜接之查詢用列車清單 (平日接連假 <-> 連續假日 <-> 連假接平日)
+function getEffectiveTimetable(schedType, direction, includeCrossNightTail = true) {
+  const base = parsedTimetables[schedType] && parsedTimetables[schedType][direction]
+    ? parsedTimetables[schedType][direction]
+    : [];
+  const hl = parsedTimetables.holiday_long && parsedTimetables.holiday_long[direction]
+    ? parsedTimetables.holiday_long[direction]
+    : [];
+
+  if (schedType !== 'long_to_weekday' && schedType !== 'weekday_to_long') {
+    return base;
+  }
+
+  const slotKey = (t) => `${t.origin}|${((t.startSec % 86400) + 86400) % 86400}`;
+  const seenKeys = new Set(base.map(slotKey));
+  const combined = base.map(t => ({ ...t }));
+
+  if (schedType === 'long_to_weekday') {
+    // 1. 連續假日凌晨 00:00 ~ 05:50 發車並銜接進入平日班表前導段（排除已被連假接平日覆蓋的重複列車）
+    for (let t of hl) {
+      if (t.startSec >= 0 && t.startSec < (5 * 3600 + 50 * 60)) {
+        let key = slotKey(t);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        combined.push({ ...t, connectBadge: '連假跨日銜接' });
+      } else if (includeCrossNightTail && t.endSec >= 86400) {
+        // 2. 前夜 23:xx 發車跨午夜於當日 00:00~01:15 到站之連續假日車次（平移 -86400 秒供當日凌晨各站查詢）
+        let shiftedStops = {};
+        for (let k in t.stops) {
+          let st = t.stops[k];
+          shiftedStops[k] = {
+            ...st,
+            arrSec: st.arrSec != null ? st.arrSec - 86400 : null,
+            depSec: st.depSec != null ? st.depSec - 86400 : null
+          };
+        }
+        combined.push({
+          ...t,
+          startSec: t.startSec - 86400,
+          endSec: t.endSec - 86400,
+          isTailCrossDay: true,
+          connectBadge: '連假跨日銜接',
+          stops: shiftedStops
+        });
+      }
+    }
+  } else if (schedType === 'weekday_to_long') {
+    // 平日接連假：午夜後 00:00 ~ 03:59 無縫接續連續假日 24 小時班次 (+86400)，排除已列出之重複班次
+    for (let t of hl) {
+      if (t.startSec >= 0 && t.startSec < 4 * 3600) {
+        let key = slotKey(t);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        let shiftedStops = {};
+        for (let k in t.stops) {
+          let st = t.stops[k];
+          shiftedStops[k] = {
+            ...st,
+            arrSec: st.arrSec != null ? st.arrSec + 86400 : null,
+            depSec: st.depSec != null ? st.depSec + 86400 : null
+          };
+        }
+        combined.push({
+          ...t,
+          startSec: t.startSec + 86400,
+          endSec: t.endSec + 86400,
+          isPostMidnight: true,
+          connectBadge: '跨日接連假',
+          stops: shiftedStops
+        });
+      }
+    }
+  }
+
+  combined.sort((a, b) => (a.startSec || 0) - (b.startSec || 0));
+  return combined;
+}
+
+// 載入 10 份時刻表 CSV
+async function loadAllTimetableData() {
+  const filePairs = [
+    { key: 'weekday_up', file: '上行平日.csv', sched: 'weekday', dir: 'up' },
+    { key: 'weekday_down', file: '下行平日.csv', sched: 'weekday', dir: 'down' },
+    { key: 'holiday_up', file: '上行假日.csv', sched: 'holiday', dir: 'up' },
+    { key: 'holiday_down', file: '下行假日.csv', sched: 'holiday', dir: 'down' },
+    { key: 'holiday_long_up', file: '上行連續假日.csv', sched: 'holiday_long', dir: 'up' },
+    { key: 'holiday_long_down', file: '下行連續假日.csv', sched: 'holiday_long', dir: 'down' },
+    { key: 'weekday_to_long_up', file: '上行平日接連假.csv', sched: 'weekday_to_long', dir: 'up' },
+    { key: 'weekday_to_long_down', file: '下行平日接連假.csv', sched: 'weekday_to_long', dir: 'down' },
+    { key: 'long_to_weekday_up', file: '上行連假接平日.csv', sched: 'long_to_weekday', dir: 'up' },
+    { key: 'long_to_weekday_down', file: '下行連假接平日.csv', sched: 'long_to_weekday', dir: 'down' }
+  ];
+
+  for (let item of filePairs) {
+    let csvTxt = (window.EMBEDDED_TIMETABLE_CSVS && window.EMBEDDED_TIMETABLE_CSVS[item.key])
+      ? window.EMBEDDED_TIMETABLE_CSVS[item.key]
+      : '';
+
+    // 若有本機伺服器則嘗試 fetch 最新 CSV
+    try {
+      let res = await fetch(item.file);
+      if (res.ok) {
+        let t = await res.text();
+        if (t && t.includes('列車番号')) csvTxt = t;
+      }
+    } catch (e) {}
+
+    rawCsvs[item.key] = csvTxt;
+    if (csvTxt) {
+      parsedTimetables[item.sched][item.dir] = parseOuDiaCSV(csvTxt, item.dir, item.sched);
+    }
+  }
+
+  resolveTransitionTrainNumbers();
+}
+
+// ========================================================
+// 介面控制與分頁切換
+// ========================================================
+function switchQueryTab(tabId) {
+  ['od', 'train', 'station'].forEach(id => {
+    document.getElementById(`tab-btn-${id}`).classList.toggle('active', id === tabId);
+    document.getElementById(`tab-panel-${id}`).classList.toggle('active', id === tabId);
+  });
+}
+
+function setScheduleType(schedKey) {
+  currentSchedSetting = schedKey;
+  ['auto', 'weekday', 'holiday', 'holiday_long', 'weekday_to_long', 'long_to_weekday'].forEach(k => {
+    let btn = document.getElementById(`btn-sched-${k}`);
+    if (btn) btn.classList.toggle('active', k === schedKey);
+  });
+
+  const todayInfo = getTodayFlywanInfo();
+  if (schedKey === 'auto') {
+    activeSchedType = todayInfo.scheduleType;
+  } else {
+    activeSchedType = schedKey;
+  }
+
+  // 重新觸發當前分頁查詢
+  if (document.getElementById('tab-panel-od').classList.contains('active')) {
+    searchOdSchedule();
+  } else if (document.getElementById('tab-panel-train').classList.contains('active')) {
+    searchTrainByNo();
+  } else {
+    searchStationSchedule();
+  }
+}
+
+function switchDirection(dir) {
+  currentDirection = dir;
+  document.getElementById('btnUp').className = dir === 'up' ? 'dir-btn active' : 'dir-btn';
+  document.getElementById('btnDown').className = dir === 'down' ? 'dir-btn active' : 'dir-btn';
+  populateStationDropdowns();
+  searchStationSchedule();
+}
+
+function populateStationDropdowns() {
+  const startSelect = document.getElementById('odStartStation');
+  const endSelect = document.getElementById('odEndStation');
+  const stationSelect = document.getElementById('stationSelect');
+
+  let curStart = startSelect.value || '飛灣工業區';
+  let curEnd = endSelect.value || '全京大道';
+  let curStation = stationSelect.value || (currentDirection === 'down' ? '飛灣工業區' : '全京大道');
+
+  startSelect.innerHTML = '';
+  endSelect.innerHTML = '';
+  stationSelect.innerHTML = '';
+
+  ALL_STATIONS.forEach(s => {
+    startSelect.add(new Option(`${s.code} ${s.name}`, s.name));
+    endSelect.add(new Option(`${s.code} ${s.name}`, s.name));
+  });
+
+  let stationList = (currentDirection === 'down')
+    ? ALL_STATIONS.slice(0, ALL_STATIONS.length - 1)
+    : [...ALL_STATIONS].reverse().slice(0, ALL_STATIONS.length - 1);
+
+  stationList.forEach(s => {
+    stationSelect.add(new Option(`${s.code} ${s.name}`, s.name));
+  });
+
+  startSelect.value = curStart;
+  endSelect.value = curEnd;
+  stationSelect.value = curStation;
+}
+
+function swapOdStations() {
+  const startSelect = document.getElementById('odStartStation');
+  const endSelect = document.getElementById('odEndStation');
+  const tmp = startSelect.value;
+  startSelect.value = endSelect.value;
+  endSelect.value = tmp;
+  searchOdSchedule();
+}
+
+function onOdStationChanged() {
+  searchOdSchedule();
+}
+
+function onOdTimeModeChanged() {
+  const isCustom = document.getElementById('odTimeModeCustom').checked;
+  const container = document.getElementById('customTimeInputContainer');
+  if (container) {
+    container.style.display = isCustom ? 'flex' : 'none';
+  }
+  searchOdSchedule();
+}
+
+// 種別標籤配色統一使用 LIVE 中的標準色彩
+function getTypeBadge(type) {
+  let cls = 'tag-local';
+  if (type.includes('特快') || type.includes('特別快速') || type.includes('特急') || type.includes('直達') || type.includes('機場')) {
+    cls = 'tag-express'; // #eab308
+  } else if (type.includes('快速') && !type.includes('通勤')) {
+    cls = 'tag-rapid';   // #0080FF
+  } else if (type.includes('通勤')) {
+    cls = 'tag-commute'; // #006400
+  } else if (type.includes('回送') || type.includes('試運轉')) {
+    cls = 'tag-deadhead'; // #94a3b8
+  }
+  return `<span class="tag-pill ${cls}">${type}</span>`;
+}
+
+// ========================================================
+// 功能 1：依起訖站查詢 (僅限 1 小時內出發，可選現在或自行輸入時間)
+// ========================================================
+function searchOdSchedule() {
+  const startName = document.getElementById('odStartStation').value;
+  const endName = document.getElementById('odEndStation').value;
+  const resArea = document.getElementById('odResultArea');
+  const allowTransfer = document.getElementById('allowTransferCheckbox').checked;
+  const typeFilter = document.getElementById('odTypeFilter').value;
+
+  if (!startName || !endName) {
+    resArea.innerHTML = '<div class="empty-state">請選擇起點站與訖點站。</div>';
+    return;
+  }
+  if (startName === endName) {
+    resArea.innerHTML = '<div class="empty-state" style="color:#ef4444;">❌ 起點站與訖點站不可相同，請選擇不同的乘車區間。</div>';
+    return;
+  }
+
+  const sObj = ALL_STATIONS.find(s => s.name === startName);
+  const eObj = ALL_STATIONS.find(s => s.name === endName);
+  const isDown = (eObj.km > sObj.km);
+  const dir = isDown ? 'down' : 'up';
+  const dirLabel = isDown ? '下行 (往 全京大道)' : '上行 (往 飛灣工業區)';
+  const distKm = Math.abs(eObj.km - sObj.km).toFixed(1);
+
+  const trains = getEffectiveTimetable(activeSchedType, dir, true);
+  if (trains.length === 0) {
+    resArea.innerHTML = '<div class="empty-state">時刻表載入中，請稍候...</div>';
+    return;
+  }
+
+  // 計算出發時間起點 (秒)
+  let startSec = 0;
+  const isNow = document.getElementById('odTimeModeNow').checked;
+  if (isNow) {
+    const now = new Date();
+    startSec = now.getHours() * 3600 + now.getMinutes() * 60;
+  } else {
+    const customVal = document.getElementById('odCustomTime').value;
+    if (customVal) {
+      let [ch, cm] = customVal.split(':').map(Number);
+      startSec = ch * 3600 + cm * 60;
+    } else {
+      const now = new Date();
+      startSec = now.getHours() * 3600 + now.getMinutes() * 60;
+    }
+  }
+
+  // 嚴格限制：僅查詢指定時刻起 1 小時 (3600 秒) 內出發之班次（含跨午夜及班表銜接）
+  let queryStartSec = startSec;
+  if ((activeSchedType === 'weekday' || activeSchedType === 'holiday' || activeSchedType === 'weekday_to_long') && startSec < 4 * 3600) {
+    queryStartSec = startSec + 86400;
+  }
+  const endSecWindow = queryStartSec + 3600;
+
+  function alignDepSecToWindow(depSec) {
+    if (depSec == null) return null;
+    if (depSec >= queryStartSec && depSec <= endSecWindow) return depSec;
+    if (activeSchedType === 'holiday_long') {
+      if (endSecWindow > 86400 && (depSec + 86400) >= queryStartSec && (depSec + 86400) <= endSecWindow) {
+        return depSec + 86400;
+      }
+      if (queryStartSec < 4 * 3600 && depSec >= 86400 && (depSec - 86400) >= queryStartSec && (depSec - 86400) <= endSecWindow) {
+        return depSec - 86400;
+      }
+    }
+    return null;
+  }
+
+  let plans = [];
+
+  // --- 1. 搜尋 1 小時內之直達方案 ---
+  for (let train of trains) {
+    if (train.type === '回送') continue;
+    if (typeFilter === 'rapid' && !train.type.includes('快')) continue;
+    if (typeFilter === 'local' && !train.type.includes('普通')) continue;
+
+    let sInfo = train.stops[startName];
+    let eInfo = train.stops[endName];
+    if (sInfo && eInfo && sInfo.status === 'stop' && eInfo.status === 'stop') {
+      let rawDepSec = sInfo.depSec != null ? sInfo.depSec : sInfo.arrSec;
+      let rawArrSec = eInfo.arrSec != null ? eInfo.arrSec : eInfo.depSec;
+      if (rawDepSec != null && rawArrSec != null) {
+        let effDepSec = alignDepSecToWindow(rawDepSec);
+        if (effDepSec != null) {
+          let shift = effDepSec - rawDepSec;
+          let adjArrSec = rawArrSec + shift;
+          if (adjArrSec < effDepSec) adjArrSec += 86400;
+          let isCrossDay = (effDepSec >= 86400) || (adjArrSec >= 86400 && effDepSec < 86400) || !!train.isTailCrossDay;
+          plans.push({
+            isTransfer: false,
+            depSec: effDepSec,
+            arrSec: adjArrSec,
+            durationMin: Math.round((adjArrSec - effDepSec) / 60),
+            train1: train,
+            startName, endName,
+            isCrossDay,
+            connectBadge: train.connectBadge || '',
+            depTimeStr: secToTimeStr(effDepSec),
+            arrTimeStr: secToTimeStr(adjArrSec)
+          });
+        }
+      }
+    }
+  }
+
+  // --- 2. 若勾選「接受轉乘」，搜尋 1 小時內起發之中途轉乘方案 ---
+  let rawTransfers = [];
+  if (allowTransfer) {
+    let startIdx = ALL_STATIONS.findIndex(s => s.name === startName);
+    let endIdx = ALL_STATIONS.findIndex(s => s.name === endName);
+    let step = isDown ? 1 : -1;
+    let candidateMids = [];
+    for (let idx = startIdx + step; idx !== endIdx; idx += step) {
+      candidateMids.push(ALL_STATIONS[idx].name);
+    }
+
+    for (let t1 of trains) {
+      if (t1.type === '回送') continue;
+      if (typeFilter === 'rapid' && !t1.type.includes('快')) continue;
+      if (typeFilter === 'local' && !t1.type.includes('普通')) continue;
+      let sInfo1 = t1.stops[startName];
+      if (!sInfo1 || sInfo1.status !== 'stop') continue;
+      let rawDepSec1 = sInfo1.depSec != null ? sInfo1.depSec : sInfo1.arrSec;
+      let effDepSec1 = alignDepSecToWindow(rawDepSec1);
+      if (effDepSec1 == null) continue;
+      let shift1 = effDepSec1 - rawDepSec1;
+
+      // 若 t1 本身就直達 endName，且在相同車種間轉乘只會徒增等待，跳過同車種無謂轉乘
+      let t1DirectInfo = t1.stops[endName];
+      let t1IsDirect = (t1DirectInfo && t1DirectInfo.status === 'stop');
+
+      for (let midName of candidateMids) {
+        let midArrInfo = t1.stops[midName];
+        if (!midArrInfo || midArrInfo.status !== 'stop') continue;
+        let rawArrMidSec = midArrInfo.arrSec != null ? midArrInfo.arrSec : midArrInfo.depSec;
+        if (rawArrMidSec == null) continue;
+        let adjArrMidSec = rawArrMidSec + shift1;
+        if (adjArrMidSec < effDepSec1) adjArrMidSec += 86400;
+
+        // 搜尋第二段列車 t2 (從 midName 到 endName)
+        for (let t2 of trains) {
+          if (t2.type === '回送' || t2.num === t1.num) continue;
+          if (t1IsDirect && t1.type === t2.type) continue; // 直達車無需在同車種間轉乘
+
+          let midDepInfo = t2.stops[midName];
+          let endInfo = t2.stops[endName];
+          if (!midDepInfo || !endInfo || midDepInfo.status !== 'stop' || endInfo.status !== 'stop') continue;
+
+          let depMidSec = midDepInfo.depSec != null ? midDepInfo.depSec : midDepInfo.arrSec;
+          let arrEndSec = endInfo.arrSec != null ? endInfo.arrSec : endInfo.depSec;
+          if (depMidSec == null || arrEndSec == null) continue;
+
+          let adjDepMidSec = depMidSec;
+          while (adjDepMidSec < effDepSec1) adjDepMidSec += 86400;
+          let waitSec = adjDepMidSec - adjArrMidSec;
+
+          // 轉乘時間約束：候車 2 ~ 35 分鐘
+          if (waitSec >= 120 && waitSec <= 2100) {
+            let adjArrEndSec = arrEndSec + (adjDepMidSec - depMidSec);
+            if (adjArrEndSec < adjDepMidSec) adjArrEndSec += 86400;
+            let totalDurationMin = Math.round((adjArrEndSec - effDepSec1) / 60);
+            let isCrossDay = (effDepSec1 >= 86400) || (adjArrEndSec >= 86400 && effDepSec1 < 86400) || !!t1.isTailCrossDay || !!t2.isTailCrossDay;
+
+            rawTransfers.push({
+              isTransfer: true,
+              depSec: effDepSec1,
+              arrSec: adjArrEndSec,
+              durationMin: totalDurationMin,
+              waitSec: waitSec,
+              waitMin: Math.round(waitSec / 60),
+              midName: midName,
+              train1: t1,
+              train2: t2,
+              startName, endName,
+              isCrossDay,
+              connectBadge: t1.connectBadge || t2.connectBadge || '',
+              depTimeStr: secToTimeStr(effDepSec1),
+              arrTimeStr: secToTimeStr(adjArrEndSec),
+              midArrTimeStr: secToTimeStr(adjArrMidSec),
+              midDepTimeStr: secToTimeStr(adjDepMidSec)
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 核心規則：同一個先搭乘班次，如需換乘，僅需提供換乘後，最快的選擇
+  // 1. 先為所有先搭乘班次 (train1.num)，找出換乘後最快抵達 (arrSec 最小 / durationMin 最小) 的單一最佳換乘方案
+  //    若有多個車站可換乘且抵達時間相同，選取候車時間最短 (waitSec 最小) 的轉乘車站
+  let fastestTransferByFirstTrain = new Map();
+  for (let p of rawTransfers) {
+    let t1Num = p.train1.num + '_' + p.depSec;
+    if (!fastestTransferByFirstTrain.has(t1Num)) {
+      fastestTransferByFirstTrain.set(t1Num, p);
+    } else {
+      let cur = fastestTransferByFirstTrain.get(t1Num);
+      let isFaster = (p.arrSec < cur.arrSec) ||
+                     (p.arrSec === cur.arrSec && p.durationMin < cur.durationMin) ||
+                     (p.arrSec === cur.arrSec && p.durationMin === cur.durationMin && p.waitSec < cur.waitSec);
+      if (isFaster) {
+        fastestTransferByFirstTrain.set(t1Num, p);
+      }
+    }
+  }
+
+  // 2. 整合直達方案與換乘方案：
+  //    - 所有直達方案 (plans) 保留
+  //    - 換乘方案：同一個先搭乘班次若本身已有直達車，僅在換乘能更早抵達時才提供；若無直達車，則加入該班次最快的換乘方案
+  let finalTransfers = [];
+  for (let p of fastestTransferByFirstTrain.values()) {
+    let direct = plans.find(d => d.train1.num === p.train1.num && d.depSec === p.depSec);
+    if (direct) {
+      if (p.arrSec < direct.arrSec) {
+        finalTransfers.push(p);
+      }
+    } else {
+      finalTransfers.push(p);
+    }
+  }
+
+  // 合併直達方案與換乘方案
+  let allPlans = [...plans, ...finalTransfers];
+
+  // 排序：先按出發時間，再按總行程時間
+  allPlans.sort((a, b) => a.depSec - b.depSec || a.durationMin - b.durationMin);
+
+  let filteredPlans = allPlans;
+
+  // 產生結果 HTML
+  let schedName = getScheduleDisplayName(activeSchedType);
+  let timeWindowText = `${secToTimeStr(startSec)} ~ ${secToTimeStr(startSec + 3600)}`;
+
+  let html = `
+    <div class="result-summary-bar">
+      <span>📍 ${startName} ➔ ${endName} ｜ ${dirLabel} ｜ 里程 ${distKm} km ｜ 適用【${schedName}】</span>
+      <span style="color:#0284c7;">出發時段：${timeWindowText} (1 小時內) ｜ 共 ${filteredPlans.length} 個方案</span>
+    </div>
+  `;
+
+  if (filteredPlans.length === 0) {
+    html += `
+      <div class="empty-state">
+        <p style="font-size:16px; font-weight:bold; color:#ef4444; margin-bottom:8px;">❌ 在此 1 小時時段內 (${timeWindowText}) 查無出發班次</p>
+        <p>此區間在該 1 小時時段內暫無列車發車，建議選擇其他出發時間。${!allowTransfer ? '<br>亦可勾選【接受中途轉乘方案】以搜尋更多接駁路線。' : ''}</p>
+      </div>
+    `;
+    resArea.innerHTML = html;
+    return;
+  }
+
+  filteredPlans.forEach((plan, idx) => {
+    let extraBadges = (plan.isCrossDay ? '<span class="cross-day-badge">跨日</span>' : '') +
+                      (plan.connectBadge ? `<span class="connect-badge">${plan.connectBadge}</span>` : '');
+    if (!plan.isTransfer) {
+      // 直達列車方案
+      let t = plan.train1;
+      html += `
+        <div class="plan-card">
+          <div class="plan-header">
+            <div class="plan-time-main">
+              <span>${plan.depTimeStr}</span>
+              <span style="color:#94a3b8; font-size:14px;">➔</span>
+              <span>${plan.arrTimeStr}</span>
+              <span class="plan-duration">約 ${plan.durationMin} 分鐘</span>
+              ${extraBadges}
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="direct-badge">直達車</span>
+              ${getTypeBadge(t.type)}
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#475569;">
+            <div>
+              <strong>${t.num} 次</strong> (${t.type}) ｜ 往 <strong>${t.dest}</strong>
+              ${t.stops[startName].plat ? ` ｜ ${startName}第 <strong>${t.stops[startName].plat}</strong> 月台發車` : ''}
+            </div>
+            <button type="button" class="stop-detail-toggle" onclick="togglePlanStops('plan-detail-${idx}')">
+              展開沿途停靠站 ▼
+            </button>
+          </div>
+          <div id="plan-detail-${idx}" style="display:none; margin-top:12px; border-top:1px dashed #cbd5e1; padding-top:10px;">
+            ${renderRouteStopsTable(t, startName, endName)}
+          </div>
+        </div>
+      `;
+    } else {
+      // 轉乘方案
+      let t1 = plan.train1;
+      let t2 = plan.train2;
+      html += `
+        <div class="plan-card" style="border-left:4px solid #f59e0b;">
+          <div class="plan-header">
+            <div class="plan-time-main">
+              <span>${plan.depTimeStr}</span>
+              <span style="color:#94a3b8; font-size:14px;">➔</span>
+              <span>${plan.arrTimeStr}</span>
+              <span class="plan-duration" style="background:#fef3c7; color:#92400e; font-weight:bold;">總計約 ${plan.durationMin} 分鐘</span>
+              ${extraBadges}
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="transfer-badge">轉乘 1 次</span>
+              ${getTypeBadge(t1.type)} ➔ ${getTypeBadge(t2.type)}
+            </div>
+          </div>
+
+          <div style="font-size:13px; color:#1e293b;">
+            <div class="transfer-step-box">
+              <strong>第一段：</strong>搭乘 <strong>${t1.num} 次 (${t1.type})</strong> 自 <strong>${startName} (${plan.depTimeStr} 發)</strong> ➔ 抵達 <strong>${plan.midName} (${plan.midArrTimeStr} 到)</strong>
+            </div>
+            <div style="padding:4px 12px; font-size:12px; color:#d97706; font-weight:bold; display:flex; align-items:center; gap:6px;">
+              <span>🔁 於 <strong>【${plan.midName}】</strong> 站內轉乘 ｜ 等候約 ${plan.waitMin} 分鐘</span>
+            </div>
+            <div class="transfer-step-box" style="border-left-color:#38bdf8;">
+              <strong>第二段：</strong>轉乘 <strong>${t2.num} 次 (${t2.type})</strong> 自 <strong>${plan.midName} (${plan.midDepTimeStr} 發)</strong> ➔ 抵達 <strong>${endName} (${plan.arrTimeStr} 到)</strong>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+            <button type="button" class="stop-detail-toggle" onclick="togglePlanStops('plan-detail-${idx}')">
+              展開兩段列車詳細站表 ▼
+            </button>
+          </div>
+          <div id="plan-detail-${idx}" style="display:none; margin-top:12px; border-top:1px dashed #cbd5e1; padding-top:10px;">
+            <div style="margin-bottom:10px;">
+              <strong>第一段：${t1.num} 次 (${t1.type}) 停靠資訊</strong>
+              ${renderRouteStopsTable(t1, startName, plan.midName)}
+            </div>
+            <div>
+              <strong>第二段：${t2.num} 次 (${t2.type}) 停靠資訊</strong>
+              ${renderRouteStopsTable(t2, plan.midName, endName)}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  resArea.innerHTML = html;
+}
+
+function togglePlanStops(elId) {
+  let el = document.getElementById(elId);
+  if (!el) return;
+  el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+
+function renderRouteStopsTable(train, fromStation, toStation) {
+  let orderedStNames = (train.direction === 'down') ? STATION_NAMES : [...STATION_NAMES].reverse();
+  let sIdx = orderedStNames.indexOf(fromStation);
+  let eIdx = orderedStNames.indexOf(toStation);
+  if (sIdx === -1 || eIdx === -1) return '';
+  let subNames = orderedStNames.slice(Math.min(sIdx, eIdx), Math.max(sIdx, eIdx) + 1);
+
+  let html = `
+    <table class="train-vertical-table">
+      <thead>
+        <tr>
+          <th>停靠車站</th>
+          <th>到達時刻</th>
+          <th>發車時刻</th>
+          <th>月台番線</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  subNames.forEach(stName => {
+    let s = train.stops[stName];
+    let isStop = s && s.status === 'stop';
+    let isPass = s && s.status.includes('pass');
+    let rowCls = isStop ? 'stop-row' : (isPass ? 'pass-row' : '');
+    let statusText = isStop ? '<span style="color:#16a34a;">🟢 停靠</span>' : (isPass ? '<span style="color:#38bdf8;">🔵 通過</span>' : '<span style="color:#94a3b8;">--</span>');
+
+    html += `
+      <tr class="${rowCls}">
+        <td style="text-align:left; font-weight:${stName === fromStation || stName === toStation ? 'bold' : 'normal'};">
+          ${stName} ${stName === fromStation ? ' (起點)' : (stName === toStation ? ' (訖點)' : '')}
+        </td>
+        <td>${s && s.arrStr ? s.arrStr : '--'}</td>
+        <td>${s && s.depStr ? s.depStr : '--'}</td>
+        <td>${s && s.plat ? s.plat : '--'}</td>
+        <td>${statusText}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  return html;
+}
+
+// ========================================================
+// 功能 2：依車次查詢全站停靠時刻表 (無快捷鍵)
+// ========================================================
+function searchTrainByNo() {
+  const queryNo = document.getElementById('trainNoInput').value.trim();
+  const resArea = document.getElementById('trainResultArea');
+  if (!queryNo) {
+    resArea.innerHTML = '<div class="empty-state">請輸入車次號碼以進行查詢。</div>';
+    return;
+  }
+
+  // 跨上下行搜尋匹配車次（含銜接班次）
+  let matchedTrains = [];
+  ['down', 'up'].forEach(dir => {
+    let trains = getEffectiveTimetable(activeSchedType, dir, false);
+    for (let t of trains) {
+      if (t.num === queryNo || t.num.toLowerCase() === queryNo.toLowerCase()) {
+        matchedTrains.push(t);
+      }
+    }
+  });
+
+  // 若完全符合沒有，嘗試模糊搜尋
+  if (matchedTrains.length === 0) {
+    ['down', 'up'].forEach(dir => {
+      let trains = getEffectiveTimetable(activeSchedType, dir, false);
+      for (let t of trains) {
+        if (t.num.includes(queryNo)) {
+          matchedTrains.push(t);
+        }
+      }
+    });
+  }
+
+  let schedName = getScheduleDisplayName(activeSchedType);
+
+  if (matchedTrains.length === 0) {
+    resArea.innerHTML = `
+      <div class="empty-state">
+        <p style="font-size:16px; font-weight:bold; color:#ef4444;">❌ 在【${schedName}】中查無車次 [${queryNo}]</p>
+        <p>請檢查車次號碼輸入是否正確，或切換時刻表類別（平日 / 假日 / 連續假日 / 平日接連假 / 連假接平日）。</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="result-summary-bar">
+      <span>🚆 車次查詢結果 ｜ 車次編號: ${queryNo} ｜ 適用【${schedName}】</span>
+      <span style="color:#0284c7;">共找到 ${matchedTrains.length} 班對應車次</span>
+    </div>
+  `;
+
+  matchedTrains.forEach(train => {
+    let dirLabel = (train.direction === 'down') ? '下行 (往 全京大道)' : '上行 (往 飛灣工業區)';
+    let orderedStNames = (train.direction === 'down') ? STATION_NAMES : [...STATION_NAMES].reverse();
+    let crossTag = (train.endSec >= 86400) ? '<span class="cross-day-badge">跨日班次</span>' : '';
+    let connTag = train.connectBadge ? `<span class="connect-badge">${train.connectBadge}</span>` : '';
+
+    html += `
+      <div class="plan-card" style="margin-bottom:25px;">
+        <div class="plan-header">
+          <div style="font-size:20px; font-weight:bold; color:#0f172a; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span>${train.num} 次</span>
+            ${getTypeBadge(train.type)}
+            ${crossTag}${connTag}
+            <span style="font-size:13px; color:#64748b; font-weight:normal;">(${dirLabel})</span>
+          </div>
+          <div>
+            ${train.opNum ? `<span style="background:#e2e8f0; color:#334155; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:bold;">運用: ${train.opNum}</span>` : ''}
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; padding:10px 14px; border-radius:6px; margin-bottom:15px; font-size:13px; color:#334155;">
+          <strong>區間：</strong>${train.origin} (${secToTimeStr(train.startSec)}) ➔ ${train.dest} (${secToTimeStr(train.endSec)}) ｜
+          <strong>車程：</strong>約 ${Math.round(((train.endSec || 0) - (train.startSec || 0)) / 60)} 分鐘
+        </div>
+
+        <h4 style="font-size:13px; color:#1e293b; margin-bottom:8px;">全線停靠時刻表 (直式 Working Timetable)</h4>
+        <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
+          <table class="train-vertical-table" style="margin:0;">
+            <thead>
+              <tr style="position: sticky; top: 0; z-index: 2;">
+                <th>站名代號</th>
+                <th>停靠車站</th>
+                <th>到達時刻</th>
+                <th>發車時刻</th>
+                <th>月台番線</th>
+                <th>運行狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    orderedStNames.forEach(stName => {
+      let stObj = ALL_STATIONS.find(s => s.name === stName);
+      let s = train.stops[stName];
+      let isStop = s && s.status === 'stop';
+      let isPass = s && s.status.includes('pass');
+      let rowCls = isStop ? 'stop-row' : (isPass ? 'pass-row' : '');
+      let statusHtml = '<span style="color:#cbd5e1;">未行駛</span>';
+      if (isStop) statusHtml = '<span style="color:#16a34a; font-weight:bold;">🟢 停靠</span>';
+      else if (isPass) statusHtml = '<span style="color:#38bdf8;">🔵 通過</span>';
+
+      html += `
+        <tr class="${rowCls}">
+          <td>${stObj ? stObj.code : ''}</td>
+          <td style="text-align:left; font-weight:${isStop ? 'bold' : 'normal'};">${stName}</td>
+          <td>${s && s.arrStr ? s.arrStr : '--'}</td>
+          <td>${s && s.depStr ? s.depStr : '--'}</td>
+          <td>${s && s.plat ? s.plat : '--'}</td>
+          <td>${statusHtml}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  });
+
+  resArea.innerHTML = html;
+}
+
+// ========================================================
+// 功能 3：依出發車站發車時刻表 + 下一班車 (倒數)
+// ========================================================
+function searchStationSchedule() {
+  const station = document.getElementById('stationSelect').value;
+  const resArea = document.getElementById('stationResultArea');
+  if (!station) {
+    resArea.innerHTML = '<div class="empty-state">請選擇出發車站。</div>';
+    return;
+  }
+
+  const trains = getEffectiveTimetable(activeSchedType, currentDirection, true);
+  let stationTrains = [];
+
+  for (let train of trains) {
+    if (train.type === '回送') continue;
+    let s = train.stops[station];
+    if (s && s.status === 'stop' && (s.depSec != null || s.arrSec != null)) {
+      let timeSec = s.depSec != null ? s.depSec : s.arrSec;
+      if (train.isTailCrossDay && timeSec < 0) continue; // 前夜發車之當日車站時刻已於前日顯示
+      if (station === train.dest && s.depSec == null) continue; // 終點站非發車不列於出發時刻表（僅保留過站或起訖可發車站）
+      stationTrains.push({
+        num: train.num,
+        type: train.type,
+        dest: train.dest,
+        timeSec: timeSec,
+        timeStr: secToTimeStr(timeSec),
+        plat: s.plat || '--',
+        isCrossDay: (timeSec >= 86400) || !!train.isTailCrossDay,
+        connectBadge: train.connectBadge || ''
+      });
+    }
+  }
+
+  stationTrains.sort((a, b) => a.timeSec - b.timeSec);
+
+  let dirText = (currentDirection === 'down') ? '下行 (往 全京大道)' : '上行 (往 飛灣工業區)';
+  let schedName = getScheduleDisplayName(activeSchedType);
+
+  let html = `
+    <div class="result-summary-bar">
+      <span>🏢 【${station}】全日發車時刻表 ｜ ${dirText} ｜ 適用【${schedName}】</span>
+      <span style="color:#0284c7;">共計 ${stationTrains.length} 班發車</span>
+    </div>
+  `;
+
+  if (stationTrains.length === 0) {
+    html += `<div class="empty-state">此方向無【${station}】之停靠發車班次。</div>`;
+    resArea.innerHTML = html;
+    return;
+  }
+
+  html += `
+    <div class="table-scroll-wrapper" style="max-height: 450px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <table class="schedule-table">
+        <thead>
+          <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+            <th width="22%">發車時刻</th>
+            <th width="23%">列車車種</th>
+            <th width="25%">開往目的地</th>
+            <th width="15%">車次編號</th>
+            <th width="15%">發車月台</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  stationTrains.forEach(item => {
+    let badges = (item.isCrossDay ? '<span class="cross-day-badge">跨日</span>' : '') +
+                 (item.connectBadge ? `<span class="connect-badge">${item.connectBadge}</span>` : '');
+    html += `
+      <tr>
+        <td><div class="time-display" style="font-size:16px; font-weight:bold; color:#0f172a;">${item.timeStr} ${badges}</div></td>
+        <td>${getTypeBadge(item.type)}</td>
+        <td><strong>${item.dest}</strong></td>
+        <td><span style="font-family:monospace; font-weight:bold;">${item.num} 次</span></td>
+        <td>${item.plat}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table></div>`;
+  resArea.innerHTML = html;
+}
+
+function showNextTrain() {
+  const station = document.getElementById('stationSelect').value;
+  const nextDisplay = document.getElementById('nextTrainDisplay');
+  if (!station) {
+    alert('請先選擇出發車站！');
+    return;
+  }
+
+  const trains = getEffectiveTimetable(activeSchedType, currentDirection, true);
+  const now = new Date();
+  const rawNowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  let refSec = rawNowSec;
+  if ((activeSchedType === 'weekday' || activeSchedType === 'holiday' || activeSchedType === 'weekday_to_long') && rawNowSec < 4 * 3600) {
+    refSec = rawNowSec + 86400;
+  }
+
+  let nextTrain = null;
+  let minDiff = Infinity;
+
+  for (let train of trains) {
+    if (train.type === '回送') continue;
+    let s = train.stops[station];
+    if (s && s.status === 'stop' && s.depSec != null) {
+      if (train.isTailCrossDay && s.depSec < 0) continue;
+      let diff = s.depSec - refSec;
+      if (activeSchedType === 'holiday_long' && diff <= 0) {
+        diff = (s.depSec + 86400) - refSec;
+      }
+      if (diff > 0 && diff < minDiff) {
+        minDiff = diff;
+        nextTrain = {
+          num: train.num,
+          type: train.type,
+          dest: train.dest,
+          timeStr: secToTimeStr(s.depSec),
+          diffMin: Math.ceil(diff / 60),
+          connectBadge: train.connectBadge || ''
+        };
+      }
+    }
+  }
+
+  nextDisplay.style.display = 'block';
+  if (nextTrain) {
+    nextDisplay.innerHTML = `
+      <div style="font-size:15px; font-weight:bold; margin-bottom:6px;">
+        ⚡ 即將發車：${getTypeBadge(nextTrain.type)} 開往 <strong>${nextTrain.dest}</strong> (車次: ${nextTrain.num} 次)
+        ${nextTrain.connectBadge ? `<span class="connect-badge">${nextTrain.connectBadge}</span>` : ''}
+      </div>
+      <div style="font-size:24px; font-weight:bold; color:#b45309; margin: 4px 0;">
+        ${nextTrain.timeStr}
+      </div>
+      <div style="font-size:12px; color:#78350f;">
+        現在時間 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}（約 <strong>${nextTrain.diffMin}</strong> 分鐘後發車）
+      </div>
+    `;
+  } else {
+    nextDisplay.innerHTML = `
+      <div style="font-size:15px; font-weight:bold; color:#7f8c8d;">
+        😴 本日後續已無發車班次
+      </div>
+      <div style="font-size:12px; color:#666; margin-top:4px;">
+        末班車已駛離，請改搭其他交通工具或查看次日班次。
+      </div>
+    `;
+  }
+}
+
+// ========================================================
+// 頁面初始化
+// ========================================================
+window.addEventListener('DOMContentLoaded', async () => {
+  const todayInfo = getTodayFlywanInfo();
+  activeSchedType = todayInfo.scheduleType;
+
+  const infoEl = document.getElementById('cal-info-text');
+  const badgeEl = document.getElementById('cal-sched-badge');
+  if (infoEl) infoEl.textContent = todayInfo.text;
+  if (badgeEl) {
+    badgeEl.textContent = todayInfo.scheduleLabel;
+    badgeEl.style.backgroundColor = todayInfo.badgeColor || getScheduleBadgeColor(todayInfo.scheduleType);
+  }
+
+  // 初始化自訂時間預設值為目前時間
+  const now = new Date();
+  const timeInput = document.getElementById('odCustomTime');
+  if (timeInput) {
+    timeInput.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  }
+
+  populateStationDropdowns();
+  await loadAllTimetableData();
+
+  // 預設執行起訖站查詢 (1 小時內班次)
+  searchOdSchedule();
+});
+</script>
+</body>
+</html>

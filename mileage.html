@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>里程表｜飛灣鐵路公司</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .mileage-table {
+      width: 100%; border-collapse: collapse; background: #ffffff;
+      border-radius: 10px; overflow: hidden; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+    .mileage-table th, .mileage-table td {
+      padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px;
+    }
+    .mileage-table th {
+      background: #064663; color: #ffffff; font-weight: 700;
+    }
+    .mileage-table tr.depot-row {
+      background: #faf5ff; color: #581c87;
+    }
+    .mileage-table tr.exp-row {
+      background: #f0f9ff;
+    }
+    .fr-code {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-weight: 700; font-size: 12px; background: #0284c7; color: #ffffff;
+    }
+    .fr-code.depot { background: #7c3aed; }
+    .tag-exp {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; background: #dbeafe; color: #1e40af;
+    }
+    .tag-local {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; background: #f1f5f9; color: #475569;
+    }
+    .calc-box {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .calc-box select {
+      padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container navbar">
+    <div class="brand">
+      <span class="brand-subtitle">FLYWAN RAILWAY COMPANY</span>
+      <span class="brand-title">飛灣鐵路公司</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">首頁</a>
+      <a href="news.html">公告資訊</a>
+      <a href="stations.html">車站資訊</a>
+      <a href="timetable.html">時刻表</a>
+      <a href="tickets.html">票務資訊</a>
+      <a href="company.html">公司介紹</a>
+      <a href="extras.html" class="active">其他資料</a>
+      <a href="game.html" target="_blank" rel="noopener noreferrer">小遊戲</a>
+      <a href="contact.html">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <section>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h1>飛灣線營業與運轉里程表</h1>
+        <p class="lead">依據飛灣鐵路運轉系統（GAME）實測幾何里程建置，包含全線 22 座車站 FR 編號及兩座車輛基地。</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a href="extras.html" class="btn btn-outline">← 返回其他資料</a>
+        <a href="track_layout.html" class="btn btn-primary">查看軌道配置圖 →</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <article class="card">
+      <h2>站間里程試算</h2>
+      <div class="calc-box">
+        <label>起點：<select id="calcFrom"></select></label>
+        <span>➔</span>
+        <label>訖點：<select id="calcTo"></select></label>
+        <div id="calcResult" style="font-size:15px; font-weight:700; color:#064663;"></div>
+      </div>
+    </article>
+  </section>
+
+  <section>
+    <h2>全線車站與車輛基地里程一覽</h2>
+    <div style="overflow-x:auto;">
+      <table class="mileage-table" id="mileageTable">
+        <thead>
+          <tr>
+            <th>FR 編號 / 基地</th>
+            <th>車站 / 基地名稱</th>
+            <th>累計里程 (km)</th>
+            <th>精確距離 (m)</th>
+            <th>與前站間距 (km)</th>
+            <th>月台型式</th>
+            <th>停靠等級 / 備註</th>
+          </tr>
+        </thead>
+        <tbody id="mileageBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>&copy; 2026 飛灣鐵路公司. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script>
+const MILEAGE_NODES = [
+  { code: 'FR01', name: '飛灣工業區',   distM: 0,     type: '雙島式月台 (4線)', exp: true,  isDepot: false, note: '下行起點站；站前設 4 線止衝擋 (-80m)' },
+  { code: '基地', name: '飛灣車輛基地', distM: 1000,  type: '車輛基地支線',      exp: false, isDepot: true,  note: '下行側 1,000m 分歧（700~1,000m）；上行側 1,200m 匯入（1,500~1,200m）' },
+  { code: 'FR02', name: '飛灣港',       distM: 7300,  type: '待避側式月台',      exp: false, isDepot: false, note: '設正線與待避側線 (±6.0m)' },
+  { code: 'FR03', name: '物流中心',     distM: 8600,  type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR04', name: '飛灣郵輪港',   distM: 9800,  type: '雙島式月台 (4線)', exp: true,  isDepot: false, note: '快速／特快停靠；站後 10,100~10,300m 設橫渡線' },
+  { code: 'FR05', name: '濱江商務區',   distM: 17000, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR06', name: '市民廣場',     distM: 18500, type: '待避側式月台',      exp: false, isDepot: false, note: '設正線與待避側線 (±6.0m)' },
+  { code: 'FR07', name: '文化中心',     distM: 19800, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR08', name: '飛灣新站',     distM: 21700, type: '雙島式月台 (4線)', exp: true,  isDepot: false, note: '快速／特快停靠' },
+  { code: 'FR09', name: '科創園',       distM: 24000, type: '待避側式月台',      exp: false, isDepot: false, note: '設正線與待避側線 (±6.0m)' },
+  { code: 'FR10', name: '飛灣學區',     distM: 25200, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR11', name: '飛灣大道',     distM: 26900, type: '島式月台 (2線)',    exp: false, isDepot: false, note: '站後接續 FR12 中央袋形軌 (27,848~28,052m)' },
+  { code: 'FR12', name: '飛灣公園',     distM: 28500, type: '雙島式月台 (4線)', exp: true,  isDepot: false, note: '快速／特快停靠；巨蛋賽事轉運樞紐' },
+  { code: 'FR13', name: '錦湖',         distM: 29900, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR14', name: '鷺島',         distM: 30400, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '全線最短站距區間 (0.5 km)' },
+  { code: 'FR15', name: '空港新城',     distM: 33200, type: '島式月台 (2線)',    exp: false, isDepot: false, note: '站後 33,500~33,700m 設橫渡線' },
+  { code: 'FR16', name: '飛灣機場',     distM: 38100, type: '雙島式月台 (4線)', exp: true,  isDepot: false, note: '快速／特快停靠；國際航廈連通站' },
+  { code: 'FR17', name: '翡翠花園',     distM: 43300, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR18', name: '紫荊苑',       distM: 46500, type: '待避側式月台',      exp: false, isDepot: false, note: '設待避側線；站後 46,800~47,000m 設橫渡線' },
+  { code: 'FR19', name: '御景新村',     distM: 54700, type: '島式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR20', name: '自然保育中心', distM: 56100, type: '側式月台 (2線)',    exp: false, isDepot: false, note: '普通／通勤停靠' },
+  { code: 'FR21', name: '綾路北站',     distM: 57900, type: '終端雙島式月台',    exp: true,  isDepot: false, note: '內側正線於 57,980m 終止；外側線續接全京大道' },
+  { code: 'FR22', name: '全京大道',     distM: 59100, type: '島式月台 (2線)',    exp: false, isDepot: false, note: '站後 59,400~59,480m 設剪式橫渡線' },
+  { code: '基地', name: '全京車輛基地', distM: 60000, type: '車輛基地終端',      exp: false, isDepot: true,  note: '基地里程 60.0 km；正線止衝擋延伸至 61,900m' }
+];
+
+const tbody = document.getElementById('mileageBody');
+let prevStationDist = 0;
+
+MILEAGE_NODES.forEach((n, idx) => {
+  const gapKm = idx === 0 ? 0 : (n.distM - prevStationDist) / 1000;
+  if (!n.isDepot) prevStationDist = n.distM;
+
+  const tr = document.createElement('tr');
+  if (n.isDepot) tr.className = 'depot-row';
+  else if (n.exp) tr.className = 'exp-row';
+
+  tr.innerHTML = `
+    <td><span class="fr-code ${n.isDepot ? 'depot' : ''}">${n.code}</span></td>
+    <td><strong>${n.name}</strong></td>
+    <td>${(n.distM / 1000).toFixed(1)} km</td>
+    <td>${n.distM.toLocaleString()} m</td>
+    <td>${idx === 0 ? '—' : gapKm.toFixed(1) + ' km'}</td>
+    <td>${n.type}</td>
+    <td>
+      ${n.isDepot ? '<span class="tag-local" style="background:#ede9fe;color:#6d28d9;">車輛基地</span>' : (n.exp ? '<span class="tag-exp">快速停靠</span>' : '<span class="tag-local">普通/通勤</span>')}
+      <span style="font-size:12px;color:#475569;margin-left:6px;">${n.note}</span>
+    </td>
+  `;
+  tbody.appendChild(tr);
+});
+
+const calcFrom = document.getElementById('calcFrom');
+const calcTo = document.getElementById('calcTo');
+MILEAGE_NODES.forEach((n, idx) => {
+  const label = `${n.code} ${n.name} (${(n.distM/1000).toFixed(1)}km)`;
+  calcFrom.add(new Option(label, idx));
+  calcTo.add(new Option(label, idx));
+});
+calcTo.selectedIndex = MILEAGE_NODES.length - 2; // FR22 全京大道
+
+function updateCalc() {
+  const a = MILEAGE_NODES[calcFrom.selectedIndex];
+  const b = MILEAGE_NODES[calcTo.selectedIndex];
+  const diffM = Math.abs(b.distM - a.distM);
+  const dir = b.distM > a.distM ? '下行（往全京方向）' : (b.distM < a.distM ? '上行（往工業區方向）' : '同站');
+  document.getElementById('calcResult').textContent = `${dir} ｜ 距離 ${(diffM / 1000).toFixed(1)} km（${diffM.toLocaleString()} m）`;
+}
+calcFrom.onchange = updateCalc;
+calcTo.onchange = updateCalc;
+updateCalc();
+</script>
+</body>
+</html>

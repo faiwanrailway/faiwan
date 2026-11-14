@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>軌道配置圖｜飛灣鐵路公司</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #0f172a; color: #e2e8f0; margin: 0; }
+    .layout-toolbar {
+      position: sticky; top: 0; z-index: 40;
+      background: #1e293b; border-bottom: 1px solid #334155;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      padding: 12px 20px;
+    }
+    .layout-toolbar-inner {
+      max-width: 1500px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .page-title { margin: 0; font-size: 20px; font-weight: 800; color: #f8fafc; }
+    .chip-btn {
+      padding: 6px 12px; border-radius: 8px; border: 1px solid #475569;
+      background: #0f172a; color: #e2e8f0; font-size: 13px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+    }
+    .chip-btn:hover { background: #334155; }
+    h2, h3 { color: #f8fafc; }
+    .lead { color: #94a3b8; margin: 4px 0 0; font-size: 13px; }
+    .layout-main { max-width: 1500px; margin: 16px auto 32px; padding: 0 16px; }
+    .blueprint-box {
+      background: #0b1220; border: 1px solid #334155; border-radius: 12px;
+      padding: 14px; overflow-x: auto; box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.5);
+    }
+    .legend-bar {
+      display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px;
+      padding: 10px 14px; background: #1e293b; border-radius: 10px; font-size: 13px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-line { width: 22px; height: 4px; border-radius: 2px; }
+    .seq-table {
+      width: 100%; border-collapse: collapse; background: #1e293b;
+      border-radius: 10px; overflow: hidden; margin-top: 14px;
+    }
+    .seq-table th, .seq-table td {
+      padding: 9px 12px; border-bottom: 1px solid #334155; font-size: 13px; text-align: left;
+    }
+    .seq-table th { background: #064663; color: #ffffff; }
+    .seq-table tr.is-switch { background: rgba(245, 158, 11, 0.08); }
+    .seq-table tr.is-depot { background: rgba(168, 85, 247, 0.10); }
+    .seq-table tr.is-pocket { background: rgba(16, 185, 129, 0.10); }
+    .tag-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    }
+    @media print {
+      .layout-toolbar { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout-toolbar">
+  <div class="layout-toolbar-inner">
+    <div>
+      <h1 class="page-title">🛤️ 飛灣線全線軌道配置圖（GAME 幾何同步版）</h1>
+      <p class="lead">依據運轉模擬系統（GAME）實際道岔、橫渡線、袋形軌與車輛基地接軌座標繪製，確保每條軌道銜接先後順序完全一致。</p>
+    </div>
+    <div class="toolbar-group">
+      <a href="extras.html" class="chip-btn">← 返回其他資料</a>
+      <a href="mileage.html" target="_blank" rel="noopener noreferrer" class="chip-btn">里程表 ↗</a>
+      <a href="timetable_sheet.html?mode=working" target="_blank" rel="noopener noreferrer" class="chip-btn">運轉時刻表 ↗</a>
+      <button class="chip-btn" onclick="window.print()">列印 / 另存 PDF</button>
+    </div>
+  </div>
+</div>
+
+<main class="layout-main">
+
+  <section>
+    <div class="legend-bar">
+      <div class="legend-item"><div class="legend-line" style="background:#38bdf8;"></div><span>上行正線 (PathA -2m)</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#60a5fa;"></div><span>下行正線 (PathB +2m)</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#94a3b8;"></div><span>待避線 / 外側線 (PathC / PathD)</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#10b981;"></div><span>FR12 中央袋形軌 (Pocket 0m)</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#f59e0b;"></div><span>剪式橫渡線 / 轉轍器</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#c084fc;"></div><span>車輛基地分歧／匯入線</span></div>
+      <div class="legend-item"><div class="legend-line" style="background:#ef4444;"></div><span>止衝擋 (Buffer Stop)</span></div>
+    </div>
+
+    <div class="blueprint-box">
+      <svg id="trackSvg" width="4400" height="360" viewBox="0 0 4400 360" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>全線軌道銜接與道岔順序表（由 FR01 -80m 至 全京車輛基地 61,900m）</h2>
+    <div style="overflow-x:auto;">
+      <table class="seq-table">
+        <thead>
+          <tr>
+            <th>順序</th>
+            <th>里程座標 (m)</th>
+            <th>設施 / 節點名稱</th>
+            <th>類別</th>
+            <th>軌道銜接與橫向偏移說明</th>
+          </tr>
+        </thead>
+        <tbody id="seqBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const TRACK_SEQUENCE = [
+  { d: '-80 m',           name: 'FR01 站前止衝擋',         cat: '止衝擋',   cls: '',          desc: '4 條軌道起端止衝擋（offset: -20m, -2m, +2m, +20m）' },
+  { d: '0 m',             name: 'FR01 飛灣工業區',         cat: '雙島車站', cls: '',          desc: '雙島式月台（PathC -20m, PathA -2m, PathB +2m, PathD +20m），站後匯入 ±2m' },
+  { d: '300 ~ 380 m',     name: 'FR01 站後剪式橫渡線',     cat: '橫渡線',   cls: 'is-switch', desc: '正線折返渡線：PathA (-2m) ↔ PathB (+2m) 雙向交叉' },
+  { d: '600 ~ 680 m',     name: '飛灣基地西側剪式橫渡線', cat: '橫渡線',   cls: 'is-switch', desc: '基地進場前調度渡線：-2m ↔ +2m' },
+  { d: '700 → 1,000 m',   name: '飛灣車輛基地分歧線 (進庫)', cat: '基地支線', cls: 'is-depot',  desc: '由下行正線 (+2m) 向右分歧至飛灣車輛基地 (+8m)' },
+  { d: '1,200 ← 1,500 m', name: '飛灣車輛基地匯入線 (出庫)', cat: '基地支線', cls: 'is-depot',  desc: '由飛灣車輛基地 (-8m) 匯入上行正線 (-2m)' },
+  { d: '1,550 ~ 1,630 m', name: '飛灣基地東側剪式橫渡線', cat: '橫渡線',   cls: 'is-switch', desc: '基地出場後調度渡線：-2m ↔ +2m' },
+  { d: '7,300 m',         name: 'FR02 飛灣港',             cat: '待避車站', cls: '',          desc: '待避側式月台（passing_side）：正線 ±2m、待避側線 ±6m' },
+  { d: '8,600 m',         name: 'FR03 物流中心',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '9,800 m',         name: 'FR04 飛灣郵輪港',         cat: '雙島車站', cls: '',          desc: '雙島式月台：正線 ±2m、外側待避線 ±20m' },
+  { d: '10,100 ~ 10,300 m', name: 'FR04 站後橫渡線',       cat: '橫渡線',   cls: 'is-switch', desc: '站後折返/調度橫渡線：-2m ↔ +2m' },
+  { d: '17,000 m',        name: 'FR05 濱江商務區',         cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '18,500 m',        name: 'FR06 市民廣場',           cat: '待避車站', cls: '',          desc: '待避側式月台（passing_side）：正線 ±2m、待避側線 ±6m' },
+  { d: '19,800 m',        name: 'FR07 文化中心',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '21,700 m',        name: 'FR08 飛灣新站',           cat: '雙島車站', cls: '',          desc: '雙島式月台：正線 ±2m、外側待避線 ±20m' },
+  { d: '24,000 m',        name: 'FR09 科創園',             cat: '待避車站', cls: '',          desc: '待避側式月台（passing_side）：正線 ±2m、待避側線 ±6m' },
+  { d: '25,200 m',        name: 'FR10 飛灣學區',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '26,900 m',        name: 'FR11 飛灣大道',           cat: '島式車站', cls: '',          desc: '島式月台：正線開展至 ±9m' },
+  { d: '27,750 ~ 27,850 m', name: 'FR12 袋形軌西側轉轍器', cat: '轉轍器',   cls: 'is-switch', desc: '正線 (±4.2m) 匯入中央袋形軌 (0m)' },
+  { d: '27,848 ~ 28,052 m', name: 'FR12 中央袋形軌 (Pocket)', cat: '袋形軌', cls: 'is-pocket', desc: '位於 0m 中央之 204m 折返／待避袋形軌' },
+  { d: '28,050 ~ 28,150 m', name: 'FR12 袋形軌東側轉轍器', cat: '轉轍器',   cls: 'is-switch', desc: '中央袋形軌 (0m) 接回雙正線 (±4.2m)' },
+  { d: '28,500 m',        name: 'FR12 飛灣公園',           cat: '雙島車站', cls: '',          desc: '雙島式月台：正線 ±4.2m、外側線 ±22.2m' },
+  { d: '29,900 m',        name: 'FR13 錦湖',               cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '30,400 m',        name: 'FR14 鷺島',               cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '33,200 m',        name: 'FR15 空港新城',           cat: '島式車站', cls: '',          desc: '島式月台：正線開展至 ±9m' },
+  { d: '33,500 ~ 33,700 m', name: 'FR15 站後橫渡線',       cat: '橫渡線',   cls: 'is-switch', desc: '站後折返/調度橫渡線：-2m ↔ +2m' },
+  { d: '38,100 m',        name: 'FR16 飛灣機場',           cat: '雙島車站', cls: '',          desc: '雙島式月台：正線 ±2m、外側線 ±20m' },
+  { d: '43,300 m',        name: 'FR17 翡翠花園',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '46,500 m',        name: 'FR18 紫荊苑',             cat: '待避車站', cls: '',          desc: '待避側式月台（passing_side）：正線 ±2m、待避側線 ±6m' },
+  { d: '46,800 ~ 47,000 m', name: 'FR18 站後橫渡線',       cat: '橫渡線',   cls: 'is-switch', desc: '站後折返/調度橫渡線：-2m ↔ +2m' },
+  { d: '54,700 m',        name: 'FR19 御景新村',           cat: '島式車站', cls: '',          desc: '島式月台：正線開展至 ±9m' },
+  { d: '56,100 m',        name: 'FR20 自然保育中心',       cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
+  { d: '57,650 ~ 57,800 m', name: 'FR21 站前外線分歧',     cat: '轉轍器',   cls: 'is-switch', desc: 'PathC (-2m→-20m) 與 PathD (+2m→+20m) 分歧至外側月台' },
+  { d: '57,720 ~ 57,800 m', name: 'FR21 站前剪式橫渡線',   cat: '橫渡線',   cls: 'is-switch', desc: '內側正線 (-2m ↔ +2m) 折返橫渡線' },
+  { d: '57,900 m',        name: 'FR21 綾路北站',           cat: '終端雙島', cls: '',          desc: '終端雙島式月台：內側 PathA/B (±2m) 終止於此，外側 PathC/D (±20m) 續行' },
+  { d: '57,980 m',        name: 'FR21 內側正線止衝擋',     cat: '止衝擋',   cls: '',          desc: 'PathA (-2m) 與 PathB (+2m) 終端止衝擋' },
+  { d: '57,980 ~ 58,230 m', name: 'FR21 站後外線收斂',     cat: '轉轍器',   cls: 'is-switch', desc: '外側線 PathC (-20m→-2m) 與 PathD (+20m→+2m) 收斂接回全京段雙線' },
+  { d: '59,100 m',        name: 'FR22 全京大道',           cat: '島式車站', cls: '',          desc: '島式月台：軌道開展至 ±9m' },
+  { d: '59,400 ~ 59,480 m', name: 'FR22 站後剪式橫渡線',   cat: '橫渡線',   cls: 'is-switch', desc: '全京段終端前折返橫渡線：-2m ↔ +2m' },
+  { d: '60,000 m',        name: '全京車輛基地',           cat: '車輛基地', cls: 'is-depot',  desc: '全京車輛基地接軌處（60.0 km）' },
+  { d: '61,900 m',        name: '全線終端止衝擋',         cat: '止衝擋',   cls: '',          desc: '主線終端止衝擋（offset: -2m, +2m）' }
+];
+
+const seqBody = document.getElementById('seqBody');
+TRACK_SEQUENCE.forEach((item, i) => {
+  const tr = document.createElement('tr');
+  if (item.cls) tr.className = item.cls;
+  tr.innerHTML = `
+    <td>${i + 1}</td>
+    <td><strong>${item.d}</strong></td>
+    <td><strong>${item.name}</strong></td>
+    <td><span class="tag-pill" style="background:#0f172a;color:#38bdf8;">${item.cat}</span></td>
+    <td>${item.desc}</td>
+  `;
+  seqBody.appendChild(tr);
+});
+
+// === 繪製 SVG 軌道配置圖 (等序節點展開，確保所有道岔先後順序清晰無重疊) ===
+const svg = document.getElementById('trackSvg');
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, text) {
+  const node = document.createElementNS(NS, tag);
+  Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+  if (text !== undefined) node.textContent = text;
+  svg.appendChild(node);
+  return node;
+}
+
+const yA = 155; // PathA (-2m)
+const yB = 205; // PathB (+2m)
+const yC = 95;  // PathC (-20m / -6m)
+const yD = 265; // PathD (+20m / +6m)
+const yMid = 180;
+
+// 主線分段繪製：PathA/B 到 FR21 (x=3760) 設止衝擋；PathC/D 於 x=3700..3880 接續至 61900m (x=4320)
+el('line', { x1: 60, y1: yA, x2: 3760, y2: yA, stroke: '#38bdf8', 'stroke-width': 3 });
+el('line', { x1: 60, y1: yB, x2: 3760, y2: yB, stroke: '#60a5fa', 'stroke-width': 3 });
+// FR21 之後由 PathC/D 收斂接續全京段
+el('line', { x1: 3880, y1: yA, x2: 4320, y2: yA, stroke: '#94a3b8', 'stroke-width': 3 });
+el('line', { x1: 3880, y1: yB, x2: 4320, y2: yB, stroke: '#94a3b8', 'stroke-width': 3 });
+
+// 輔助繪製函式
+function drawCrossover(x1, x2, label) {
+  el('line', { x1, y1: yA, x2, y2: yB, stroke: '#f59e0b', 'stroke-width': 2.5 });
+  el('line', { x1, y1: yB, x2, y2: yA, stroke: '#f59e0b', 'stroke-width': 2.5 });
+  el('text', { x: (x1 + x2) / 2, y: 318, fill: '#fbbf24', 'font-size': 10, 'text-anchor': 'middle' }, label);
+}
+
+function drawBuffer(x, y) {
+  el('line', { x1: x, y1: y - 9, x2: x, y2: y + 9, stroke: '#ef4444', 'stroke-width': 4 });
+}
+
+function drawStationBox(x, code, name, kind, distLabel) {
+  if (kind === 'double_island' || kind === 'double_island_end') {
+    el('path', { d: `M ${x - 70} ${yA} C ${x - 50} ${yA}, ${x - 50} ${yC}, ${x - 30} ${yC} L ${x + 30} ${yC} C ${x + 50} ${yC}, ${x + 50} ${yA}, ${x + 70} ${yA}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+    el('path', { d: `M ${x - 70} ${yB} C ${x - 50} ${yB}, ${x - 50} ${yD}, ${x - 30} ${yD} L ${x + 30} ${yD} C ${x + 50} ${yD}, ${x + 50} ${yB}, ${x + 70} ${yB}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+    el('rect', { x: x - 34, y: yC + 8, width: 68, height: yA - yC - 16, rx: 4, fill: '#334155', stroke: '#38bdf8' });
+    el('rect', { x: x - 34, y: yB + 8, width: 68, height: yD - yB - 16, rx: 4, fill: '#334155', stroke: '#60a5fa' });
+  } else if (kind === 'passing_side') {
+    el('path', { d: `M ${x - 60} ${yA} L ${x - 35} ${yC + 18} L ${x + 35} ${yC + 18} L ${x + 60} ${yA}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+    el('path', { d: `M ${x - 60} ${yB} L ${x - 35} ${yD - 18} L ${x + 35} ${yD - 18} L ${x + 60} ${yB}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+    el('rect', { x: x - 30, y: yC - 4, width: 60, height: 14, rx: 3, fill: '#475569' });
+    el('rect', { x: x - 30, y: yD - 10, width: 60, height: 14, rx: 3, fill: '#475569' });
+  } else if (kind === 'island') {
+    el('rect', { x: x - 32, y: yA + 8, width: 64, height: yB - yA - 16, rx: 4, fill: '#475569', stroke: '#94a3b8' });
+  } else {
+    el('rect', { x: x - 28, y: yA - 18, width: 56, height: 12, rx: 3, fill: '#475569' });
+    el('rect', { x: x - 28, y: yB + 6, width: 56, height: 12, rx: 3, fill: '#475569' });
+  }
+  el('text', { x, y: 42, fill: '#f8fafc', 'font-size': 12, 'font-weight': 'bold', 'text-anchor': 'middle' }, `${code} ${name}`);
+  el('text', { x, y: 58, fill: '#94a3b8', 'font-size': 10, 'text-anchor': 'middle' }, distLabel);
+}
+
+// 1. FR01 (-80m 止衝擋 + 0m 車站 + 300~380m 橫渡線)
+drawBuffer(60, yC); drawBuffer(60, yA); drawBuffer(60, yB); drawBuffer(60, yD);
+el('line', { x1: 60, y1: yC, x2: 110, y2: yC, stroke: '#94a3b8', 'stroke-width': 2.5 });
+el('line', { x1: 60, y1: yD, x2: 110, y2: yD, stroke: '#94a3b8', 'stroke-width': 2.5 });
+drawStationBox(140, 'FR01', '飛灣工業區', 'double_island', '0.0 km');
+drawCrossover(245, 295, '300~380m');
+
+// 2. 飛灣車輛基地 (600~680, 700->1000, 1500->1200, 1550~1630)
+drawCrossover(340, 385, '600~680m');
+el('path', { d: `M 405 ${yB} C 430 ${yB}, 435 285, 465 285 L 555 285 C 585 285, 595 ${yA}, 615 ${yA}`, fill: 'none', stroke: '#c084fc', 'stroke-width': 3 });
+el('rect', { x: 465, y: 270, width: 90, height: 28, rx: 6, fill: '#581c87', stroke: '#c084fc' });
+el('text', { x: 510, y: 288, fill: '#f3e8ff', 'font-size': 11, 'font-weight': 'bold', 'text-anchor': 'middle' }, '飛灣車輛基地');
+el('text', { x: 435, y: 318, fill: '#c084fc', 'font-size': 10, 'text-anchor': 'middle' }, '700~1000m進');
+el('text', { x: 585, y: 318, fill: '#c084fc', 'font-size': 10, 'text-anchor': 'middle' }, '1500~1200m出');
+drawCrossover(645, 690, '1550~1630m');
+
+// 3. FR02 ~ FR11
+drawStationBox(830, 'FR02', '飛灣港', 'passing_side', '7.3 km');
+drawStationBox(980, 'FR03', '物流中心', 'side', '8.6 km');
+drawStationBox(1150, 'FR04', '飛灣郵輪港', 'double_island', '9.8 km');
+drawCrossover(1250, 1300, '10100~10300m');
+drawStationBox(1430, 'FR05', '濱江商務區', 'side', '17.0 km');
+drawStationBox(1590, 'FR06', '市民廣場', 'passing_side', '18.5 km');
+drawStationBox(1750, 'FR07', '文化中心', 'side', '19.8 km');
+drawStationBox(1930, 'FR08', '飛灣新站', 'double_island', '21.7 km');
+drawStationBox(2110, 'FR09', '科創園', 'passing_side', '24.0 km');
+drawStationBox(2260, 'FR10', '飛灣學區', 'side', '25.2 km');
+drawStationBox(2410, 'FR11', '飛灣大道', 'island', '26.9 km');
+
+// 4. FR12 中央袋形軌 + FR12 飛灣公園
+el('line', { x1: 2510, y1: yA, x2: 2545, y2: yMid, stroke: '#f59e0b', 'stroke-width': 2.5 });
+el('line', { x1: 2510, y1: yB, x2: 2545, y2: yMid, stroke: '#f59e0b', 'stroke-width': 2.5 });
+el('line', { x1: 2545, y1: yMid, x2: 2635, y2: yMid, stroke: '#10b981', 'stroke-width': 4 });
+el('line', { x1: 2635, y1: yMid, x2: 2670, y2: yA, stroke: '#f59e0b', 'stroke-width': 2.5 });
+el('line', { x1: 2635, y1: yMid, x2: 2670, y2: yB, stroke: '#f59e0b', 'stroke-width': 2.5 });
+el('text', { x: 2590, y: 318, fill: '#34d399', 'font-size': 10, 'text-anchor': 'middle' }, '27750~28150m 袋形軌');
+drawStationBox(2780, 'FR12', '飛灣公園', 'double_island', '28.5 km');
+
+// 5. FR13 ~ FR20
+drawStationBox(2940, 'FR13', '錦湖', 'side', '29.9 km');
+drawStationBox(3060, 'FR14', '鷺島', 'side', '30.4 km');
+drawStationBox(3190, 'FR15', '空港新城', 'island', '33.2 km');
+drawCrossover(3260, 3305, '33500~33700m');
+drawStationBox(3430, 'FR16', '飛灣機場', 'double_island', '38.1 km');
+drawStationBox(3590, 'FR17', '翡翠花園', 'side', '43.3 km');
+drawStationBox(3730, 'FR18', '紫荊苑', 'passing_side', '46.5 km');
+drawCrossover(3815, 3860, '46800~47000m');
+drawStationBox(3960, 'FR19', '御景新村', 'island', '54.7 km');
+drawStationBox(4070, 'FR20', '自然保育中心', 'side', '56.1 km');
+
+// 6. Wait: 調整 SVG 寬度或後半座標讓 FR21~61900m 完整容納 (重新映射最後一段於 4140..4380 不夠，把 3700 之後擴寬至 4900)
+svg.setAttribute('width', '4950');
+svg.setAttribute('viewBox', '0 0 4950 360');
+// 重設 FR21 止衝擋至 4420 & 接續線至 4890
+svg.querySelectorAll('line')[0].setAttribute('x2', '4420');
+svg.querySelectorAll('line')[1].setAttribute('x2', '4420');
+svg.querySelectorAll('line')[2].setAttribute('x1', '4510');
+svg.querySelectorAll('line')[2].setAttribute('x2', '4890');
+svg.querySelectorAll('line')[3].setAttribute('x1', '4510');
+svg.querySelectorAll('line')[3].setAttribute('x2', '4890');
+
+drawCrossover(4160, 4215, '57720~57800m');
+// FR21 外側線分歧並延伸過 57980m 止衝擋後收斂回 ±2m
+el('path', { d: `M 4150 ${yA} C 4190 ${yA}, 4200 ${yC}, 4240 ${yC} L 4430 ${yC} C 4470 ${yC}, 4480 ${yA}, 4510 ${yA}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+el('path', { d: `M 4150 ${yB} C 4190 ${yB}, 4200 ${yD}, 4240 ${yD} L 4430 ${yD} C 4470 ${yD}, 4480 ${yB}, 4510 ${yB}`, fill: 'none', stroke: '#94a3b8', 'stroke-width': 2.5 });
+el('rect', { x: 4290, y: yC + 8, width: 70, height: yA - yC - 16, rx: 4, fill: '#334155', stroke: '#38bdf8' });
+el('rect', { x: 4290, y: yB + 8, width: 70, height: yD - yB - 16, rx: 4, fill: '#334155', stroke: '#60a5fa' });
+el('text', { x: 4325, y: 42, fill: '#f8fafc', 'font-size': 12, 'font-weight': 'bold', 'text-anchor': 'middle' }, 'FR21 綾路北站');
+el('text', { x: 4325, y: 58, fill: '#94a3b8', 'font-size': 10, 'text-anchor': 'middle' }, '57.9 km (內線終止)');
+drawBuffer(4420, yA); drawBuffer(4420, yB);
+
+drawStationBox(4610, 'FR22', '全京大道', 'island', '59.1 km');
+drawCrossover(4695, 4745, '59400~59480m');
+el('rect', { x: 4775, y: 158, width: 85, height: 44, rx: 6, fill: '#581c87', stroke: '#c084fc' });
+el('text', { x: 4817, y: 184, fill: '#f3e8ff', 'font-size': 11, 'font-weight': 'bold', 'text-anchor': 'middle' }, '全京基地');
+el('text', { x: 4817, y: 58, fill: '#c084fc', 'font-size': 10, 'text-anchor': 'middle' }, '60.0 km');
+drawBuffer(4890, yA); drawBuffer(4890, yB);
+el('text', { x: 4890, y: 318, fill: '#ef4444', 'font-size': 10, 'text-anchor': 'middle' }, '61,900m');
+</script>
+</body>
+</html>
