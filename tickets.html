@@ -515,7 +515,7 @@
         holidayName: '年初假期週',
         scheduleType: 'holiday_long',
         text: `${year}年 年初假期週 第${dayOfYear}天 (${weekdayNames[weekdayIdx]} [連假 - 年初假期週])`,
-        short: `${year} 假期週 D${dayOfYear}`
+        short: `${year}年 年初假期週 第${dayOfYear}天`
       };
     }
 
@@ -547,7 +547,7 @@
       holidayName: fest ? fest.name : (isRest ? '休息日' : ''),
       scheduleType: schedType,
       text: `${year}年 第${month}月 第${weekInMonth}週 第${dayInWeek}天 (${weekdayNames[weekdayIdx]}${tag}) - 該月第${dayInMonth}日`,
-      short: `${year}年${month}月${dayInMonth}日 (W${weekInMonth}-D${dayInWeek}${fest ? '・' + fest.name : ''})`
+      short: `${year}年${month}月${dayInMonth}日${fest ? '・' + fest.name : ''}`
     };
   }
 
@@ -697,7 +697,8 @@
       const cal = convertGregorianToFlywan(dt);
       const gregStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
       const opt = document.createElement('option');
-      opt.value = `${gregStr} [${cal.short}]`;
+      opt.value = gregStr;
+      opt.dataset.flywanShort = cal.short;
       opt.textContent = `${i === 0 ? '今天｜' : ''}飛灣曆 ${cal.text}`;
       businessDateSelect.appendChild(opt);
     }
@@ -1379,7 +1380,8 @@
       displayName = `單程票 (${startName} → ${endName}, ${dist.toFixed(1)}km, ${trainTrip}次)`;
     } else if (type === 'business') {
       typeName = '快速列車商務艙票';
-      const travelDate = businessDateSelect.value;
+      const selectedDateOpt = businessDateSelect.options[businessDateSelect.selectedIndex];
+      const travelDate = (selectedDateOpt && selectedDateOpt.dataset.flywanShort) ? selectedDateOpt.dataset.flywanShort : businessDateSelect.value;
       const method = document.querySelector('input[name="seat-method"]:checked').value;
       let seat = '';
       if (method === 'manual') {
