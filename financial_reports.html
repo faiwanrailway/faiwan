@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>詳細財務報表（三大報表）｜飛灣鐵路公司</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .subnav-bar {
+      background: #043349;
+      border-bottom: 2px solid var(--secondary);
+      padding: 10px 0;
+    }
+    .subnav-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .subnav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .subnav-links a {
+      color: #E0F2FE;
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.22);
+      transition: 0.15s;
+    }
+    .subnav-links a:hover, .subnav-links a.active {
+      background: var(--secondary);
+      color: #032B3D;
+      font-weight: 700;
+      border-color: var(--secondary);
+    }
+    .seed-pill {
+      display: inline-block;
+      background: #0F172A;
+      color: #38BDF8;
+      font-family: Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .controls-card {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .controls-left {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
+    }
+    .control-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+    .control-group select {
+      padding: 9px 12px;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.95rem;
+      min-width: 190px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--primary);
+    }
+    .kpi-card.cyan { border-top-color: var(--secondary); }
+    .kpi-card.accent { border-top-color: var(--accent); }
+    .kpi-card.green { border-top-color: #16A34A; }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+    .chart-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .stmt-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 26px;
+      overflow: hidden;
+    }
+    .stmt-header {
+      background: #064663;
+      color: #fff;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .stmt-header h3 { margin: 0; font-size: 1.1rem; color: #fff; }
+    .stmt-badge {
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      color: #E0F2FE;
+    }
+    table.fin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    table.fin-table th {
+      background: #F1F5F9;
+      color: var(--primary);
+      text-align: left;
+      padding: 9px 14px;
+      border-bottom: 2px solid #CBD5E1;
+      white-space: nowrap;
+    }
+    table.fin-table td {
+      padding: 8px 14px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    table.fin-table td.num, table.fin-table th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    tr.fin-section td {
+      background: #F8FAFC;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    tr.fin-subtotal td {
+      background: #F0F9FF;
+      font-weight: 700;
+      border-top: 1px solid #93C5FD;
+      border-bottom: 1px solid #93C5FD;
+    }
+    tr.fin-total td {
+      background: #EFF6FF;
+      font-weight: 800;
+      color: #0F172A;
+      border-top: 2px solid #064663;
+      border-bottom: 2px solid #064663;
+    }
+    .indent { padding-left: 28px !important; color: #334155; }
+    .neg { color: #B91C1C; }
+    .pos { color: #15803D; }
+    .fare-note {
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      border-left: 4px solid #D97706;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 22px;
+      font-size: 0.9rem;
+      color: #78350F;
+    }
+  </style>
+</head>
+<body>
+<div id="sim-loading-overlay" style="display:flex;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(2,6,23,0.65);backdrop-filter:blur(4px);">
+  <div style="background:rgba(15,23,42,0.95);border:1px solid rgba(56,189,248,0.45);border-radius:16px;padding:18px 26px;display:flex;align-items:center;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,0.45);color:#f8fafc;font-family:sans-serif;">
+    <div style="width:26px;height:26px;border-radius:50%;border:3px solid rgba(56,189,248,0.25);border-top-color:#38bdf8;animation:spin 0.8s linear infinite;"></div>
+    <div><div style="font-size:14px;font-weight:700;letter-spacing:0.04em;">LOADING · 推演運算中...</div><div style="font-size:12px;color:#94a3b8;margin-top:2px;">正在計算財務報表模擬數據</div></div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<header class="site-header">
+  <div class="container navbar">
+    <div class="brand">
+      <span class="brand-subtitle">FLYWAN RAILWAY COMPANY</span>
+      <span class="brand-title">飛灣鐵路公司</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">首頁</a>
+      <a href="news.html">公告資訊</a>
+      <a href="stations.html">車站資訊</a>
+      <a href="timetable.html">時刻表</a>
+      <a href="tickets.html">票務資訊</a>
+      <a href="company.html" class="active">公司介紹</a>
+      <a href="extras.html">其他資料</a>
+      <a href="game.html" target="_blank" rel="noopener noreferrer">小遊戲</a>
+      <a href="contact.html">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+
+<div class="subnav-bar">
+  <div class="container subnav-inner">
+    <div class="subnav-links">
+      <a href="company.html">← 返回公司介紹</a>
+      <a href="station_stats.html">車站進出統計數據</a>
+      <a href="od_stats.html">OD 旅運與熱門走廊</a>
+      <a href="financial_reports.html" class="active">年度財務報表</a>
+      <a href="service_quality.html">服務品質統計</a>
+    </div>
+    <span class="seed-pill" id="seed-indicator">SEED: flywan-finance-annual-2020-2026</span>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="container">
+    <h1>飛灣鐵路公司年度財務報表（2020 年起可查）</h1>
+    <p>依法揭露綜合損益表、資產負債表與現金流量表三大報表；依公司歷史里程碑（2020 成立、2021 機場線、2022 全線、2024 環狀線聯網、2026 海岸轉型）及校準票價模型編製，採固定匯率 <strong>1 飛灣幣 = 10 美元</strong>。</p>
+  </div>
+</section>
+
+<main class="container" style="padding-top: 28px; padding-bottom: 48px;">
+  <article class="card controls-card">
+    <div class="controls-left">
+      <div class="control-group">
+        <label for="sel-year">查詢會計年度（2020 年起，當年統計至當日）</label>
+        <select id="sel-year"></select>
+      </div>
+      <div class="control-group">
+        <label for="sel-currency">貨幣顯示單位</label>
+        <select id="sel-currency">
+          <option value="both" selected>雙幣並列（千飛灣幣 + 千美元）</option>
+          <option value="fwc">飛灣幣（千飛灣幣 kFWC）</option>
+          <option value="usd">美元（千美元 kUSD · 1:10）</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button type="button" class="btn btn-outline" id="btn-export-fin">匯出當年度三大報表 CSV</button>
+      <button type="button" class="btn btn-primary" onclick="window.print()">列印／存為 PDF</button>
+    </div>
+  </article>
+
+  <div class="fare-note">
+    <strong>票價模型連動與修正說明：</strong>依 <code>tickets.html</code> 與全線旅運模型核算，原短途／定期票（如 1 日定期票 0.50 FWC 低於全線單程 0.69 FWC）會造成套利與前期虧損壓力。現已同步修訂票價基準：一般單程 <strong>0.12 + 0.012/km 飛灣幣</strong>（約 $1.20 + $0.12/km 美元）、商務艙 <strong>0.35 + 0.030/km 飛灣幣</strong>、1 日～30 日定期票 <strong>0.85～10.80 飛灣幣</strong>，帶動 2024 年起本業穩定轉虧為盈。
+  </div>
+
+  <div id="milestone-banner" class="card" style="margin-bottom: 20px; border-left: 4px solid var(--secondary); padding: 12px 18px; background: #F0F9FF;"></div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">年度營業收入總額</div>
+      <div class="kpi-value" id="kpi-rev">-</div>
+      <div class="kpi-sub" id="kpi-rev-sub">-</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-label">營業利益 (EBIT)／稅後淨利</div>
+      <div class="kpi-value" id="kpi-ebit">-</div>
+      <div class="kpi-sub" id="kpi-ni-sub">-</div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">年度總旅次／平均單次票價</div>
+      <div class="kpi-value" id="kpi-trips">-</div>
+      <div class="kpi-sub" id="kpi-fare-sub">-</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">票箱比／資產負債平帳狀態</div>
+      <div class="kpi-value" id="kpi-farebox">-</div>
+      <div class="kpi-sub" id="kpi-balance-sub">-</div>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <h3 style="margin:0 0 6px 0; color: var(--primary);" id="trend-title">2020 年起各年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）</h3>
+    <div style="font-size:0.82rem; color: var(--muted); margin-bottom: 10px;">
+      <span style="margin-right:16px;"><strong style="color:#064663">■</strong> 營業總收入</span>
+      <span style="margin-right:16px;"><strong style="color:#00B4D8">■</strong> 營業成本及費用</span>
+      <span><strong style="color:#FF8C42">●</strong> 稅後淨利（右側零線參考）</span>
+    </div>
+    <svg id="trend-svg" viewBox="0 0 960 250" style="width:100%; height:auto; display:block;"></svg>
+  </div>
+
+  <!-- 1. 綜合損益表 -->
+  <div class="stmt-card">
+    <div class="stmt-header">
+      <h3>一、綜合損益表（Income Statement）— <span class="yr-tag"></span> 年度<span id="is-ytd-tag" style="font-size:0.85rem;font-weight:500;"></span></h3>
+      <span class="stmt-badge" id="is-unit-badge">單位：千元</span>
+    </div>
+    <table class="fin-table">
+      <thead id="is-thead"></thead>
+      <tbody id="is-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 2. 資產負債表 -->
+  <div class="stmt-card">
+    <div class="stmt-header">
+      <h3>二、資產負債表（Balance Sheet）— 截至 <span id="bs-date-tag"></span></h3>
+      <span class="stmt-badge" id="bs-check-badge">Assets = Liabilities + Equity 檢核</span>
+    </div>
+    <table class="fin-table">
+      <thead id="bs-thead"></thead>
+      <tbody id="bs-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 3. 現金流量表 -->
+  <div class="stmt-card">
+    <div class="stmt-header">
+      <h3>三、現金流量表（Cash Flow Statement · 間接法）— <span class="yr-tag"></span> 年度<span id="cf-ytd-tag" style="font-size:0.85rem;font-weight:500;"></span></h3>
+      <span class="stmt-badge" id="cf-check-badge">與資產負債表現金完全調節</span>
+    </div>
+    <table class="fin-table">
+      <thead id="cf-thead"></thead>
+      <tbody id="cf-tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>本網站所有財務報表皆為配合飛灣鐵路營運模型之模擬資料，僅供娛樂與創作參考（1 飛灣幣 = 10 美元）。</p>
+  </div>
+</footer>
+
+<script type="text/plain" id="page-main">
+(function () {
+  const E = window.FlywanSimEngine;
+  const dateCtx = E.getReportingDateContext();
+  let reports = {};
+  const selYear = document.getElementById('sel-year');
+  const selCurr = document.getElementById('sel-currency');
+
+  document.getElementById('seed-indicator').textContent = `SEED: flywan-finance-annual-2020-${dateCtx.currentYear}`;
+  document.getElementById('trend-title').textContent = `2020–${dateCtx.currentYear} 年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）`;
+
+  // 動態建立 2020 ~ 當年度選單，跨年時會自動新增年度
+  for (let y = dateCtx.currentYear; y >= 2020; y--) {
+    const opt = document.createElement('option');
+    opt.value = String(y);
+    if (y === dateCtx.currentYear) {
+      opt.textContent = `${y} 年度（統計至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
+      opt.selected = true;
+    } else {
+      opt.textContent = `${y} 全年度`;
+    }
+    selYear.appendChild(opt);
+  }
+
+  function fmtK(valK, currMode) {
+    const fwc = Math.round(valK);
+    const usd = Math.round(valK * E.USD_PER_FWC);
+    const fmt = n => (n < 0 ? `(${Math.abs(n).toLocaleString()})` : n.toLocaleString());
+    if (currMode === 'fwc') return [`${fmt(fwc)} kFWC`];
+    if (currMode === 'usd') return [`$${fmt(usd)} kUSD`];
+    return [`${fmt(fwc)}`, `$${fmt(usd)}`];
+  }
+
+  function clsNum(v) {
+    return v < 0 ? 'neg' : '';
+  }
+
+  function colHeaders(currMode, compareYear) {
+    const prevLabel = compareYear ? `${compareYear} 前年度` : '—';
+    if (currMode === 'both') {
+      return `<tr>
+        <th>會計科目</th>
+        <th class="num">飛灣幣 (千 FWC)</th>
+        <th class="num">美元 (千 USD · 1:10)</th>
+        <th class="num">${prevLabel} (千 FWC)</th>
+        <th class="num">備註說明</th>
+      </tr>`;
+    }
+    const unit = currMode === 'fwc' ? '千 FWC' : '千 USD';
+    return `<tr>
+      <th>會計科目</th>
+      <th class="num">本年度 (${unit})</th>
+      <th class="num">${prevLabel} (${unit})</th>
+      <th class="num">備註說明</th>
+    </tr>`;
+  }
+
+  function makeRow(label, valK, prevValK, note, currMode, rowClass = '') {
+    const curCells = fmtK(valK, currMode);
+    const prevCells = (prevValK === null || prevValK === undefined) ? ['—'] : fmtK(prevValK, currMode);
+    if (currMode === 'both') {
+      return `<tr class="${rowClass}">
+        <td class="${rowClass === '' ? 'indent' : ''}">${label}</td>
+        <td class="num ${clsNum(valK)}">${curCells[0]}</td>
+        <td class="num ${clsNum(valK)}">${curCells[1]}</td>
+        <td class="num ${prevValK < 0 ? 'neg' : ''}" style="color:#64748B;">${prevCells[0]}</td>
+        <td style="font-size:0.82rem;color:#64748B;">${note || ''}</td>
+      </tr>`;
+    }
+    return `<tr class="${rowClass}">
+      <td class="${rowClass === '' ? 'indent' : ''}">${label}</td>
+      <td class="num ${clsNum(valK)}">${curCells[0]}</td>
+      <td class="num" style="color:#64748B;">${prevCells[0]}</td>
+      <td style="font-size:0.82rem;color:#64748B;">${note || ''}</td>
+    </tr>`;
+  }
+
+  function makeSectionRow(title, currMode) {
+    const cols = currMode === 'both' ? 5 : 4;
+    return `<tr class="fin-section"><td colspan="${cols}">${title}</td></tr>`;
+  }
+
+  function renderTrendChart(activeYear) {
+    const svg = document.getElementById('trend-svg');
+    const years = Object.keys(reports).map(Number).sort((a, b) => a - b);
+    let maxBar = 1000;
+    let minNI = 0, maxNI = 1000;
+    years.forEach(y => {
+      const r = reports[y].incomeStatement;
+      const totCost = r.totalCostK + r.totalOpexK;
+      if (r.totalRevenueK > maxBar) maxBar = r.totalRevenueK;
+      if (totCost > maxBar) maxBar = totCost;
+      if (r.netIncomeK < minNI) minNI = r.netIncomeK;
+      if (r.netIncomeK > maxNI) maxNI = r.netIncomeK;
+    });
+    maxBar = Math.ceil(maxBar * 1.15);
+
+    const W = 960, H = 250, L = 66, R = 64, T = 18, B = 38;
+    const cw = W - L - R, ch = H - T - B;
+    const step = cw / years.length;
+    let out = '';
+
+    for (let i = 0; i <= 4; i++) {
+      const v = Math.round((maxBar * i) / 4);
+      const y = T + ch - (ch * i) / 4;
+      out += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#E2E8F0" stroke-dasharray="${i===0?'':'3,3'}"/>`;
+      out += `<text x="${L - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#64748B">${v.toLocaleString()}</text>`;
+    }
+
+    const niPts = [];
+    const niRange = Math.max(2000, maxNI - minNI);
+    const niTop = Math.max(maxNI + 1500, 3000);
+    const niBot = Math.min(minNI - 1500, -10000);
+    const niZeroY = T + ((niTop - 0) / (niTop - niBot)) * ch;
+    out += `<line x1="${L}" y1="${niZeroY.toFixed(1)}" x2="${W - R}" y2="${niZeroY.toFixed(1)}" stroke="#FCA5A5" stroke-width="1" stroke-dasharray="4,2"/>`;
+    out += `<text x="${W - R + 6}" y="${(niZeroY + 4).toFixed(1)}" font-size="10" fill="#B91C1C">損益平衡 $0</text>`;
+
+    years.forEach((y, idx) => {
+      const isActive = y === activeYear;
+      const r = reports[y].incomeStatement;
+      const totCost = r.totalCostK + r.totalOpexK;
+      const x0 = L + idx * step;
+      const bw = Math.min(34, (step - 24) / 2);
+      const bx1 = x0 + (step - bw * 2 - 6) / 2;
+      const bx2 = bx1 + bw + 6;
+      const h1 = (r.totalRevenueK / maxBar) * ch;
+      const h2 = (totCost / maxBar) * ch;
+
+      if (isActive) {
+        out += `<rect x="${(x0 + 6).toFixed(1)}" y="${T}" width="${(step - 12).toFixed(1)}" height="${ch}" rx="6" fill="rgba(0,180,216,0.10)"/>`;
+      }
+      out += `<g style="cursor:pointer" data-yr="${y}">`;
+      out += `<rect x="${bx1.toFixed(1)}" y="${(T + ch - h1).toFixed(1)}" width="${bw}" height="${h1.toFixed(1)}" rx="2" fill="#064663"><title>${y} 營收: ${r.totalRevenueK.toLocaleString()} kFWC</title></rect>`;
+      out += `<rect x="${bx2.toFixed(1)}" y="${(T + ch - h2).toFixed(1)}" width="${bw}" height="${h2.toFixed(1)}" rx="2" fill="#00B4D8"><title>${y} 營業成本+費用: ${totCost.toLocaleString()} kFWC</title></rect>`;
+      out += `<text x="${(x0 + step/2).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="12" font-weight="${isActive?'800':'600'}" fill="${isActive?'#064663':'#475569'}">${y}</text>`;
+      out += `</g>`;
+
+      const cx = x0 + step / 2;
+      const cy = T + ((niTop - r.netIncomeK) / (niTop - niBot)) * ch;
+      niPts.push({ x: cx, y: cy, yYear: y, val: r.netIncomeK });
+    });
+
+    out += `<polyline fill="none" stroke="#FF8C42" stroke-width="2.5" points="${niPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}"/>`;
+    niPts.forEach(p => {
+      out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="#FF8C42" stroke="#fff" stroke-width="1.5"><title>${p.yYear} 稅後淨利: ${p.val.toLocaleString()} kFWC</title></circle>`;
+    });
+
+    svg.innerHTML = out;
+    svg.querySelectorAll('g[data-yr]').forEach(g => {
+      g.addEventListener('click', () => {
+        selYear.value = g.getAttribute('data-yr');
+        renderYear();
+      });
+    });
+  }
+
+  function renderYear() {
+    const year = parseInt(selYear.value, 10);
+    const currMode = selCurr.value;
+    const rep = reports[year];
+    const prev = reports[year - 1] || null;
+    const is = rep.incomeStatement;
+    const bs = rep.balanceSheet;
+    const cf = rep.cashFlow;
+    const kp = rep.kpis;
+    const pis = prev ? prev.incomeStatement : null;
+    const pbs = prev ? prev.balanceSheet : null;
+    const pcf = prev ? prev.cashFlow : null;
+
+    document.querySelectorAll('.yr-tag').forEach(el => { el.textContent = year; });
+    const ytdNote = rep.isYTD ? `（統計至 ${rep.asOfDateStr} · 累計 ${rep.opDays} 日）` : '';
+    document.getElementById('is-ytd-tag').textContent = ytdNote;
+    document.getElementById('cf-ytd-tag').textContent = ytdNote;
+    document.getElementById('bs-date-tag').textContent = rep.asOfDateStr;
+    document.getElementById('milestone-banner').innerHTML =
+      `<strong>${rep.milestone.label}</strong>${rep.isYTD ? ` <span style="color:#0369A1;">[截至當日 ${rep.asOfDateStr}，累計 ${rep.opDays} 日]</span>` : ''} — ${rep.milestone.note}`;
+
+    // KPI Cards
+    const revStr = currMode === 'usd'
+      ? `$${(is.totalRevenueK * 10).toLocaleString()} kUSD`
+      : `${is.totalRevenueK.toLocaleString()} kFWC`;
+    document.getElementById('kpi-rev').textContent = revStr;
+    document.getElementById('kpi-rev-sub').textContent = `折合美元 $${(is.totalRevenueK * 10).toLocaleString()} 千美元｜客運佔比 ${((is.totalPassengerRevK / is.totalRevenueK) * 100).toFixed(1)}%`;
+
+    document.getElementById('kpi-ebit').textContent = `${is.operatingIncomeK.toLocaleString()} / ${is.netIncomeK.toLocaleString()} kFWC`;
+    document.getElementById('kpi-ebit').style.color = is.netIncomeK >= 0 ? '#15803D' : '#B91C1C';
+    document.getElementById('kpi-ni-sub').textContent = `營益率 ${kp.opMarginPct}% · 淨利率 ${kp.netMarginPct}% · EPS ${kp.epsFWC.toFixed(2)} FWC ($${(kp.epsFWC*10).toFixed(2)})`;
+
+    document.getElementById('kpi-trips').textContent = `${(kp.annualTrips / 10000).toFixed(1)} 萬人次`;
+    document.getElementById('kpi-fare-sub').textContent = `日均 ${kp.avgDailyTrips.toLocaleString()} 人次｜平均實收 ${kp.avgFareFWC.toFixed(3)} FWC ($${(kp.avgFareFWC*10).toFixed(2)})`;
+
+    document.getElementById('kpi-farebox').textContent = `${kp.fareboxRecoveryPct}%`;
+    document.getElementById('kpi-balance-sub').textContent = `負債比 ${kp.debtRatioPct}%｜ROE ${kp.roePct}%｜平帳檢核：${bs.balanced ? '✓ 完全平衡' : '異常'}`;
+
+    document.getElementById('is-unit-badge').textContent = currMode === 'usd' ? '單位：千美元 (kUSD)' : (currMode === 'fwc' ? '單位：千飛灣幣 (kFWC)' : '雙幣單位：千 FWC / 千 USD');
+    document.getElementById('bs-check-badge').textContent = bs.balanced ? '✓ 資產 = 負債 + 權益 (完全平衡)' : '檢核失敗';
+    document.getElementById('cf-check-badge').textContent = (cf.endCashK === bs.cashK) ? '✓ 期末現金與資產負債表 100% 吻合' : '現金調節差異';
+
+    // 1. Income Statement
+    document.getElementById('is-thead').innerHTML = colHeaders(currMode, prev ? year - 1 : null);
+    document.getElementById('is-tbody').innerHTML = [
+      makeSectionRow('營業收入 (Operating Revenues)', currMode),
+      makeRow('單程票暨飛灣國民卡 IC 客運收入', is.revSingleAndICK, pis?.revSingleAndICK, '依 tickets.html 0.12 + 0.012/km 實收模型', currMode),
+      makeRow('快速列車商務艙（含特急券）收入', is.revBusinessK, pis?.revBusinessK, '135M 快速列車 48 席專屬艙等（0.35 + 0.030/km）', currMode),
+      makeRow('定期票（1～30 日）推算攤銷收入', is.revRegularPassK, pis?.revRegularPassK, '0.85～10.80 FWC 定期票遞延認列', currMode),
+      makeRow('假日與季節性紀念套票收入', is.revHolidayPkgK, pis?.revHolidayPkgK, '0.50 FWC 節慶套票專案', currMode),
+      makeRow('行李託運、自行車及大件行李收入', is.revLuggageK, pis?.revLuggageK, '0.08～0.20 FWC 附加旅運服務', currMode),
+      makeRow('客運票務收入合計', is.totalPassengerRevK, pis?.totalPassengerRevK, '', currMode, 'fin-subtotal'),
+      makeRow('車站商場租金、智慧儲值聯名手續費', is.revRetailLeaseK, pis?.revRetailLeaseK, '飛灣新站、飛灣公園等核心站商業招商', currMode),
+      makeRow('車體與月台數位廣告暨機場聯運分潤', is.revAdsAndAirportK, pis?.revAdsAndAirportK, '航空盟友商務銜接專案及廣告授權', currMode),
+      makeRow('附屬事業與聯運收入合計', is.totalAncillaryRevK, pis?.totalAncillaryRevK, '', currMode, 'fin-subtotal'),
+      makeRow('營業收入總額 (Total Revenue)', is.totalRevenueK, pis?.totalRevenueK, '客運與附業總營收', currMode, 'fin-total'),
+
+      makeSectionRow('營業成本 (Operating Costs)', currMode),
+      makeRow('行車駕駛、站務及車勤用人成本', is.costLaborK, pis?.costLaborK, '薪資與值班津貼', currMode),
+      makeRow('電力牽引與場站能源成本', is.costPowerK, pis?.costPowerK, '與開行班次及車重相關', currMode),
+      makeRow('軌道設備、CBTC 號誌暨電聯車維修費', is.costMaintK, pis?.costMaintK, '預防性維修保養支出', currMode),
+      makeRow('不動產、廠房及列車設備折舊費用', is.costDepK, pis?.costDepK, '直線法提列土建軌道與 E300 車隊折舊', currMode),
+      makeRow('營業成本合計 (Total Cost)', is.totalCostK, pis?.totalCostK, '', currMode, 'fin-subtotal'),
+      makeRow('營業毛利 (Gross Profit)', is.grossProfitK, pis?.grossProfitK, `毛利率 ${kp.grossMarginPct}%`, currMode, 'fin-subtotal'),
+
+      makeSectionRow('營業費用 (Operating Expenses)', currMode),
+      makeRow('總部行政管理費用', is.opexAdminK, pis?.opexAdminK, '行政、財務及人資後勤', currMode),
+      makeRow('宣傳企劃與聯賽觀光行銷費用', is.opexMarketingK, pis?.opexMarketingK, '紀念套票暨跨界聯名推廣', currMode),
+      makeRow('監管部內控暨營運安全責任險', is.opexComplianceK, pis?.opexComplianceK, '獨立監管部稽核與旅客責任險', currMode),
+      makeRow('營業費用合計 (Total OpEx)', is.totalOpexK, pis?.totalOpexK, '', currMode, 'fin-subtotal'),
+      makeRow('營業利益 (Operating Income / EBIT)', is.operatingIncomeK, pis?.operatingIncomeK, `營業利益率 ${kp.opMarginPct}%`, currMode, 'fin-total'),
+
+      makeSectionRow('營業外收支、稅項與本期淨利', currMode),
+      makeRow('綠色交通補助與存款利息收入', is.nonOpSubsidyAndInterestK, pis?.nonOpSubsidyAndInterestK, '政府節能運輸補貼及帳上資金孳息', currMode),
+      makeRow('銀行借款及綠色債券利息費用', -is.interestExpK, pis ? -pis.interestExpK : null, '約 2.2% 加權資金成本', currMode),
+      makeRow('海岸重軌設施除役資產處分損失', -is.assetDisposalLossK, pis ? -pis.assetDisposalLossK : null, year === 2026 ? '2026/01 海岸復育除役一次性帳面損失' : '無重大處分損益', currMode),
+      makeRow('營業外收支淨額', is.nonOpNetK, pis?.nonOpNetK, '', currMode, 'fin-subtotal'),
+      makeRow('稅前淨利 (EBT)', is.ebtK, pis?.ebtK, '', currMode),
+      makeRow('所得稅費用 (估計有效稅率 20%)', -is.incomeTaxK, pis ? -pis.incomeTaxK : null, '稅前虧損年度不計所得稅', currMode),
+      makeRow('本期稅後淨利 (Net Income)', is.netIncomeK, pis?.netIncomeK, `每股盈餘 EPS: ${kp.epsFWC.toFixed(2)} FWC ($${(kp.epsFWC*10).toFixed(2)})`, currMode, 'fin-total')
+    ].join('');
+
+    // 2. Balance Sheet
+    document.getElementById('bs-thead').innerHTML = colHeaders(currMode, prev ? year - 1 : null);
+    document.getElementById('bs-tbody').innerHTML = [
+      makeSectionRow('資產 (Assets)', currMode),
+      makeRow('現金及約當現金 (Cash & Equivalents)', bs.cashK, pbs?.cashK, '與現金流量表期末現金完全一致', currMode),
+      makeRow('應收票款及聯運清算帳款 (AR)', bs.arK, pbs?.arK, '信用卡與航空／轉乘清算應收', currMode),
+      makeRow('備品耗材與存貨 (Inventory)', bs.inventoryK, pbs?.inventoryK, '軌道材料、號誌與列車備品', currMode),
+      makeRow('流動資產合計 (Current Assets)', bs.currentAssetsK, pbs?.currentAssetsK, '', currMode, 'fin-subtotal'),
+      makeRow('不動產、廠房、軌道及電聯車原始成本', bs.ppeGrossK, pbs?.ppeGrossK, '累積資本支出與 2026 海岸路段除役調整', currMode),
+      makeRow('減：累計折舊 (Accumulated Depreciation)', -bs.accumDepK, pbs ? -pbs.accumDepK : null, '', currMode),
+      makeRow('不動產、廠房及設備淨額 (Net PP&E)', bs.netPPEK, pbs?.netPPEK, '', currMode, 'fin-subtotal'),
+      makeRow('使用權資產、CBTC 軟體暨路網授權無形資產', bs.rouAndIntangibleK, pbs?.rouAndIntangibleK, '2020 初始化暨 2024 環狀線聯網系統建置', currMode),
+      makeRow('非流動資產合計 (Non-Current Assets)', bs.nonCurrentAssetsK, pbs?.nonCurrentAssetsK, '', currMode, 'fin-subtotal'),
+      makeRow('資產總計 (Total Assets)', bs.totalAssetsK, pbs?.totalAssetsK, '', currMode, 'fin-total'),
+
+      makeSectionRow('負債 (Liabilities)', currMode),
+      makeRow('應付帳款及工程保留款 (AP)', bs.apK, pbs?.apK, '電力與修繕廠商應付款', currMode),
+      makeRow('合約負債／定期票與國民卡預收儲值金', bs.unearnedRevK, pbs?.unearnedRevK, '未搭乘定期票天數與電子票證餘額', currMode),
+      makeRow('一年內到期長期借款 (Current Portion of Debt)', bs.shortTermDebtK, pbs?.shortTermDebtK, '', currMode),
+      makeRow('流動負債合計 (Current Liabilities)', bs.currentLiabK, pbs?.currentLiabK, '', currMode, 'fin-subtotal'),
+      makeRow('長期銀行融資借款 (Long-Term Debt)', bs.nonCurrentDebtK, pbs?.nonCurrentDebtK, '', currMode),
+      makeRow('飛灣綠色鐵道永續債券 (Green Bonds)', bs.greenBondsK, pbs?.greenBondsK, '2024 年發行支應環狀線轉乘與綠色計畫', currMode),
+      makeRow('非流動負債合計 (Non-Current Liabilities)', bs.nonCurrentLiabK, pbs?.nonCurrentLiabK, '', currMode, 'fin-subtotal'),
+      makeRow('負債總計 (Total Liabilities)', bs.totalLiabK, pbs?.totalLiabK, `負債佔總資產比率 ${kp.debtRatioPct}%`, currMode, 'fin-total'),
+
+      makeSectionRow('股東權益 (Shareholders\' Equity)', currMode),
+      makeRow('股本 (Share Capital)', bs.shareCapitalK, pbs?.shareCapitalK, '創始暨 2021 增資股本', currMode),
+      makeRow('資本公積 (Capital Surplus)', bs.capitalSurplusK, pbs?.capitalSurplusK, '發行溢價公積', currMode),
+      makeRow('保留盈餘 (Retained Earnings)', bs.retainedEarningsK, pbs?.retainedEarningsK, '歷年稅後損益累計（減已配發股利）', currMode),
+      makeRow('股東權益總計 (Total Equity)', bs.totalEquityK, pbs?.totalEquityK, `權益報酬率 ROE ${kp.roePct}%`, currMode, 'fin-subtotal'),
+      makeRow('負債及股東權益總計 (Total L & E)', bs.totalLiabAndEquityK, pbs?.totalLiabAndEquityK, bs.balanced ? '✓ 與資產總計完全相等' : '不平衡', currMode, 'fin-total')
+    ].join('');
+
+    // 3. Cash Flow Statement
+    document.getElementById('cf-thead').innerHTML = colHeaders(currMode, prev ? year - 1 : null);
+    document.getElementById('cf-tbody').innerHTML = [
+      makeSectionRow('營業活動之現金流量 (Operating Activities)', currMode),
+      makeRow('本期稅後淨利 (Net Income)', cf.netIncomeK, pcf?.netIncomeK, '', currMode),
+      makeRow('調整項目：加回折舊費用 (Depreciation)', cf.addDepK, pcf?.addDepK, '非現金折舊費用加回', currMode),
+      makeRow('調整項目：加回資產處分帳面損失', cf.addDisposalLossK, pcf?.addDisposalLossK, '', currMode),
+      makeRow('營運資金變動：應收帳款 (增加)/減少', cf.chgArK, pcf?.chgArK, '', currMode),
+      makeRow('營運資金變動：存貨備品 (增加)/減少', cf.chgInvK, pcf?.chgInvK, '', currMode),
+      makeRow('營運資金變動：應付帳款 增加/(減少)', cf.chgApK, pcf?.chgApK, '', currMode),
+      makeRow('營運資金變動：定期票與預收款 增加/(減少)', cf.chgUnearnedK, pcf?.chgUnearnedK, '', currMode),
+      makeRow('營業活動淨現金流入 (Operating Cash Flow)', cf.ocfK, pcf?.ocfK, '', currMode, 'fin-subtotal'),
+
+      makeSectionRow('投資活動之現金流量 (Investing Activities)', currMode),
+      makeRow('購置軌道土木、機電及電聯車資本支出 (CapEx)', cf.icfCapexK, pcf?.icfCapexK, '', currMode),
+      makeRow('取得使用權與智慧號誌無形資產支出', cf.icfIntangibleK, pcf?.icfIntangibleK, '', currMode),
+      makeRow('投資活動淨現金流出 (Investing Cash Flow)', cf.icfK, pcf?.icfK, '', currMode, 'fin-subtotal'),
+
+      makeSectionRow('籌資活動之現金流量 (Financing Activities)', currMode),
+      makeRow('發行新股現金增資', cf.equityIssueK, pcf?.equityIssueK, '', currMode),
+      makeRow('長期銀行借款舉借', cf.debtDrawK, pcf?.debtDrawK, '', currMode),
+      makeRow('發行飛灣綠色永續債券', cf.bondIssueK, pcf?.bondIssueK, '', currMode),
+      makeRow('償還銀行長期借款本金', cf.debtRepayK, pcf?.debtRepayK, '', currMode),
+      makeRow('發放股東現金股利 (獲利達標年度 30%)', cf.dividendsK, pcf?.dividendsK, '', currMode),
+      makeRow('籌資活動淨現金流入/(流出) (Financing Cash Flow)', cf.fcfK, pcf?.fcfK, '', currMode, 'fin-subtotal'),
+
+      makeRow('本期現金及約當現金淨增加/(減少)數', cf.netCashChangeK, pcf?.netCashChangeK, '', currMode, 'fin-subtotal'),
+      makeRow('期初現金及約當現金餘額', cf.beginCashK, pcf?.beginCashK, '承接上年度期末現金', currMode),
+      makeRow('期末現金及約當現金餘額 (Ending Cash)', cf.endCashK, pcf?.endCashK, '✓ 與資產負債表現金科目一致', currMode, 'fin-total')
+    ].join('');
+
+    renderTrendChart(year);
+  }
+
+  document.getElementById('btn-export-fin').addEventListener('click', () => {
+    const year = parseInt(selYear.value, 10);
+    const rep = reports[year];
+    const lines = ['Statement,Item,Amount_kFWC,Amount_kUSD'];
+    const dumpObj = (stmtName, obj) => {
+      Object.entries(obj).forEach(([k, v]) => {
+        if (typeof v === 'number') lines.push(`${stmtName},${k},${v},${Math.round(v * E.USD_PER_FWC)}`);
+      });
+    };
+    dumpObj('IncomeStatement', rep.incomeStatement);
+    dumpObj('BalanceSheet', rep.balanceSheet);
+    dumpObj('CashFlow', rep.cashFlow);
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `flywan_financial_statements_${year}.csv`;
+    a.click();
+  });
+
+  function runWithLoading(fn) {
+    const ov = document.getElementById('sim-loading-overlay');
+    if (!ov) return fn();
+    const t0 = performance.now();
+    ov.style.display = 'flex';
+    requestAnimationFrame(() => setTimeout(() => {
+      try { fn(); } finally {
+        const wait = Math.max(0, 300 - (performance.now() - t0));
+        setTimeout(() => { ov.style.display = 'none'; }, wait);
+      }
+    }, 16));
+  }
+
+  [selYear, selCurr].forEach(el => el.addEventListener('change', () => runWithLoading(renderYear)));
+  runWithLoading(() => {
+    reports = E.buildAllFinancialReports(dateCtx.refDate);
+    renderYear();
+  });
+})();
+</script>
+<script>
+(function(){
+  function load(src){return new Promise(function(r,j){var e=document.createElement('script');e.src=src;e.onload=r;e.onerror=j;document.body.appendChild(e);});}
+  function start(){
+    load('timetable_data.js').then(function(){return load('flywan_sim_engine.js');}).then(function(){
+      var e=document.createElement('script');e.textContent=document.getElementById('page-main').textContent;document.body.appendChild(e);
+    }).catch(function(){var o=document.getElementById('sim-loading-overlay');if(o)o.style.display='none';});
+  }
+  requestAnimationFrame(function(){setTimeout(start,30);});
+})();
+</script>
+</body>
+</html>

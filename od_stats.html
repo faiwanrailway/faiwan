@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>OD 旅運矩陣與前五大熱門走廊｜飛灣鐵路公司</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .subnav-bar {
+      background: #043349;
+      border-bottom: 2px solid var(--secondary);
+      padding: 10px 0;
+    }
+    .subnav-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .subnav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .subnav-links a {
+      color: #E0F2FE;
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.22);
+      transition: 0.15s;
+    }
+    .subnav-links a:hover, .subnav-links a.active {
+      background: var(--secondary);
+      color: #032B3D;
+      font-weight: 700;
+      border-color: var(--secondary);
+    }
+    .seed-pill {
+      display: inline-block;
+      background: #0F172A;
+      color: #38BDF8;
+      font-family: Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .controls-card {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .controls-inputs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
+    }
+    .control-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+    .control-group select {
+      min-width: 185px;
+      padding: 9px 12px;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.95rem;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--primary);
+    }
+    .kpi-card.cyan { border-top-color: var(--secondary); }
+    .kpi-card.accent { border-top-color: var(--accent); }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 1.55rem; font-weight: 800; color: var(--primary); }
+    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+    .heatmap-wrap {
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 28px;
+    }
+    table.od-matrix {
+      border-collapse: collapse;
+      font-size: 0.72rem;
+      width: 100%;
+      min-width: 840px;
+    }
+    table.od-matrix th, table.od-matrix td {
+      border: 1px solid #E2E8F0;
+      text-align: center;
+      padding: 4px 2px;
+      min-width: 35px;
+      height: 25px;
+      font-variant-numeric: tabular-nums;
+    }
+    table.od-matrix th {
+      background: #F1F5F9;
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 26px;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    table.data-table th {
+      background: #F1F5F9;
+      color: var(--primary);
+      text-align: left;
+      padding: 11px 14px;
+      border-bottom: 2px solid #CBD5E1;
+      white-space: nowrap;
+    }
+    table.data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+    }
+    table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .rank-badge.top1 { background: #D97706; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div id="sim-loading-overlay" style="display:flex;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(2,6,23,0.65);backdrop-filter:blur(4px);">
+  <div style="background:rgba(15,23,42,0.95);border:1px solid rgba(56,189,248,0.45);border-radius:16px;padding:18px 26px;display:flex;align-items:center;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,0.45);color:#f8fafc;font-family:sans-serif;">
+    <div style="width:26px;height:26px;border-radius:50%;border:3px solid rgba(56,189,248,0.25);border-top-color:#38bdf8;animation:spin 0.8s linear infinite;"></div>
+    <div><div style="font-size:14px;font-weight:700;letter-spacing:0.04em;">LOADING · 推演運算中...</div><div style="font-size:12px;color:#94a3b8;margin-top:2px;">正在計算旅運模擬數據</div></div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<header class="site-header">
+  <div class="container navbar">
+    <div class="brand">
+      <span class="brand-subtitle">FLYWAN RAILWAY COMPANY</span>
+      <span class="brand-title">飛灣鐵路公司</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">首頁</a>
+      <a href="news.html">公告資訊</a>
+      <a href="stations.html">車站資訊</a>
+      <a href="timetable.html">時刻表</a>
+      <a href="tickets.html">票務資訊</a>
+      <a href="company.html" class="active">公司介紹</a>
+      <a href="extras.html">其他資料</a>
+      <a href="game.html" target="_blank" rel="noopener noreferrer">小遊戲</a>
+      <a href="contact.html">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+
+<div class="subnav-bar">
+  <div class="container subnav-inner">
+    <div class="subnav-links">
+      <a href="company.html">← 返回公司介紹</a>
+      <a href="station_stats.html">車站進出統計數據</a>
+      <a href="od_stats.html" class="active">OD 旅運與熱門走廊</a>
+      <a href="financial_reports.html">年度財務報表</a>
+      <a href="service_quality.html">服務品質統計</a>
+    </div>
+    <span class="seed-pill" id="seed-indicator">SEED: ...</span>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="container">
+    <h1>22 × 22 OD 旅運矩陣熱力圖與前五大熱門走廊</h1>
+    <p>支援「近一年」、「近一個月」、「年度（2020 起至今）」、「年度月（2020 年起選月至今）」及「近一年年平均日」查詢；錦湖（FR13）與鷺島（FR14）依車站規模 3 計列，並自動於跨年新增年度。</p>
+  </div>
+</section>
+
+<main class="container" style="padding-top: 28px; padding-bottom: 48px;">
+  <article class="card controls-card">
+    <div class="controls-inputs">
+      <div class="control-group">
+        <label for="sel-mode">統計模式</label>
+        <select id="sel-mode" style="min-width:230px;">
+          <option value="rolling_1y">近一年（滾動近 365 日合計）</option>
+          <option value="rolling_1m">近一個月（滾動近一月合計）</option>
+          <option value="year" selected>年度（2020 年起，今年至當日）</option>
+          <option value="year_month">年度月（2020 年起選月，本月至今）</option>
+          <option value="rolling_1y_daily">近一年年平均日（平均單日水準）</option>
+        </select>
+      </div>
+      <div class="control-group" id="grp-year">
+        <label for="sel-year">選擇年度</label>
+        <select id="sel-year"></select>
+      </div>
+      <div class="control-group hidden" id="grp-month">
+        <label for="sel-month">選擇月份</label>
+        <select id="sel-month"></select>
+      </div>
+    </div>
+    <div id="period-badge" style="font-size:0.9rem; color:var(--primary); font-weight:600;"></div>
+  </article>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpi-od-label">期間 OD 旅運總量</div>
+      <div class="kpi-value" id="kpi-od-trips">-</div>
+      <div class="kpi-sub" id="kpi-od-days">-</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-label">期間日均 OD 旅次</div>
+      <div class="kpi-value" id="kpi-avg-daily">-</div>
+      <div class="kpi-sub">含平日、週五、假日與連假實際權重</div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label" id="kpi-rev-label">客運推算票務收入</div>
+      <div class="kpi-value" id="kpi-rev-fwc">-</div>
+      <div class="kpi-sub" id="kpi-rev-usd">-</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">平均乘距／商務艙搭乘</div>
+      <div class="kpi-value" id="kpi-avgkm">-</div>
+      <div class="kpi-sub" id="kpi-biz">-</div>
+    </div>
+  </div>
+
+  <h2 style="margin-bottom: 8px;">22 × 22 站間 OD 旅運矩陣熱力圖</h2>
+  <p style="font-size:0.88rem; color: var(--muted); margin-top:0;">
+    直列為起站 (Origin)、橫欄為訖站 (Destination)，格內顯示單位為「<strong id="matrix-unit">千人次 (k)</strong>」（滑鼠移上可檢視確切人次、站距與單程基準票價）。
+  </p>
+  <div class="heatmap-wrap">
+    <table class="od-matrix" id="od-matrix"></table>
+  </div>
+
+  <h2 style="margin-bottom: 10px;">前 5 大熱門 OD 走廊排行</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th class="num">排名</th>
+          <th>起點車站</th>
+          <th>訖點車站</th>
+          <th class="num">站間距離(km)</th>
+          <th class="num">平均乘車時間</th>
+          <th class="num" id="th-trips">OD 旅次</th>
+          <th class="num">商務艙人次</th>
+          <th class="num">推算收入(飛灣幣)</th>
+          <th class="num">換算美元(USD · 1:10)</th>
+        </tr>
+      </thead>
+      <tbody id="top-od-tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>本網站所有公告與統計數據皆屬虛構模擬資料，僅供娛樂與創作參考。</p>
+  </div>
+</footer>
+
+<script type="text/plain" id="page-main">
+(function () {
+  const E = window.FlywanSimEngine;
+  const dateCtx = E.getReportingDateContext();
+  const selMode = document.getElementById('sel-mode');
+  const selYear = document.getElementById('sel-year');
+  const selMonth = document.getElementById('sel-month');
+  const grpYear = document.getElementById('grp-year');
+  const grpMonth = document.getElementById('grp-month');
+
+  // 動態建立 2020 ~ 當年度選單（新年度會自動新增）
+  for (let y = dateCtx.currentYear; y >= 2020; y--) {
+    const opt = document.createElement('option');
+    opt.value = String(y);
+    if (y === dateCtx.currentYear) {
+      opt.textContent = `${y} 年（至當日 ${dateCtx.todayStr}）`;
+      opt.selected = true;
+    } else {
+      opt.textContent = `${y} 年`;
+    }
+    selYear.appendChild(opt);
+  }
+
+  function rebuildMonthOptions() {
+    const y = parseInt(selYear.value, 10);
+    const prevVal = parseInt(selMonth.value || dateCtx.currentMonth, 10);
+    const maxM = (y === dateCtx.currentYear) ? dateCtx.currentMonth : 12;
+    selMonth.innerHTML = '';
+    for (let m = maxM; m >= 1; m--) {
+      const opt = document.createElement('option');
+      opt.value = String(m).padStart(2, '0');
+      const isCurYTDMonth = (y === dateCtx.currentYear && m === dateCtx.currentMonth);
+      opt.textContent = isCurYTDMonth
+        ? `${String(m).padStart(2, '0')} 月（至 ${dateCtx.todayStr}）`
+        : `${String(m).padStart(2, '0')} 月`;
+      selMonth.appendChild(opt);
+    }
+    const targetM = Math.min(maxM, Math.max(1, prevVal));
+    selMonth.value = String(targetM).padStart(2, '0');
+  }
+
+  function syncFilterVisibility() {
+    const mode = selMode.value;
+    if (mode === 'year') {
+      grpYear.classList.remove('hidden');
+      grpMonth.classList.add('hidden');
+    } else if (mode === 'year_month') {
+      grpYear.classList.remove('hidden');
+      grpMonth.classList.remove('hidden');
+    } else {
+      grpYear.classList.add('hidden');
+      grpMonth.classList.add('hidden');
+    }
+  }
+
+  function renderHeatmap(odTrips, mode) {
+    const tbl = document.getElementById('od-matrix');
+    const unitEl = document.getElementById('matrix-unit');
+    const isDaily = (mode === 'rolling_1y_daily');
+    const isMonthly = (mode === 'rolling_1m' || mode === 'year_month');
+    unitEl.textContent = isDaily ? '人次 / 日' : (isMonthly ? '百人次 (×100)' : '千人次 (k)');
+
+    let maxV = 10;
+    for (let o = 0; o < 22; o++) {
+      for (let d = 0; d < 22; d++) {
+        if (odTrips[o][d] > maxV) maxV = odTrips[o][d];
+      }
+    }
+
+    let html = '<thead><tr><th>O \\ D</th>';
+    E.STATION_PROFILES.forEach(st => { html += `<th title="${st.name}">${st.code.replace('FR','')}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    for (let o = 0; o < 22; o++) {
+      const stO = E.STATION_PROFILES[o];
+      html += `<tr><th title="${stO.name}">${stO.code}</th>`;
+      for (let d = 0; d < 22; d++) {
+        if (o === d) {
+          html += `<td style="background:#E2E8F0;color:#94A3B8;">—</td>`;
+          continue;
+        }
+        const v = odTrips[o][d];
+        const ratio = Math.min(1, v / maxV);
+        const alpha = (0.06 + ratio * 0.85).toFixed(2);
+        const bg = `rgba(0, 140, 190, ${alpha})`;
+        const txtCol = ratio > 0.5 ? '#FFFFFF' : '#0F172A';
+        const stD = E.STATION_PROFILES[d];
+
+        let disp;
+        if (isDaily) {
+          disp = v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v);
+        } else if (isMonthly) {
+          disp = v >= 100 ? String(Math.round(v / 100)) : (v > 0 ? '<1' : '0');
+        } else {
+          disp = v >= 1000 ? String(Math.round(v / 1000)) : (v > 0 ? '<1' : '0');
+        }
+
+        const distKm = Math.abs(stD.km - stO.km).toFixed(1);
+        const fare = E.calculateFareFWC(parseFloat(distKm), 'single').toFixed(2);
+        const unitDesc = isDaily ? '人/日' : '人次';
+        html += `<td style="background:${bg};color:${txtCol}" title="${stO.code}${stO.name} → ${stD.code}${stD.name}&#10;OD 流量: ${v.toLocaleString()} ${unitDesc}&#10;里程: ${distKm} km｜單程基準票價: ${fare} FWC">$` + disp + `</td>`.replace('$', '');
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    tbl.innerHTML = html;
+  }
+
+  function updateAll() {
+    syncFilterVisibility();
+    const mode = selMode.value;
+    let periodKey = mode;
+    if (mode === 'year') {
+      periodKey = selYear.value;
+    } else if (mode === 'year_month') {
+      periodKey = `${selYear.value}-${selMonth.value}`;
+    }
+
+    const pSim = E.simulatePeriodStats(periodKey, 'all', dateCtx.refDate);
+    const s = pSim.summary;
+    const isDaily = !!pSim.isDailyAvg;
+
+    document.getElementById('seed-indicator').textContent = `SEED: ${pSim.seedIndicator}`;
+    document.getElementById('period-badge').textContent = `統計區間：${pSim.periodLabel}`;
+
+    document.getElementById('kpi-od-label').textContent = isDaily ? '近一年平均單日 OD 旅次' : '期間 OD 旅運總量';
+    document.getElementById('kpi-od-trips').textContent = isDaily
+      ? `${s.totalOdTrips.toLocaleString()} 人次/日`
+      : `${s.totalOdTrips.toLocaleString()} 人次`;
+    document.getElementById('kpi-od-days').textContent = isDaily
+      ? `以近 ${pSim.totalDays} 個營運日加權平均計算`
+      : `涵蓋 ${pSim.totalDays} 日營運區間`;
+
+    document.getElementById('kpi-avg-daily').textContent = `${s.avgDailyTrips.toLocaleString()} 人次/日`;
+
+    document.getElementById('kpi-rev-label').textContent = isDaily ? '平均單日客運推算收入' : '客運推算票務收入';
+    document.getElementById('kpi-rev-fwc').textContent = isDaily
+      ? `${s.totalFareRevFWC.toLocaleString()} 飛灣幣/日`
+      : `${Math.round(s.totalFareRevFWC / 1000).toLocaleString()} 千飛灣幣`;
+    document.getElementById('kpi-rev-usd').textContent = isDaily
+      ? `約 $${s.totalFareRevUSD.toLocaleString()} 美元/日 (1 FWC = $10 USD)`
+      : `約 $${Math.round(s.totalFareRevUSD / 1000).toLocaleString()} 千美元 (1 FWC = $10 USD)`;
+
+    document.getElementById('kpi-avgkm').textContent = `${s.avgTripKm.toFixed(2)} km`;
+    document.getElementById('kpi-biz').textContent = isDaily
+      ? `商務艙日均 ${s.totalBizBoardings.toLocaleString()} 人次`
+      : `商務艙累計搭乘 ${s.totalBizBoardings.toLocaleString()} 人次`;
+
+    document.getElementById('th-trips').textContent = isDaily ? '日均 OD 旅次' : '期間累計 OD 旅次';
+
+    renderHeatmap(pSim.odTrips, mode);
+
+    document.getElementById('top-od-tbody').innerHTML = pSim.topODPairs.slice(0, 5).map((p, i) => `
+      <tr>
+        <td class="num"><span class="rank-badge ${i === 0 ? 'top1' : ''}">${i + 1}</span></td>
+        <td><strong>${p.originCode}</strong> ${p.originName}</td>
+        <td><strong>${p.destCode}</strong> ${p.destName}</td>
+        <td class="num">${p.distKm.toFixed(1)}</td>
+        <td class="num">${p.avgRideMins} 分</td>
+        <td class="num"><strong>${p.trips.toLocaleString()}</strong></td>
+        <td class="num">${p.bizTrips.toLocaleString()}</td>
+        <td class="num">${p.revenueFWC.toLocaleString()}</td>
+        <td class="num">$${p.revenueUSD.toLocaleString()}</td>
+      </tr>
+    `).join('');
+  }
+
+  function runWithLoading(fn) {
+    const ov = document.getElementById('sim-loading-overlay');
+    if (!ov) return fn();
+    const t0 = performance.now();
+    ov.style.display = 'flex';
+    requestAnimationFrame(() => setTimeout(() => {
+      try { fn(); } finally {
+        const wait = Math.max(0, 300 - (performance.now() - t0));
+        setTimeout(() => { ov.style.display = 'none'; }, wait);
+      }
+    }, 16));
+  }
+
+  selYear.addEventListener('change', () => {
+    rebuildMonthOptions();
+    runWithLoading(updateAll);
+  });
+  selMode.addEventListener('change', () => runWithLoading(updateAll));
+  selMonth.addEventListener('change', () => runWithLoading(updateAll));
+
+  rebuildMonthOptions();
+  runWithLoading(updateAll);
+})();
+</script>
+<script>
+(function(){
+  function load(src){return new Promise(function(r,j){var e=document.createElement('script');e.src=src;e.onload=r;e.onerror=j;document.body.appendChild(e);});}
+  function start(){
+    load('timetable_data.js').then(function(){return load('flywan_sim_engine.js');}).then(function(){
+      var e=document.createElement('script');e.textContent=document.getElementById('page-main').textContent;document.body.appendChild(e);
+    }).catch(function(){var o=document.getElementById('sim-loading-overlay');if(o)o.style.display='none';});
+  }
+  requestAnimationFrame(function(){setTimeout(start,30);});
+})();
+</script>
+</body>
+</html>

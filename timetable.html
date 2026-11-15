@@ -1322,8 +1322,17 @@ function searchOdSchedule() {
           while (adjDepMidSec < effDepSec1) adjDepMidSec += 86400;
           let waitSec = adjDepMidSec - adjArrMidSec;
 
-          // 轉乘時間約束：候車 2 ~ 35 分鐘
-          if (waitSec >= 120 && waitSec <= 2100) {
+          // 轉乘時間約束：預設不設最低候車時間下限 (0 ~ 2100 秒)；特定車站與月台條件須 180 秒
+          let minWaitSec = 0;
+          let p1 = parseInt(midArrInfo.plat, 10);
+          let p2 = parseInt(midDepInfo.plat, 10);
+          let hasPlats = !isNaN(p1) && !isNaN(p2);
+          if (midName === '綾路北站' && t1.type !== t2.type && hasPlats && p1 !== p2) {
+            minWaitSec = 180;
+          } else if (midName === '飛灣公園' && hasPlats && Math.abs(p1 - p2) >= 2) {
+            minWaitSec = 180;
+          }
+          if (waitSec >= minWaitSec && waitSec <= 2100) {
             let adjArrEndSec = arrEndSec + (adjDepMidSec - depMidSec);
             if (adjArrEndSec < adjDepMidSec) adjArrEndSec += 86400;
             let totalDurationMin = Math.round((adjArrEndSec - effDepSec1) / 60);

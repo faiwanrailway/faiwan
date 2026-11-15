@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>駕駛模擬器 (GAME) 教學手冊 | 飛灣鐵路公司</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="manual-body">
+
+  <div class="page">
+    <div class="watermark">內部訓練 • 駕駛模擬器教學</div>
+    <div class="cover-title">
+      <h1>飛灣鐵路公司<br>駕駛模擬器 (GAME) 教學手冊</h1>
+      <p style="text-align: center; font-size: 1.5em; color: #666;">Train Driving Simulator User Manual</p>
+    </div>
+    <div class="cover-info">
+      <p><strong>文件編號：</strong> FWR-GAME-2026-002</p>
+      <p><strong>版本：</strong> V 2.0（由淺入深完整版）</p>
+      <p><strong>生效日期：</strong> 2026年 11月 14日</p>
+      <p><strong>權責單位：</strong> 機務處 / 運務訓練中心</p>
+    </div>
+    <div class="footer">頁碼 1 / 6</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>第一章：世界觀劇情與基礎操作</span>
+    </div>
+
+    <h2>1.1 值勤劇情與背景設定</h2>
+    <p>歡迎加入飛灣鐵路公司！你將以「正線值乘司機員」的身份，駕駛飛灣線主力電聯車（4 輛編成普通車或 6 輛編成直達/區間快車），穿梭於飛灣工業區、飛灣郵輪港、飛灣新站、飛灣機場與全京大道之間。在真實的 CBTC 移動閉塞號誌與動態旅運需求下，你的任務是：<strong>安全第一、準點運行、平穩停靠、妥善疏運每一位旅客。</strong></p>
+
+    <h2>1.2 電門與煞車段位（入門操作）</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>段位</th>
+          <th>物理含意</th>
+          <th>適用時機</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>P1 – P4</strong></td><td>牽引加速（P4 為最大出力）</td><td>離站加速、上坡補速與維持巡航</td></tr>
+        <tr><td><strong>N</strong></td><td>惰行（切斷動力滑行）</td><td>接近速限、下坡或進站前節能滑行</td></tr>
+        <tr><td><strong>B1 – B7</strong></td><td>常用煞車（B7 為最大常用制軔）</td><td>進站減速、降速配合速限與對準停車標</td></tr>
+        <tr><td><strong>EB</strong></td><td>緊急煞車（Emergency Brake）</td><td>突發危險或觸發 ATP 冒進保護時作動</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box">
+      <strong>ATO 自動駕駛模式：</strong><br>
+      可隨時切換 <strong>ATO</strong> 由系統自動執行 P4 加速、巡航、B5 進站減速與精準停靠；切換回手動即可接管電門與煞車。
+    </div>
+
+    <div class="footer">頁碼 2 / 6</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>第二章：核心規則與判定標準</span>
+    </div>
+
+    <h2>2.1 停靠對標與發車標準</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>規則含意</th>
+          <th>合格標準</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>停車對標</strong></td><td>確保列車車門與月台門（PSD）對齊</td><td>停妥於停止標容許誤差範圍內（過頭或不足需微調）</td></tr>
+        <tr><td><strong>準點判定</strong></td><td>維持全線時刻表秩序與轉乘銜接</td><td>依表定到離站時刻運作，不得早發（提前關門離站）</td></tr>
+        <tr><td><strong>車門聯鎖</strong></td><td>防止車門未關妥即啟動造成旅客墜落</td><td>須待「車門全關（Doors Closed）」後始可推進 P 段</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2.2 動態上下車與乘車率標準</h2>
+    <ul>
+      <li><strong>開門瞬間（下車）：</strong>列車停妥開門的瞬間，系統立即結算並扣除到達該站之下車旅客。</li>
+      <li><strong>關門瞬間（上車）：</strong>確認安全並關閉車門的瞬間，系統立即加上選擇搭乘本班車之上車旅客。</li>
+      <li><strong>乘車率分級：</strong>4 輛編成額定 600 人、6 輛編成額定普通 750 + 商務 48 人；雙方最高上限皆為 <strong>175%</strong>，超過上限將產生月台留置旅客。</li>
+    </ul>
+
+    <div class="footer">頁碼 3 / 6</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>第三章：駕駛艙螢幕項目與按鈕操作</span>
+    </div>
+
+    <h2>3.1 駕駛艙螢幕顯示項目</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>螢幕項目</th>
+          <th>顯示內容與意義</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>速度與 ATP 速限</strong></td><td>即時車速（km/h）與當前區間／CBTC 允許最高速限，超速將觸發 ATP 介入。</td></tr>
+        <tr><td><strong>號誌與 CBTC 狀態</strong></td><td>顯示前方閉塞燈態（綠/黃/紅）與 CBTC 連線狀態（藍燈閃爍代表定位丟失故障）。</td></tr>
+        <tr><td><strong>站距與停止標距離</strong></td><td>顯示距離下一站月台與停止標之剩餘公尺數，供進站對標減速參考。</td></tr>
+        <tr><td><strong>時刻與發車倒數</strong></td><td>顯示當前模擬時間、表定到離站時刻與關門發車倒數秒數。</td></tr>
+        <tr><td><strong>車門與載客狀態</strong></td><td>顯示各車廂車門狀態（開啟／關閉中／全關）及當前在車人數與乘車率百分比。</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3.2 按鈕與鍵盤操作方式</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>操作項目 / 按鍵</th>
+          <th>功能與操作方式</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>電門 / 煞車（W / S 或 ↑ / ↓）</strong></td><td>向上推入 P1–P4 加速、切回 N 惰行、向下拉入 B1–B7 常用煞車或 EB 緊急煞車。</td></tr>
+        <tr><td><strong>車門控制（空白鍵 Space）</strong></td><td>停妥月台後按空白鍵開門；發車倒數結束按空白鍵關門（車門異常時再按一次重關）。</td></tr>
+        <tr><td><strong>行控中心通報（Backspace / T）</strong></td><td>發生車門關閉異常或突發狀況時，於抵達下站前按鍵向行控中心回報。</td></tr>
+        <tr><td><strong>ATO 自動駕駛按鈕</strong></td><td>點擊介面 ATO 按鈕可隨時切換自動駕駛／手動駕駛模式。</td></tr>
+      </tbody>
+    </table>
+
+    <div class="footer">頁碼 4 / 7</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>第四章：進階與隱藏規則</span>
+    </div>
+
+    <h2>3.1 CBTC 移動閉塞與 ATP 保護</h2>
+    <p>系統即時計算前方列車車尾位置與道岔狀態，並動態給出 ATP 允許速度。一旦超速或接近前方閉塞終點未及時減速，ATP 將強制介入煞車（甚至觸發 EB）。</p>
+
+    <h2>3.2 隱藏規則與進階評分細節</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>隱藏機制</th>
+          <th>觸發條件與影響</th>
+          <th>應對技巧</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>早發／未停妥懲罰</strong></td><td>未達表定發車時刻即強行關門離站，或過站未停靠</td><td>停站時緊盯發車倒數，確認時間到再關門</td></tr>
+        <tr><td><strong>舒適度（平穩度）</strong></td><td>頻繁在 P4 與 B7/EB 間劇烈切換會降低旅客舒適度</td><td>進站前預留煞車距離，善用 N 段惰行與 B2–B5 漸進減速</td></tr>
+        <tr><td><strong>前車閉塞連鎖</strong></td><td>前方班車尚未關門離站時，進站停止點會提前保護</td><td>觀察前方車距與號誌燈色，提早降速避免急煞</td></tr>
+        <tr><td><strong>分流與留置連鎖</strong></td><td>尖峰時段誤點會導致月台累積更多旅客並推高乘車率</td><td>維持準點與順暢運轉，避免連帶延誤後車</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3.3 異常情境與突發故障處置</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>異常情境</th>
+          <th>觸發條件與徵兆</th>
+          <th>標準處置與通報規定</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>車門關閉異常</strong></td><td>尖峰時段（06:45–08:45、16:45–19:45）隨機觸發；異常車廂持續顯示「關閉中」且不自動重關</td><td>1. 手動再次按 <strong>空白鍵</strong> 重新關門（持續 5 秒）。<br>2. <strong>必須於抵達下一站站區前按 Backspace（或 T）向行控中心回報</strong>，否則檢定失敗！回報後後續各站出發許可延遲 30 秒。</td></tr>
+        <tr><td><strong>CBTC 位置丟失故障</strong></td><td>每趟運轉約 1% 機率，於途中隨機位置觸發；ATP 燈顯示 <strong>CBTC LOSS（藍燈閃爍）</strong>，速度碼丟失、ATP 限速歸零</td><td>1. ATO 駕駛時系統自動施加 EB；CM 手動駕駛時須於 <strong>2 秒內</strong>拉緊急煞車 (EB)。<br>2. 減速至完全停妥過程中<strong>不得離開 EB</strong>。<br>3. 停妥後按 <strong>Backspace（或 T）</strong>向行控中心回報（約 5 秒），再經 5 秒設定為 <strong>RM 限制手動駕駛</strong>（限速 15 km/h）。<br>4. 釋放煞車並重設 EB，以 RM 慢速<strong>前進 50 公尺以上</strong>後：再次停車，<strong>停妥 3 秒自動重設為 ATO</strong>；或到站開門時自動花 5 秒恢復速度碼並切回 ATO。<br>5. 未回報或未完成 RM 設定即啟動列車，檢定失敗；後續各站出發許可延遲 60 秒。</td></tr>
+        <tr><td><strong>防護無線發報</strong></td><td>每趟運轉約 1% 機率，於途中隨機位置觸發；ATP 燈顯示 <strong>RADIO ALARM（紅閃）</strong>，蜂鳴器持續鳴響，ATP 限速歸零</td><td>1. 行進中須於 <strong>2 秒內</strong>拉緊急煞車 (EB)；若已停妥則免拉，但仍須通報。<br>2. 減速至完全停止過程中<strong>不得離開 EB</strong>。<br>3. 停妥後按 <strong>Backspace（或 T）</strong>向行控中心通報，約 10 秒後取得開車許可。<br>4. 釋放煞車並重設 EB 後方可繼續行駛；未通報或未取得許可即啟動列車，檢定失敗。後續各站出發許可延遲 30 秒。</td></tr>
+        <tr><td><strong>旅客緊急狀況</strong></td><td>每趟運轉約 1% 機率，於途中隨機位置觸發；TCMS 自動跳轉首頁並顯示旅客緊急通話訊息</td><td>須於 <strong>1 分鐘內</strong>按 <strong>Backspace（或 T）</strong>向行控中心回報旅客緊急狀況，逾時未回報則檢定失敗。</td></tr>
+      </tbody>
+    </table>
+
+    <div class="footer">頁碼 4 / 6</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>第四章：實戰範例 — 101 次（正常情境）</span>
+    </div>
+
+    <h2>4.1 班次基本資料</h2>
+    <p><strong>車次：</strong>101 次（下行普通車，4 輛編成，額定容量 600 人）｜<strong>情境：</strong>正常營運日，全線號誌與天候正常。</p>
+
+    <h2>4.2 分段運轉流程示範</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>階段</th>
+          <th>區間 / 車站</th>
+          <th>標準操作與注意事項</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>1. 整備發車</strong></td><td>FR01 飛灣工業區</td><td>確認目標班次 101 次與發車時刻，關閉車門確認 Doors Closed 後推至 P3–P4 加速出站。</td></tr>
+        <tr><td><strong>2. 市區通勤段</strong></td><td>FR02 – FR08（飛灣港 → 飛灣新站）</td><td>依區間速限巡航，適時切 N 段惰行；進站前以 B4–B5 平穩減速對標，開門下車、準點關門上車。</td></tr>
+        <tr><td><strong>3. 轉乘與機場段</strong></td><td>FR12 飛灣公園 – FR16 飛灣機場</td><td>此區間上下車旅客較多，停站時注意月台候車與關門後的乘車率變化，切勿早發。</td></tr>
+        <tr><td><strong>4. 郊區終點段</strong></td><td>FR17 – FR22（翡翠花園 → 全京大道）</td><td>依限速平穩行駛，抵達終點站停妥開門清客後完成 101 次值乘任務。</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box">
+      <strong>新手建議：</strong><br>
+      初次練習 101 次時，可先開啟 <strong>ATO</strong> 觀察系統如何抓進站煞車點與對標時機，熟悉路段速限後再切換手動駕駛挑戰高分！
+    </div>
+
+    <div class="footer">頁碼 5 / 6</div>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <span class="header-logo">飛灣鐵路公司 - 駕駛模擬器</span>
+      <span>附錄：快速檢查清單</span>
+    </div>
+
+    <h2>值乘前中後檢查清單</h2>
+    <ul>
+      <li><strong>發車前：</strong>確認車次（如 101 次）、情境（正常）與表定發車時刻，確認車門已完全關閉。</li>
+      <li><strong>行駛中：</strong>隨時留意 ATP 速限與前方列車距離，避免觸發常用/緊急煞車介入。</li>
+      <li><strong>進站時：</strong>預留充足煞車距離，對準停止標後再開啟車門（開門結算下車、關門結算上車）。</li>
+    </ul>
+
+    <div class="footer">頁碼 6 / 6</div>
+  </div>
+
+</body>
+</html>

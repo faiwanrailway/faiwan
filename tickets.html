@@ -205,15 +205,15 @@
           <select id="ticket-type-select" class="login-input" style="margin-bottom: 12px;">
             <option value="single">一般單程票</option>
             <option value="business">快速列車商務艙票 (含特急券、2+2對號座)</option>
-            <option value="pass_1">1日定期票 (0.50 飛灣幣)</option>
-            <option value="pass_2">2日定期票 (0.95 飛灣幣)</option>
-            <option value="pass_3">3日定期票 (1.35 飛灣幣)</option>
-            <option value="pass_5">5日定期票 (2.10 飛灣幣)</option>
-            <option value="pass_7">7日定期票 (2.70 飛灣幣)</option>
-            <option value="pass_30">30日定期票 (9.00 飛灣幣)</option>
-            <option value="luggage_check">行李託運票 (0.08 飛灣幣)</option>
-            <option value="bicycle">自行車票 (0.15 飛灣幣)</option>
-            <option value="large_luggage">大件行李票 (0.05 飛灣幣)</option>
+            <option value="pass_1">1日定期票 (0.85 飛灣幣)</option>
+            <option value="pass_2">2日定期票 (1.55 飛灣幣)</option>
+            <option value="pass_3">3日定期票 (2.20 飛灣幣)</option>
+            <option value="pass_5">5日定期票 (3.40 飛灣幣)</option>
+            <option value="pass_7">7日定期票 (4.50 飛灣幣)</option>
+            <option value="pass_30">30日定期票 (10.80 飛灣幣)</option>
+            <option value="luggage_check">行李託運票 (0.12 飛灣幣)</option>
+            <option value="bicycle">自行車票 (0.20 飛灣幣)</option>
+            <option value="large_luggage">大件行李票 (0.08 飛灣幣)</option>
             <optgroup label="節日紀念套票 (限節日前一天起販售至節日當天/期間・超出作廢・相框永久保留)">
               <option value="holiday_1_1">1/1 建國紀念日套票 - 飛灣色 (0.50 飛灣幣)</option>
               <option value="holiday_2_1">2/1 情人日套票 - 粉色 (0.50 飛灣幣)</option>
@@ -290,6 +290,7 @@
           
           <p style="margin-bottom: 16px; color: #5c7088;">
             試算票價：<strong id="ticket-price-calc" style="font-size: 24px;">0.00</strong> 飛灣幣
+            <span id="ticket-price-usd" style="font-size: 14px; margin-left: 8px; color: #64748b;">(約 $0.00 美元 · 1 飛灣幣 = 10 美元)</span>
           </p>
           <button id="do-buy-btn" class="sys-btn-primary" style="width: 100%;">確認購買 / 兌換</button>
         </article>
@@ -301,8 +302,8 @@
       </div>
     </div>
 
-    <div id="modal-ticket-detail" class="sys-modal">
-      <div class="sys-modal-content">
+    <div id="modal-ticket-detail" class="sys-modal" style="padding:16px;">
+      <div class="sys-modal-content" style="max-height:90vh;overflow-y:auto;">
         <h2 id="detail-ticket-name" style="color: #123b72; margin-top: 0; margin-bottom: 4px;">車票名稱</h2>
         <p id="detail-ticket-info" style="color: #5c7088; margin-top: 0; margin-bottom: 8px; font-weight: bold;"></p>
         
@@ -370,13 +371,13 @@
     <h2>票價計算方式</h2>
     <div class="grid grid-2">
       <article class="card">
-        <h3>旅客票價（每人）</h3>
+        <h3>旅客票價（每人 · 1 飛灣幣 = 10 美元）</h3>
         <p>
-          基本票價：<strong>0.1 飛灣幣</strong><br>
-          每公里：<strong>0.01 飛灣幣</strong>
+          一般單程基本票價：<strong>0.12 飛灣幣</strong>（約 $1.20 美元），每公里加收：<strong>0.012 飛灣幣</strong>（約 $0.12 美元）<br>
+          快速商務艙基本票價：<strong>0.35 飛灣幣</strong>（約 $3.50 美元），每公里加收：<strong>0.030 飛灣幣</strong>（約 $0.30 美元）
         </p>
         <p class="meta">
-          實際票價將依路線與行駛距離自動計算，部分促銷方案可能適用不同計價方式。
+          為配合全線營運成本、車輛折舊與旅運模型平衡，單程、商務艙及定期票已依站間里程與日均搭乘趟次調整計價，無短途套利空間。部分節慶紀念套票仍適用專案優惠價（0.50 飛灣幣）。
         </p>
       </article>
     </div>
@@ -1100,12 +1101,12 @@
 
     let price = 0;
     if (type === 'single') {
-      price = (dist > 0) ? (0.1 + (dist * 0.01)) : 0;
+      price = (dist > 0) ? (0.12 + (dist * 0.012)) : 0;
     } else if (type === 'business') {
       const isStartRapid = RAPID_STATION_NAMES.includes(startName);
       const isEndRapid = RAPID_STATION_NAMES.includes(endName);
       if (dist > 0 && isStartRapid && isEndRapid) {
-        const baseFullPrice = 0.3 + (dist * 0.025);
+        const baseFullPrice = 0.35 + (dist * 0.03);
         const discountMode = businessMemberSelect.value;
         if (discountMode === 'platinum' || discountMode === 'black_air') {
           price = 0.00;
@@ -1119,19 +1120,23 @@
       } else {
         price = 0.00;
       }
-    } else if (type === 'pass_1') price = 0.50;
-    else if (type === 'pass_2') price = 0.95;
-    else if (type === 'pass_3') price = 1.35;
-    else if (type === 'pass_5') price = 2.10;
-    else if (type === 'pass_7') price = 2.70;
-    else if (type === 'pass_30') price = 9.00;
-    else if (type === 'luggage_check') price = 0.08;
-    else if (type === 'bicycle') price = 0.15;
-    else if (type === 'large_luggage') price = 0.05;
+    } else if (type === 'pass_1') price = 0.85;
+    else if (type === 'pass_2') price = 1.55;
+    else if (type === 'pass_3') price = 2.20;
+    else if (type === 'pass_5') price = 3.40;
+    else if (type === 'pass_7') price = 4.50;
+    else if (type === 'pass_30') price = 10.80;
+    else if (type === 'luggage_check') price = 0.12;
+    else if (type === 'bicycle') price = 0.20;
+    else if (type === 'large_luggage') price = 0.08;
     else if (HOLIDAY_PACKAGES[type]) price = HOLIDAY_PACKAGES[type].price;
 
     const finalPrice = parseFloat(price.toFixed(2));
     priceCalc.textContent = finalPrice.toFixed(2);
+    const usdEl = document.getElementById('ticket-price-usd');
+    if (usdEl) {
+      usdEl.textContent = `(約 $${(finalPrice * 10).toFixed(2)} 美元 · 1 飛灣幣 = 10 美元)`;
+    }
     return finalPrice;
   }
 

@@ -10,6 +10,7 @@
     <!-- 本檔由 c:\ke_chen_you\game\faiwanrailway\build_live.py 自動產生，推演方式與 2D 全線調度監控中心相同 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="flywan_sim_engine.js"></script>
     <style>
         body { background-color: #0f172a; color: #e0e0e0; overflow: hidden; font-family: 'Microsoft JhengHei', sans-serif; touch-action: none; }
         .digital { font-family: 'Courier New', monospace; font-weight: bold; }
@@ -78,6 +79,7 @@
         <div class="absolute top-6 right-4 z-20 bg-gray-900/80 px-4 py-2 rounded border border-gray-700 backdrop-blur pointer-events-auto text-right">
             <div class="text-3xl text-blue-400 digital">{{ currentTimeStr }}</div>
             <div class="text-xs text-gray-400 mt-1">{{ schedLabel }}時刻表 · 線上列車: {{ trains.length }}</div>
+            <div class="text-[11px] text-cyan-300/90 mt-0.5 font-mono" v-if="liveDaySim">在車 {{ liveOnBoardTotal.toLocaleString() }} 人 · 候車 {{ liveWaitingTotal.toLocaleString() }} 人</div>
         </div>
 
         <div v-if="errorMsg" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/95 backdrop-blur">
@@ -89,7 +91,7 @@
 
         <div v-if="!isLoaded && !errorMsg" class="absolute inset-0 z-40 flex items-center justify-center bg-slate-950">
             <div class="text-center text-gray-300">
-                <div class="text-lg font-bold text-blue-400 mb-2">正在推演全線列車位置…</div>
+                <div class="text-lg font-bold text-blue-400 mb-2">正在載入中...</div>
                 <div class="text-xs text-gray-500">依時刻表、ATO 運轉曲線與 CBTC 閉塞規則同步至目前時刻</div>
             </div>
         </div>
@@ -174,13 +176,20 @@
                     <div class="text-sm font-bold text-white digital">{{ selectedTrain.schedLine }}</div>
                     <div class="text-xs font-bold" :style="{ color: selectedTrain.delayColor }">{{ selectedTrain.delayText }}</div>
                 </div>
-                <div class="w-full md:w-56" v-if="selectedTrain.type !== '回送'">
+                <div class="w-full md:w-72" v-if="selectedTrain.type !== '回送'">
                     <div class="flex justify-between text-[10px] font-black mb-1">
-                        <span class="text-gray-400">車廂擁擠度 ({{ selectedTrain.crowding }}級)</span>
+                        <span class="text-gray-400">車廂乘車率 {{ selectedTrain.loadPct }}% ({{ selectedTrain.crowding }}級)</span>
                         <span :class="crowdLevels[selectedTrain.crowding].color">{{ crowdLevels[selectedTrain.crowding].text }}</span>
                     </div>
                     <div class="crowd-bar">
-                        <div class="crowd-fill" :style="{ width: (selectedTrain.crowding * 20) + '%', backgroundColor: crowdLevels[selectedTrain.crowding].hex }"></div>
+                        <div class="crowd-fill" :style="{ width: Math.min(100, Math.max(8, Math.round((selectedTrain.loadPct || 0) / 1.75))) + '%', backgroundColor: crowdLevels[selectedTrain.crowding].hex }"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+                        <span>普通 {{ selectedTrain.onBoardOrd }}/{{ selectedTrain.capOrdBase }} 人 (極限 {{ selectedTrain.capOrdMax }})</span>
+                        <span v-if="selectedTrain.is6Cars" class="text-cyan-300">商務 {{ selectedTrain.onBoardBiz }}/{{ selectedTrain.capBiz }}</span>
+                    </div>
+                    <div class="text-[10px] text-amber-400 mt-0.5 font-bold" v-if="selectedTrain.leftBehind > 0">
+                        ⚠ 本站尖峰留置約 {{ selectedTrain.leftBehind }} 人改搭下班車
                     </div>
                 </div>
                 <button @click="selectedUid = null" class="bg-gray-800 hover:bg-red-600 text-white w-8 h-8 rounded-full transition-all flex items-center justify-center ml-auto">✕</button>
@@ -2815,7 +2824,7 @@
 
 
 
-            // 回送列車：依照時刻表通過，若無時刻則計算平均速率用平均速率運行
+            // 回送列車：補充無時刻通過站的遠距時刻表內插標記 (實際線上區間改為正常 ATO 物理運轉，不使用平均速率控速)
 
             let isDeadhead = !!(trainObj.type && (trainObj.type.includes('回送') || trainObj.type.includes('迴送')));
 
@@ -6197,233 +6206,7 @@
 
             let dayNow = resolveTrainDayNow(tl, toDayCycleSecs(tNow));
 
-            if (tl.isDeadhead) {
-
-                let nodes = tl.nodes;
-
-                if (!nodes || nodes.length < 2) {
-
-                    tl._liveState = { active: false };
-
-                    return;
-
-                }
-
-                let firstNode = nodes[0];
-
-                let lastNode = nodes[nodes.length - 1];
-
-                let originDep = (firstNode.depSecs !== null) ? firstNode.depSecs : firstNode.arrSecs;
-
-                let destArr = (lastNode.arrSecs !== null) ? lastNode.arrSecs : lastNode.depSecs;
-
-
-
-                let dayDep = toDayCycleSecs(originDep);
-
-                let dayArr = toDayCycleSecs(destArr);
-
-                let isDepotEnd = (lastNode.cleanName || lastNode.name || '').includes('車輛基地');
-
-                let termDwell = isDepotEnd ? 15 : 60;
-
-
-
-                if (dayNow < dayDep - 60 || dayNow > dayArr + termDwell) {
-
-                    tl._liveState = { active: false };
-
-                    return;
-
-                }
-
-
-
-                if (dayNow <= dayDep) {
-
-                    tl._liveState = {
-
-                        active: true,
-
-                        dHead: firstNode.pos,
-
-                        v: 0,
-
-                        p: 0,
-
-                        b: 4,
-
-                        currentAcc: 0,
-
-                        stopIdx: 0,
-
-                        targetStopIdx: 1,
-
-                        isStoppedAtStation: true,
-
-                        doorOpen: false,
-
-                        doorClosing: false,
-
-                        doorTimer: 0,
-
-                        spawnTime: tNow,
-
-                        arrTimeSecs: originDep - 60,
-
-                        depTimeSecs: originDep,
-
-                        isStopping: false,
-
-                        atoCurrentBrake: 0,
-
-                        cbtcNotchTimer: 0,
-
-                        lastCbtcSpeedLimit: 120
-
-                    };
-
-                    return;
-
-                }
-
-
-
-                if (dayNow >= dayArr) {
-
-                    tl._liveState = {
-
-                        active: true,
-
-                        dHead: lastNode.pos,
-
-                        v: 0,
-
-                        p: 0,
-
-                        b: 4,
-
-                        currentAcc: 0,
-
-                        stopIdx: nodes.length - 1,
-
-                        targetStopIdx: nodes.length - 1,
-
-                        isStoppedAtStation: true,
-
-                        doorOpen: false,
-
-                        doorClosing: false,
-
-                        doorTimer: 0,
-
-                        spawnTime: tNow,
-
-                        arrTimeSecs: destArr,
-
-                        depTimeSecs: destArr + termDwell,
-
-                        isStopping: false,
-
-                        atoCurrentBrake: 0,
-
-                        cbtcNotchTimer: 0,
-
-                        lastCbtcSpeedLimit: 120
-
-                    };
-
-                    return;
-
-                }
-
-
-
-                for (let i = 0; i < nodes.length - 1; i++) {
-
-                    let nA = nodes[i];
-
-                    let nB = nodes[i + 1];
-
-                    let rawTA = (nA.depSecs !== null) ? nA.depSecs : ((nA.passSecs !== null) ? nA.passSecs : nA.arrSecs);
-
-                    let rawTB = (nB.arrSecs !== null) ? nB.arrSecs : ((nB.passSecs !== null) ? nB.passSecs : nB.depSecs);
-
-                    let tA = toDayCycleSecs(rawTA);
-
-                    let tB = toDayCycleSecs(rawTB);
-
-                    if (dayNow >= tA && dayNow <= tB) {
-
-                        let dur = Math.max(1, tB - tA);
-
-                        let ratio = (dayNow - tA) / dur;
-
-                        let curD = nA.pos + (nB.pos - nA.pos) * ratio;
-
-                        let spd = Math.abs(nB.pos - nA.pos) / dur;
-
-                        tl._liveState = {
-
-                            active: true,
-
-                            dHead: curD,
-
-                            v: spd,
-
-                            p: 4,
-
-                            b: 0,
-
-                            currentAcc: 0,
-
-                            stopIdx: i,
-
-                            targetStopIdx: i + 1,
-
-                            isStoppedAtStation: false,
-
-                            doorOpen: false,
-
-                            doorClosing: false,
-
-                            doorsWereClosed: true,
-
-                            doorTimer: 0,
-
-                            spawnTime: tNow,
-
-                            arrTimeSecs: null,
-
-                            depTimeSecs: rawTB,
-
-                            isStopping: false,
-
-                            atoCurrentBrake: 0,
-
-                            cbtcNotchTimer: 0,
-
-                            lastCbtcSpeedLimit: 120
-
-                        };
-
-                        return;
-
-                    }
-
-                }
-
-
-
-                tl._liveState = { active: false };
-
-                return;
-
-            }
-
-
-
-            let stops = tl.targetNodes || tl.stopNodes;
+            let stops = tl.targetNodes || (tl.isDeadhead ? tl.nodes : tl.stopNodes);
 
             if (!stops || stops.length < 2) {
 
@@ -6499,7 +6282,7 @@
 
                     doorClosing: isClosing,
 
-                    doorsWereClosed: isDepartReady,
+                    doorsWereClosed: tl.isDeadhead || isDepartReady,
 
                     doorTimer: isClosing ? Math.max(0, timeToDep) : 0,
 
@@ -6549,11 +6332,11 @@
 
                     isStoppedAtStation: true,
 
-                    doorOpen: true,
+                    doorOpen: !tl.isDeadhead,
 
                     doorClosing: false,
 
-                    doorsWereClosed: false,
+                    doorsWereClosed: !!tl.isDeadhead,
 
                     doorTimer: 0,
 
@@ -6623,7 +6406,7 @@
 
                             doorClosing: isClosing,
 
-                            doorsWereClosed: isDepartReady,
+                            doorsWereClosed: tl.isDeadhead || isDepartReady,
 
                             doorTimer: isClosing ? Math.max(0, timeToDep) : 0,
 
@@ -6781,435 +6564,7 @@
 
 
 
-        function stepDeadheadOtherTrain(tl, dt, tNow) {
 
-            let st = tl._liveState;
-
-            if (!st || !st.active) return;
-
-            let nodes = tl.nodes;
-
-            if (!nodes || nodes.length < 2) {
-
-                st.active = false;
-
-                return;
-
-            }
-
-            let firstNode = nodes[0];
-
-            let lastNode = nodes[nodes.length - 1];
-
-
-
-            // 1. 若處於車站停靠中 (起點待發 或 終點停等結束)
-
-            if (st.isStoppedAtStation) {
-
-                st.v = 0;
-
-                st.p = 0;
-
-                st.b = 4;
-
-                st.currentAcc = 0;
-
-                st.doorOpen = false;
-
-
-
-                // 終點站處理：抵達終點站後停等 60 秒 (或超過 depTimeSecs) 即退出消失
-
-                // 若同一車組下一班折返車已進入出發前 60 秒預備區間且本站已停妥滿 2 秒，立即交接退場，避免折返班次延遲生成導致誤點
-
-                if (st.stopIdx >= nodes.length - 1) {
-
-                    st.dHead = lastNode.pos;
-
-                    let rawDayNow = toDayCycleSecs(tNow);
-
-                    let dayNow = resolveTrainDayNow(tl, rawDayNow);
-
-                    let dwellElapsed = (st.arrTimeSecs !== null) ? (dayNow - toDayCycleSecs(st.arrTimeSecs)) : 60.0;
-
-                    let hasNextDutyWaiting = false;
-
-                    if (dwellElapsed >= 2.0) {
-
-                        const allLists = [cachedDownTimelines || [], cachedUpTimelines || []];
-
-                        for (let tList of allLists) {
-
-                            for (let i = 0; i < tList.length; i++) {
-
-                                let otherTl = tList[i];
-
-                                if (otherTl.num === tl.num || otherTl._liveState) continue;
-
-                                if (areTrainsSameCarGroup(tl, otherTl)) {
-
-                                    let oStart = toDayCycleSecs(otherTl.startSecs);
-
-                                    let oEnd = toDayCycleSecs(otherTl.endSecs);
-
-                                    let otherDayNow = resolveTrainDayNow(otherTl, rawDayNow);
-
-                                    if (otherDayNow >= oStart - 60 && otherDayNow <= oEnd) {
-
-                                        hasNextDutyWaiting = true;
-
-                                        break;
-
-                                    }
-
-                                }
-
-                            }
-
-                            if (hasNextDutyWaiting) break;
-
-                        }
-
-                    }
-
-                    let dwellLimit = (lastNode.cleanName === '飛灣車輛基地' || (lastNode.name && lastNode.name.includes('車輛基地'))) ? 15.0 : 60.0;
-
-                    if (dwellElapsed >= dwellLimit || hasNextDutyWaiting || tNow >= (st.depTimeSecs || (lastNode.arrSecs + 60))) {
-
-                        st.active = false;
-
-                        tl._liveState = null;
-
-                        tl._hasFinishedRun = true;
-
-                        return;
-
-                    }
-
-                    return;
-
-                }
-
-
-
-                // 起點站處理：待發狀態
-
-                st.dHead = firstNode.pos;
-
-                let originDepSecs = st.depTimeSecs || firstNode.depSecs || firstNode.arrSecs;
-
-                if (tNow >= originDepSecs) {
-
-                    // 出發前檢查閉塞與衝突
-
-                    let cbtc = getOtherTrainCbtc(tl, st.dHead, st.v, tl.dir, tNow, nodes[1]);
-
-                    let overdueSecs = tNow - originDepSecs;
-
-                    let hasPhysicalObstacleAhead = (cbtc && cbtc.hasLead && typeof cbtc.blockDist === 'number' && cbtc.blockDist < 40.0);
-
-                    if ((cbtc.blockDist > 20 && !cbtc.holdForDeparture) || (overdueSecs >= 30.0 && !cbtc.holdForDeparture && !hasPhysicalObstacleAhead)) {
-
-                        st.isStoppedAtStation = false;
-
-                        if (firstNode && typeof markTrainDeparted === 'function') {
-
-                            let cleanOrig = firstNode.cleanName || (firstNode.name ? firstNode.name.replace(/^FR\d+\s*/, '').trim() : '');
-
-                            markTrainDeparted(cleanOrig, tl.num, tNow);
-
-                        }
-
-                        st.stopIdx = 0;
-
-                        st.targetStopIdx = 1;
-
-                        if (nodes[1]) st.depTimeSecs = nodes[1].passSecs || nodes[1].depSecs || nodes[1].arrSecs;
-
-                        st.p = 4;
-
-                        st.b = 0;
-
-                    }
-
-                }
-
-                return;
-
-            }
-
-
-
-            // 2. 列車在區間運行中：檢查是否已抵達或越過當前目標節點 (targetNode)
-
-            let targetIdx = st.targetStopIdx || 1;
-
-            let targetNode = nodes[targetIdx] || lastNode;
-
-            let distToTarget = (tl.dir === 'down') ? (targetNode.pos - st.dHead) : (st.dHead - targetNode.pos);
-
-
-
-            // 若已越過或到達 targetNode
-
-            while (distToTarget <= 0 && targetIdx < nodes.length - 1) {
-
-                if (targetNode && typeof markTrainDeparted === 'function') {
-
-                    let cleanP = targetNode.cleanName || (targetNode.name ? targetNode.name.replace(/^FR\d+\s*/, '').trim() : '');
-
-                    markTrainDeparted(cleanP, tl.num, tNow);
-
-                }
-
-                // 通過該中間站，推進到下一個節點
-
-                st.stopIdx = targetIdx;
-
-                targetIdx++;
-
-                st.targetStopIdx = targetIdx;
-
-                targetNode = nodes[targetIdx];
-
-                if (targetNode) st.depTimeSecs = targetNode.passSecs || targetNode.depSecs || targetNode.arrSecs;
-
-                distToTarget = (tl.dir === 'down') ? (targetNode.pos - st.dHead) : (st.dHead - targetNode.pos);
-
-            }
-
-
-
-            // 若目標節點是終點站且已抵達 (distToTarget <= 0.6)
-
-            if (targetIdx >= nodes.length - 1 && distToTarget <= 0.6) {
-
-                st.dHead = lastNode.pos;
-
-                st.v = 0;
-
-                st.p = 0;
-
-                st.b = 4;
-
-                st.isStoppedAtStation = true;
-
-                st.stopIdx = nodes.length - 1;
-
-                st.targetStopIdx = nodes.length - 1;
-
-                st.arrTimeSecs = tNow;
-
-                st.depTimeSecs = tNow + 60;
-
-                return;
-
-            }
-
-
-
-            // 3. 計算表定目標速度 (若無時刻則以平均速率運行，若有時刻則依表定通過時刻運行)
-
-            let prevNode = nodes[st.stopIdx] || firstNode;
-
-            let tPrev = (st.stopIdx === 0) ? (prevNode.depSecs || prevNode.arrSecs) : (prevNode.passSecs || prevNode.depSecs || prevNode.arrSecs);
-
-            let tNext = (targetIdx === nodes.length - 1) ? (targetNode.arrSecs || targetNode.depSecs) : (targetNode.passSecs || targetNode.arrSecs || targetNode.depSecs);
-
-
-
-            let segDist = Math.max(1, Math.abs(targetNode.pos - prevNode.pos));
-
-            let segDur = Math.max(1, tNext - tPrev);
-
-            let segAvgV = segDist / segDur; // m/s (無時刻時計算出的平均速率)
-
-
-
-            let vTarget = segAvgV;
-
-
-
-            // 依即時剩餘時間與距離微調目標速度 (維持時刻表定時運行與追趕延誤)
-
-            let timeRemaining = tNext - tNow;
-
-            if (timeRemaining > 0 && distToTarget > 0) {
-
-                vTarget = distToTarget / timeRemaining;
-
-            } else if (timeRemaining <= 0) {
-
-                vTarget = 120 / 3.6;
-
-            }
-
-
-
-            // 4. 速度限制：最高限速 120 km/h，以及曲線/道岔限速 (Zone Limit)
-
-            let pFR01 = String((tl.platforms && (tl.platforms['飛灣工業區'] || tl.platforms['FR01'])) || '');
-
-            let pFR21 = String((tl.platforms && (tl.platforms['綾路北站'] || tl.platforms['FR21'])) || '');
-
-            let activeZones = filterExemptSpeedZones([...SPEED_ZONES], tl.dir, pFR01, pFR21);
-
-            if (tl.sidingZones || getTrainSidingSpeedZones(tl)) {
-
-                activeZones.push(...(tl.sidingZones || getTrainSidingSpeedZones(tl)));
-
-            }
-
-            let currentZoneLimit = 120;
-
-            for (let z of activeZones) {
-
-                let effStart = (tl.dir === 'down') ? z.start : z.end;
-
-                let effEnd = (tl.dir === 'down') ? z.end + tl.length : z.start - tl.length;
-
-                let inZone = (tl.dir === 'down') ? (st.dHead >= effStart && st.dHead <= effEnd) : (st.dHead <= effStart && st.dHead >= effEnd);
-
-                if (inZone && z.limit < currentZoneLimit) {
-
-                    currentZoneLimit = z.limit;
-
-                }
-
-            }
-
-            vTarget = Math.min(vTarget, currentZoneLimit / 3.6);
-
-
-
-            // 5. 閉塞影響 (除非受到閉塞影響)
-
-            let cbtc = getOtherTrainCbtc(tl, st.dHead, st.v, tl.dir, tNow, targetNode);
-
-            // 進站對向道岔衝突/側線轉轍器停止點為硬性停止目標，必須依 CBTC 曲線減速，不可套用站內 45km/h 放寬
-            let isHardCbtcHold = !!(cbtc.isRule1Controlling || (cbtc.holdInfo && (cbtc.holdInfo.isArrivalCrossoverHold || cbtc.holdInfo.isSidingTurnoutHold)));
-            let isNotAtFixedStop = !!(targetNode && targetNode.isStop && distToTarget > 0.45 && distToTarget < 400 && !st.isStoppedAtStation && !isHardCbtcHold);
-
-            let isStationStopBlock = !!(cbtc.holdForDeparture || cbtc.isStationStopBefore5mHold || (cbtc.isStationPointTarget && !cbtc.hasLead));
-
-            let isStationArea = isStationStopBlock || (targetNode && targetNode.isStop && distToTarget < 400 && distToTarget > -15);
-
-
-
-            if (isNotAtFixedStop && (isStationStopBlock || isStationArea)) {
-
-                // 修改ATO邏輯：站內低於45KPH未到達定點可加速至45KPH (到站減速仍優先)
-
-                let stationBlockLim = 45 / 3.6;
-
-                let approachLim = (distToTarget < 20) ? (Math.max(1.0, Math.min(25, distToTarget * 1.5)) / 3.6) : stationBlockLim;
-
-                let vDecel = Math.sqrt(2 * 0.65 * Math.max(0.05, distToTarget - 0.15));
-
-                vTarget = Math.min(currentZoneLimit / 3.6, Math.min(stationBlockLim, Math.min(approachLim, vDecel)));
-
-            } else if (cbtc.holdForDeparture) {
-
-                vTarget = 0;
-
-            } else if (cbtc.hasLead || cbtc.clampPos !== null) {
-
-                if (cbtc.blockDist <= 4.5) {
-
-                    vTarget = 0;
-
-                } else if (cbtc.blockDist < 1500) {
-
-                    let curveLim = applyBrakingCurve(120, 0, Math.max(0.1, cbtc.blockDist - 4.0)) / 3.6;
-
-                    vTarget = Math.min(vTarget, curveLim);
-
-                }
-
-            }
-
-            if (typeof cbtc.cbtcSpeedLimit === 'number' && cbtc.cbtcSpeedLimit < 119.9) {
-
-                if (!(isNotAtFixedStop && isStationStopBlock && cbtc.cbtcSpeedLimit < 45)) {
-
-                    vTarget = Math.min(vTarget, cbtc.cbtcSpeedLimit / 3.6);
-
-                }
-
-            }
-
-
-
-            // 6. 速度平滑過渡與位移嚴格一致 (v 與 deltaD = v * dt 100% 一致)
-
-            if (vTarget <= 0) {
-
-                if (st.v <= 0.35 || (cbtc.blockDist <= 2.0)) {
-
-                    st.v = 0;
-
-                    st.p = 0;
-
-                    st.b = 4;
-
-                } else {
-
-                    let decelRate = (cbtc.blockDist < 20 || cbtc.holdForDeparture) ? 2.8 : 1.8;
-
-                    st.v = Math.max(0, st.v - decelRate * dt);
-
-                    st.p = 0;
-
-                    st.b = (st.v < 4.0 / 3.6) ? 2 : 4;
-
-                }
-
-            } else {
-
-                if (st.v < vTarget) {
-
-                    st.v = Math.min(vTarget, st.v + 1.2 * dt);
-
-                    st.p = 4;
-
-                    st.b = 0;
-
-                } else if (st.v > vTarget) {
-
-                    st.v = Math.max(vTarget, st.v - 1.5 * dt);
-
-                    st.p = 0;
-
-                    st.b = 3;
-
-                } else {
-
-                    st.p = 1;
-
-                    st.b = 0;
-
-                }
-
-            }
-
-
-
-            // 位移嚴格等於 速度 × dt
-
-            let deltaD = st.v * dt;
-
-            if (tl.dir === 'down') {
-
-                st.dHead += deltaD;
-
-            } else {
-
-                st.dHead -= deltaD;
-
-            }
-
-        }
 
 
 
@@ -8918,7 +8273,75 @@
 
 
 
-        // AI 駕駛車輛物理與 ATO 運轉計算 (除回送車外，與玩家 ATO、速度限制、進路、閉塞 100% 完全一致)
+        // AI 駕駛車輛物理與 ATO 運轉計算 (含回送車與一般車，與玩家 ATO、速度限制、進路、閉塞 100% 完全一致)
+
+        function completeAiStationArrival(tl, st, stops, targetStop, tNow) {
+
+            st.v = 0;
+
+            st.vehicleStopDuration = 0;
+
+            st.wasHeldByCbtc = false;
+
+            // 自然停靠原地，不強制覆蓋座標 (消除到站瞬間位置跳躍)
+
+            st.isStoppedAtStation = true;
+
+            st.stopIdx = st.targetStopIdx;
+
+            st.targetStopIdx = Math.min(st.stopIdx + 1, stops.length - 1);
+
+            st.arrTimeSecs = tNow;
+
+            let isTermStop = (st.stopIdx >= stops.length - 1);
+
+            let isDepotStop = (targetStop.cleanName === '飛灣車輛基地' || (targetStop.name && targetStop.name.includes('車輛基地')));
+
+            let termDwellSecs = isDepotStop ? 15 : 60;
+
+            let schedDep = targetStop.depSecs || (targetStop.arrSecs + (isTermStop ? termDwellSecs : getStationDefaultDwellSecs(targetStop.cleanName)));
+
+            st.depTimeSecs = isTermStop ? (tNow + termDwellSecs) : Math.max(schedDep, tNow + 15);
+
+            st.p = 0;
+
+            st.b = 4;
+
+            st.currentAcc = 0;
+
+            st.isStopping = false;
+
+
+
+            // 回送車到站維持車門關閉；一般載客列車依開門時序 (1.0 秒等待 -> 3.0 秒開門中 -> 車門完全開啟)
+
+            st.doorOpen = false;
+
+            st.doorClosing = false;
+
+            st.doorOpening = false;
+
+            if (tl.isDeadhead) {
+
+                st.doorsWereClosed = true;
+
+                st.atoAutoDoorDelaying = false;
+
+                st.atoAutoDoorTimer = 0;
+
+            } else {
+
+                st.doorsWereClosed = false;
+
+                st.atoAutoDoorDelaying = true;
+
+                st.atoAutoDoorTimer = 1.0;
+
+            }
+
+        }
+
+
 
         function stepSingleOtherTrain(tl, dt, tNow) {
 
@@ -8926,15 +8349,7 @@
 
             if (!st || !st.active) return;
 
-            if (tl.isDeadhead) {
-
-                stepDeadheadOtherTrain(tl, dt, tNow);
-
-                return;
-
-            }
-
-            let stops = tl.targetNodes || tl.stopNodes;
+            let stops = tl.targetNodes || (tl.isDeadhead ? tl.nodes : tl.stopNodes);
 
             if (!stops || stops.length < 2) return;
 
@@ -9364,51 +8779,7 @@
 
                 st.justArrivedAtStation = false;
 
-                st.v = 0;
-
-                st.vehicleStopDuration = 0;
-
-                st.wasHeldByCbtc = false;
-
-                // 自然停靠原地，不強制覆蓋座標 (消除到站瞬間位置跳躍)
-
-                st.isStoppedAtStation = true;
-
-                st.stopIdx = st.targetStopIdx;
-
-                st.targetStopIdx = Math.min(st.stopIdx + 1, stops.length - 1);
-
-                st.arrTimeSecs = tNow;
-
-                let isTermStop = (st.stopIdx >= stops.length - 1);
-
-                let schedDep = targetStop.depSecs || (targetStop.arrSecs + (isTermStop ? 60 : getStationDefaultDwellSecs(targetStop.cleanName)));
-
-                st.depTimeSecs = isTermStop ? (tNow + 60) : Math.max(schedDep, tNow + 15);
-
-                st.p = 0;
-
-                st.b = 4;
-
-                st.currentAcc = 0;
-
-                st.isStopping = false;
-
-
-
-                // 開門時序：與玩家完全一致 (1.0 秒等待 -> 3.0 秒開門中 -> 車門完全開啟)
-
-                st.doorOpen = false;
-
-                st.doorClosing = false;
-
-                st.doorOpening = false;
-
-                st.doorsWereClosed = false;
-
-                st.atoAutoDoorDelaying = true;
-
-                st.atoAutoDoorTimer = 1.0;
+                completeAiStationArrival(tl, st, stops, targetStop, tNow);
 
                 return;
 
@@ -9500,6 +8871,14 @@
 
 
 
+            if (tl.isDeadhead && typeof markPassedStationsDeparted === 'function') {
+
+                markPassedStationsDeparted(tl, tNow);
+
+            }
+
+
+
             // 移動後檢查是否通過「有時刻之通過目標車站 (pass_time, !targetStop.isStop)」或停妥於停靠站月台
 
             let postDistToStop = (tl.dir === 'down') ? (targetPos - st.dHead) : (st.dHead - targetPos);
@@ -9550,51 +8929,7 @@
 
             if (isAiStopArrived) {
 
-                st.v = 0;
-
-                st.vehicleStopDuration = 0;
-
-                st.wasHeldByCbtc = false;
-
-                // 自然停靠原地，不強制覆蓋座標 (消除到站瞬間位置跳躍)
-
-                st.isStoppedAtStation = true;
-
-                st.stopIdx = st.targetStopIdx;
-
-                st.targetStopIdx = Math.min(st.stopIdx + 1, stops.length - 1);
-
-                st.arrTimeSecs = tNow;
-
-                let isTermStop = (st.stopIdx >= stops.length - 1);
-
-                let schedDep = targetStop.depSecs || (targetStop.arrSecs + (isTermStop ? 60 : getStationDefaultDwellSecs(targetStop.cleanName)));
-
-                st.depTimeSecs = isTermStop ? (tNow + 60) : Math.max(schedDep, tNow + 15);
-
-                st.p = 0;
-
-                st.b = 4;
-
-                st.currentAcc = 0;
-
-                st.isStopping = false;
-
-
-
-                // 開門時序：與玩家完全一致 (1.0 秒等待 -> 3.0 秒開門中 -> 車門完全開啟)
-
-                st.doorOpen = false;
-
-                st.doorClosing = false;
-
-                st.doorOpening = false;
-
-                st.doorsWereClosed = false;
-
-                st.atoAutoDoorDelaying = true;
-
-                st.atoAutoDoorTimer = 1.0;
+                completeAiStationArrival(tl, st, stops, targetStop, tNow);
 
             } else if (postDistToStop < -5.0 && st.v > 0.5 && st.targetStopIdx < stops.length - 1) {
 
@@ -12437,6 +11772,9 @@
                     selectedUid: null,
                     stationCrowdData: {},
                     lastSeedBlock: -1,
+                    liveDaySim: null,
+                    liveOnBoardTotal: 0,
+                    liveWaitingTotal: 0,
                     typeLegend: [
                         { name: '普通', color: '#008080' },
                         { name: '通勤', color: '#006400' },
@@ -12538,6 +11876,19 @@
                     this.currentTime = now;
                     this.serviceKey = serviceDayKey(now);
                     jumpSimTimeTo(wallSecs(now));
+                    if (typeof window.FlywanSimEngine !== 'undefined' && typeof cachedDownTimelines !== 'undefined' && typeof cachedUpTimelines !== 'undefined') {
+                        if (typeof ensureAllTrainTimelinesCache === 'function') ensureAllTrainTimelinesCache();
+                        const expectKey = `${this.serviceKey || 'today'}-${this.schedType}`;
+                        if (!this.liveDaySim || this.liveDaySim.seedKey !== expectKey) {
+                            this.liveDaySim = window.FlywanSimEngine.computeLiveDaySim(
+                                cachedDownTimelines,
+                                cachedUpTimelines,
+                                this.schedType,
+                                this.serviceKey,
+                                now
+                            );
+                        }
+                    }
                     this.lastWall = performance.now();
                     this.render();
                 },
@@ -12666,7 +12017,8 @@
                     const el = this.pathGeom();
                     const L = this.pathLength;
                     const active = (occSim.activeTrains || []).filter(tl => tl._liveState && tl._liveState.active);
-                    this.updateStationCrowding();
+                    const eng = window.FlywanSimEngine;
+                    let onBoardSum = 0;
 
                     const items = active.map(tl => {
                         const st = tl._liveState;
@@ -12709,7 +12061,12 @@
                         if (tl.dir === 'up') angle += 180;
 
                         const color = trainColor(tl);
-                        const crowdSt = this.stationCrowdData[STATION_NAMES[this.nearestStationIdx(st.dHead)]];
+                        const loadInfo = (eng && this.liveDaySim)
+                            ? eng.getTrainLoadAtTime(this.liveDaySim, tl, occSim.simTimeSecs, st)
+                            : { crowding: 1, loadPct: 0, loadPctBiz: 0, onBoardOrd: 0, onBoardBiz: 0, capOrdBase: 600, capOrdMax: 1050, capBiz: 0, is6Cars: false, leftBehind: 0, formationLabel: '85M' };
+                        if (tl.type !== '回送' && !tl.isDeadhead) {
+                            onBoardSum += (loadInfo.onBoardOrd || 0) + (loadInfo.onBoardBiz || 0);
+                        }
                         return {
                             uid: `${tl.dir}-${tl.num}`,
                             num: String(tl.num),
@@ -12722,11 +12079,31 @@
                             textColor: trainTextColor(color),
                             isStopped: item.stopped,
                             speed: Math.round(Math.abs(st.v || 0) * 3.6),
-                            crowding: crowdSt ? (crowdSt[tl.dir] || 1) : 1,
+                            crowding: loadInfo.crowding,
+                            loadPct: loadInfo.loadPct,
+                            loadPctBiz: loadInfo.loadPctBiz,
+                            onBoardOrd: loadInfo.onBoardOrd,
+                            onBoardBiz: loadInfo.onBoardBiz,
+                            capOrdBase: loadInfo.capOrdBase,
+                            capOrdMax: loadInfo.capOrdMax,
+                            capBiz: loadInfo.capBiz,
+                            is6Cars: loadInfo.is6Cars,
+                            formationLabel: loadInfo.formationLabel,
+                            leftBehind: loadInfo.leftBehind,
                             x, y, angle,
                             ...this.describeTrain(tl, st)
                         };
                     });
+
+                    this.liveOnBoardTotal = Math.round(onBoardSum);
+                    if (eng && this.liveDaySim && this.liveDaySim.minuteWaitingTotals) {
+                        const normSecs = eng.normalizeTimetableSecs(occSim.simTimeSecs);
+                        const simMin = Math.min(1679, Math.max(0, Math.floor(normSecs / 60)));
+                        const frac = (normSecs % 60) / 60;
+                        const w0 = this.liveDaySim.minuteWaitingTotals[simMin] || 0;
+                        const w1 = this.liveDaySim.minuteWaitingTotals[simMin + 1] ?? w0;
+                        this.liveWaitingTotal = Math.round(w0 + (w1 - w0) * frac);
+                    }
                 },
 
                 // ---------------- 擁擠度 (沿用原網站模型) ----------------

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>車站進出統計數據｜飛灣鐵路公司</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .subnav-bar {
+      background: #043349;
+      border-bottom: 2px solid var(--secondary);
+      padding: 10px 0;
+    }
+    .subnav-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .subnav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .subnav-links a {
+      color: #E0F2FE;
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.22);
+      transition: 0.15s;
+    }
+    .subnav-links a:hover, .subnav-links a.active {
+      background: var(--secondary);
+      color: #032B3D;
+      font-weight: 700;
+      border-color: var(--secondary);
+    }
+    .controls-card {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+      align-items: end;
+    }
+    .control-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+    .control-group select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--primary);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    .kpi-card.accent { border-top-color: var(--accent); }
+    .kpi-card.cyan { border-top-color: var(--secondary); }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 1.6rem; font-weight: 800; color: var(--primary); line-height: 1.2; }
+    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+    .chart-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .chart-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+    .seed-pill {
+      display: inline-block;
+      background: #0F172A;
+      color: #38BDF8;
+      font-family: Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+<div id="sim-loading-overlay" style="display:flex;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(2,6,23,0.65);backdrop-filter:blur(4px);">
+  <div style="background:rgba(15,23,42,0.95);border:1px solid rgba(56,189,248,0.45);border-radius:16px;padding:18px 26px;display:flex;align-items:center;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,0.45);color:#f8fafc;font-family:sans-serif;">
+    <div style="width:26px;height:26px;border-radius:50%;border:3px solid rgba(56,189,248,0.25);border-top-color:#38bdf8;animation:spin 0.8s linear infinite;"></div>
+    <div><div style="font-size:14px;font-weight:700;letter-spacing:0.04em;">LOADING · 推演運算中...</div><div style="font-size:12px;color:#94a3b8;margin-top:2px;">正在計算旅運模擬數據</div></div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<header class="site-header">
+  <div class="container navbar">
+    <div class="brand">
+      <span class="brand-subtitle">FLYWAN RAILWAY COMPANY</span>
+      <span class="brand-title">飛灣鐵路公司</span>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">首頁</a>
+      <a href="news.html">公告資訊</a>
+      <a href="stations.html">車站資訊</a>
+      <a href="timetable.html">時刻表</a>
+      <a href="tickets.html">票務資訊</a>
+      <a href="company.html" class="active">公司介紹</a>
+      <a href="extras.html">其他資料</a>
+      <a href="game.html" target="_blank" rel="noopener noreferrer">小遊戲</a>
+      <a href="contact.html">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+
+<div class="subnav-bar">
+  <div class="container subnav-inner">
+    <div class="subnav-links">
+      <a href="company.html">← 返回公司介紹</a>
+      <a href="station_stats.html" class="active">車站進出統計數據</a>
+      <a href="od_stats.html">OD 旅運與熱門走廊</a>
+      <a href="financial_reports.html">年度財務報表</a>
+      <a href="service_quality.html">服務品質統計</a>
+    </div>
+    <span class="seed-pill" id="seed-indicator">SEED: ...</span>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="container">
+    <h1>全線 22 站進出統計數據</h1>
+    <p>整合飛灣線實際時刻表班次、8 種土地利用屬性（A–H）與 24 小時 8 時段（T1–T8）推算。當年數據自動推演統計至當日，新年度並將自動加入選單。</p>
+  </div>
+</section>
+
+<main class="container" style="padding-top: 28px; padding-bottom: 48px;">
+  <article class="card controls-card">
+    <div class="control-group">
+      <label for="sel-year">統計年度（2020 年起，自動延展至今年）</label>
+      <select id="sel-year"></select>
+    </div>
+    <div class="control-group">
+      <label for="sel-mode">統計口徑／時刻表日型</label>
+      <select id="sel-mode">
+        <option value="period_all" selected>年度累計總量（依實際平假日權重至當日）</option>
+        <option value="weekday">單日代表：平日時刻表 (Weekday)</option>
+        <option value="holiday">單日代表：一般假日／週末 (Holiday)</option>
+        <option value="holiday_long">單日代表：連續假期 24H (Long Holiday)</option>
+        <option value="weekday_to_long">單日代表：平日接連假前夕 (Eve)</option>
+        <option value="long_to_weekday">單日代表：連假收假日 (Return)</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="sel-station">檢視車站</label>
+      <select id="sel-station">
+        <option value="ALL" selected>全線 22 站彙總</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="sel-league">飛灣巨蛋聯賽事件（單日模式適用）</label>
+      <select id="sel-league">
+        <option value="normal" selected>一般例行週（週二～日散場常態）</option>
+        <option value="finals">第 6 週冠軍賽散場尖峰（FR12 加成）</option>
+      </select>
+    </div>
+  </article>
+
+  <div id="milestone-banner" class="card" style="margin-bottom: 20px; border-left: 4px solid var(--secondary); padding: 12px 18px; background: #F0F9FF;"></div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpi-in-label">進站旅次總計</div>
+      <div class="kpi-value" id="kpi-in">-</div>
+      <div class="kpi-sub" id="kpi-in-sub">-</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-label" id="kpi-out-label">出站旅次總計</div>
+      <div class="kpi-value" id="kpi-out">-</div>
+      <div class="kpi-sub" id="kpi-out-sub">-</div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">尖峰未擠上車留置人次</div>
+      <div class="kpi-value" id="kpi-lb">-</div>
+      <div class="kpi-sub" id="kpi-lb-sub">達物理容量上限轉階段 B 不挑車</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpi-extra-label">日均／有效統計日數</div>
+      <div class="kpi-value" id="kpi-trains">-</div>
+      <div class="kpi-sub" id="kpi-topst">-</div>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-header">
+      <div>
+        <h3 style="margin:0; color: var(--primary);" id="hourly-title">24 小時（T1–T8）分時進出站流量分佈</h3>
+        <div style="font-size: 0.82rem; color: var(--muted); margin-top: 2px;">橫軸依營運日 04:00 至隔日 03:00 排列；T2 早尖峰（07:00–09:00）與 T6 晚尖峰（17:00–19:30）已著色標示</div>
+      </div>
+      <div class="chart-legend">
+        <span><i class="legend-dot" style="background:#064663"></i>進站人次</span>
+        <span><i class="legend-dot" style="background:#00B4D8"></i>出站人次</span>
+        <span><i class="legend-dot" style="background:rgba(255,140,66,0.22)"></i>早／晚尖峰帶</span>
+      </div>
+    </div>
+    <svg id="hourly-svg" viewBox="0 0 960 290" style="width:100%; height:auto; display:block;"></svg>
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-header">
+      <div>
+        <h3 style="margin:0; color: var(--primary);">全線 22 站進出運量比較（由 FR01 飛灣工業區 → FR22 全京大道）</h3>
+        <div style="font-size: 0.82rem; color: var(--muted); margin-top: 2px;">點擊長條圖任一車站可切換上方 24 小時分時圖，游標移上可檢視確切進站、出站與合計人次</div>
+      </div>
+    </div>
+    <svg id="station-bar-svg" viewBox="0 0 960 270" style="width:100%; height:auto; display:block;"></svg>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>本網站所有公告與統計數據皆屬虛構模擬資料，僅供娛樂與創作參考。</p>
+  </div>
+</footer>
+
+<script type="text/plain" id="page-main">
+(function () {
+  const E = window.FlywanSimEngine;
+  const dateCtx = E.getReportingDateContext();
+  const selYear = document.getElementById('sel-year');
+  const selMode = document.getElementById('sel-mode');
+  const selStation = document.getElementById('sel-station');
+  const selLeague = document.getElementById('sel-league');
+
+  // 動態建立 2020 ~ 當年度選單 (新年度會自動新增)
+  for (let y = dateCtx.currentYear; y >= 2020; y--) {
+    const yf = E.getYearHistoryFactor(y);
+    const opt = document.createElement('option');
+    opt.value = String(y);
+    if (y === dateCtx.currentYear) {
+      opt.textContent = `${y} 年（截至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
+      opt.selected = true;
+    } else {
+      opt.textContent = `${y} 年（${yf.label}）`;
+    }
+    selYear.appendChild(opt);
+  }
+
+  E.STATION_PROFILES.forEach(st => {
+    const opt = document.createElement('option');
+    opt.value = st.code;
+    opt.textContent = `${st.code} ${st.name} (${st.landLabel})`;
+    selStation.appendChild(opt);
+  });
+
+  function renderHourlyChart(hoursIn, hoursOut, titlePrefix) {
+    const svg = document.getElementById('hourly-svg');
+    document.getElementById('hourly-title').textContent = `${titlePrefix} — 24 小時分時進出站流量（04:00 → 03:00）`;
+    const orderHours = [];
+    for (let i = 0; i < 24; i++) orderHours.push((4 + i) % 24);
+
+    let maxVal = 10;
+    orderHours.forEach(h => {
+      if (hoursIn[h] > maxVal) maxVal = hoursIn[h];
+      if (hoursOut[h] > maxVal) maxVal = hoursOut[h];
+    });
+    maxVal = Math.ceil(maxVal * 1.12);
+
+    const W = 960, H = 290, L = 74, R = 18, T = 20, B = 42;
+    const cw = W - L - R, ch = H - T - B;
+    const colW = cw / 24;
+    let out = '';
+
+    const peakBands = [
+      { startIdx: 3, span: 2, label: 'T2 早尖峰' },
+      { startIdx: 13, span: 3, label: 'T6 晚尖峰' }
+    ];
+    peakBands.forEach(pb => {
+      const x = L + pb.startIdx * colW;
+      const w = pb.span * colW;
+      out += `<rect x="${x.toFixed(1)}" y="${T}" width="${w.toFixed(1)}" height="${ch}" fill="rgba(255,140,66,0.12)"/>`;
+      out += `<text x="${(x + w/2).toFixed(1)}" y="${T + 14}" text-anchor="middle" font-size="11" font-weight="700" fill="#C2410C">${pb.label}</text>`;
+    });
+
+    for (let i = 0; i <= 4; i++) {
+      const val = Math.round((maxVal * i) / 4);
+      const y = T + ch - (ch * i) / 4;
+      out += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#E2E8F0" stroke-dasharray="${i === 0 ? '' : '3,3'}"/>`;
+      out += `<text x="${L - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#64748B">${val.toLocaleString()}</text>`;
+    }
+
+    orderHours.forEach((hr, idx) => {
+      const x0 = L + idx * colW;
+      const barW = Math.max(5, (colW - 8) / 2);
+      const hIn = (hoursIn[hr] / maxVal) * ch;
+      const hOut = (hoursOut[hr] / maxVal) * ch;
+      const yIn = T + ch - hIn;
+      const yOut = T + ch - hOut;
+
+      out += `<rect x="${(x0 + 3).toFixed(1)}" y="${yIn.toFixed(1)}" width="${barW.toFixed(1)}" height="${hIn.toFixed(1)}" rx="2" fill="#064663"><title>${String(hr).padStart(2,'0')}:00 進站: ${hoursIn[hr].toLocaleString()}</title></rect>`;
+      out += `<rect x="${(x0 + 4 + barW).toFixed(1)}" y="${yOut.toFixed(1)}" width="${barW.toFixed(1)}" height="${hOut.toFixed(1)}" rx="2" fill="#00B4D8"><title>${String(hr).padStart(2,'0')}:00 出站: ${hoursOut[hr].toLocaleString()}</title></rect>`;
+      out += `<text x="${(x0 + colW/2).toFixed(1)}" y="${H - 18}" text-anchor="middle" font-size="11" fill="#475569">${String(hr).padStart(2,'0')}</text>`;
+    });
+    svg.innerHTML = out;
+  }
+
+  function renderStationBars(stations, selectedCode) {
+    const svg = document.getElementById('station-bar-svg');
+    const maxTot = Math.max(100, ...stations.map(s => s.total));
+    const W = 960, H = 270, L = 74, R = 16, T = 16, B = 74;
+    const cw = W - L - R, ch = H - T - B;
+    const step = cw / stations.length;
+    let out = '';
+
+    for (let i = 0; i <= 4; i++) {
+      const val = Math.round((maxTot * i) / 4);
+      const y = T + ch - (ch * i) / 4;
+      out += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#E2E8F0" stroke-dasharray="${i === 0 ? '' : '3,3'}"/>`;
+      out += `<text x="${L - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#64748B">${val.toLocaleString()}</text>`;
+    }
+
+    stations.forEach((st, idx) => {
+      const x = L + idx * step + 5;
+      const bw = Math.max(10, step - 10);
+      const hIn = (st.entries / maxTot) * ch;
+      const hOut = (st.exits / maxTot) * ch;
+      const yOut = T + ch - hOut;
+      const yIn = yOut - hIn;
+      const isSel = selectedCode === st.code;
+      const stroke = isSel ? 'stroke="#FF8C42" stroke-width="2.5"' : '';
+
+      out += `<g style="cursor:pointer" data-stcode="${st.code}">`;
+      out += `<rect x="${x.toFixed(1)}" y="${yIn.toFixed(1)}" width="${bw.toFixed(1)}" height="${hIn.toFixed(1)}" fill="#064663" ${stroke}><title>${st.code} ${st.name} (${st.landLabel})&#10;進站: ${st.entries.toLocaleString()} 人次｜出站: ${st.exits.toLocaleString()} 人次&#10;進出總量: ${st.total.toLocaleString()} 人次</title></rect>`;
+      out += `<rect x="${x.toFixed(1)}" y="${yOut.toFixed(1)}" width="${bw.toFixed(1)}" height="${hOut.toFixed(1)}" fill="#00B4D8" ${stroke}><title>${st.code} ${st.name}｜進出總量: ${st.total.toLocaleString()}</title></rect>`;
+      out += `<text x="${(x + bw/2).toFixed(1)}" y="${T + ch + 14}" text-anchor="middle" font-size="10" font-weight="${isSel ? '800' : '600'}" fill="${isSel ? '#C2410C' : '#334155'}">${st.code}</text>`;
+      out += `<text transform="translate(${(x + bw/2 + 3).toFixed(1)}, ${T + ch + 26}) rotate(42)" font-size="10" fill="#475569">${st.name}</text>`;
+      out += `</g>`;
+    });
+
+    svg.innerHTML = out;
+    svg.querySelectorAll('g[data-stcode]').forEach(g => {
+      g.addEventListener('click', () => {
+        selStation.value = g.getAttribute('data-stcode');
+        updateView();
+      });
+    });
+  }
+
+  function updateView() {
+    const year = parseInt(selYear.value, 10);
+    const mode = selMode.value;
+    const stCode = selStation.value;
+    const isFinalsWeek = (selLeague.value === 'finals');
+    const yf = E.getYearHistoryFactor(year);
+
+    let stations, totalDaysLabel, extraMain, subInText, subOutText, seedStr;
+    if (mode === 'period_all') {
+      selLeague.disabled = true;
+      const pSim = E.simulatePeriodStats(String(year), 'all', dateCtx.refDate);
+      stations = pSim.stationStats;
+      seedStr = pSim.seedIndicator;
+      totalDaysLabel = `累計 ${pSim.totalDays} 個營運日`;
+      extraMain = `${pSim.totalDays} 日`;
+      subInText = pSim.isYTD ? `統計至 ${pSim.asOfDateStr}` : `${year} 全年度累計`;
+      subOutText = `僅計最終目的地出站（不含轉乘）`;
+      document.getElementById('kpi-extra-label').textContent = '統計有效天數／最高負荷站';
+      document.getElementById('milestone-banner').innerHTML =
+        `<strong>${pSim.periodLabel}</strong> — ${yf.note}`;
+    } else {
+      selLeague.disabled = false;
+      const schedType = mode;
+      const seedKey = `${year}-${schedType}${isFinalsWeek ? '-finals' : ''}`;
+      seedStr = `flywan-sim-${seedKey}`;
+      const dayType = (schedType === 'holiday_long') ? 'holiday_long' :
+                      (schedType === 'holiday') ? 'holiday' :
+                      (schedType === 'weekday_to_long') ? 'weekday_to_long' :
+                      (schedType === 'long_to_weekday') ? 'long_to_weekday' : 'weekday';
+      const sim = E.simulateDayOperations({ schedType, dayType, year, seedKey, isFinalsWeek, collectSamples: false });
+      stations = sim.stationStats;
+      extraMain = `${sim.summary.totalTrains} 班`;
+      subInText = '單日代表時刻表進站總量';
+      subOutText = '僅計最終目的地閘門出站';
+      document.getElementById('kpi-extra-label').textContent = '日行載客班次／最高負荷站';
+      document.getElementById('milestone-banner').innerHTML =
+        `<strong>${yf.label}</strong>（單日代表時刻表 · 需求倍率 ${Math.round(yf.demandScale * 100)}%）— ${yf.note}`;
+    }
+
+    document.getElementById('seed-indicator').textContent = `SEED: ${seedStr}`;
+    const topSt = [...stations].sort((a, b) => b.total - a.total)[0];
+
+    if (stCode === 'ALL') {
+      const sumIn = stations.reduce((a, b) => a + b.entries, 0);
+      const sumOut = stations.reduce((a, b) => a + b.exits, 0);
+      const sumLB = stations.reduce((a, b) => a + b.leftBehinds, 0);
+
+      document.getElementById('kpi-in-label').textContent = '全線進站旅次';
+      document.getElementById('kpi-out-label').textContent = '全線出站旅次';
+      document.getElementById('kpi-in').textContent = sumIn.toLocaleString();
+      document.getElementById('kpi-out').textContent = sumOut.toLocaleString();
+      document.getElementById('kpi-in-sub').textContent = subInText;
+      document.getElementById('kpi-out-sub').textContent = subOutText;
+      document.getElementById('kpi-lb').textContent = sumLB.toLocaleString();
+      document.getElementById('kpi-lb-sub').textContent = `留置佔進站比 ${((sumLB / Math.max(1, sumIn)) * 100).toFixed(2)}%`;
+
+      const hIn = new Array(24).fill(0);
+      const hOut = new Array(24).fill(0);
+      stations.forEach(s => {
+        for (let h = 0; h < 24; h++) {
+          hIn[h] += s.hourlyEntries[h];
+          hOut[h] += s.hourlyExits[h];
+        }
+      });
+      renderHourlyChart(hIn, hOut, '全線 22 站合計');
+    } else {
+      const target = stations.find(s => s.code === stCode) || stations[0];
+      document.getElementById('kpi-in-label').textContent = `${target.code} ${target.name} 進站人次`;
+      document.getElementById('kpi-out-label').textContent = `${target.code} ${target.name} 出站人次`;
+      document.getElementById('kpi-in').textContent = target.entries.toLocaleString();
+      document.getElementById('kpi-out').textContent = target.exits.toLocaleString();
+      document.getElementById('kpi-in-sub').textContent = subInText;
+      document.getElementById('kpi-out-sub').textContent = `站點規模 ${target.scale}/5 · ${target.landLabel}`;
+      document.getElementById('kpi-lb').textContent = target.leftBehinds.toLocaleString();
+      renderHourlyChart(target.hourlyEntries, target.hourlyExits, `${target.code} ${target.name}`);
+    }
+
+    document.getElementById('kpi-trains').textContent = extraMain;
+    document.getElementById('kpi-topst').textContent = `最高流量：${topSt.code} ${topSt.name} (${topSt.total.toLocaleString()} 人次)`;
+    renderStationBars(stations, stCode);
+  }
+
+  function runWithLoading(fn) {
+    const ov = document.getElementById('sim-loading-overlay');
+    if (!ov) return fn();
+    const t0 = performance.now();
+    ov.style.display = 'flex';
+    requestAnimationFrame(() => setTimeout(() => {
+      try { fn(); } finally {
+        const wait = Math.max(0, 300 - (performance.now() - t0));
+        setTimeout(() => { ov.style.display = 'none'; }, wait);
+      }
+    }, 16));
+  }
+
+  [selYear, selMode, selStation, selLeague].forEach(el => el.addEventListener('change', () => runWithLoading(updateView)));
+  runWithLoading(updateView);
+})();
+</script>
+<script>
+(function(){
+  function load(src){return new Promise(function(r,j){var e=document.createElement('script');e.src=src;e.onload=r;e.onerror=j;document.body.appendChild(e);});}
+  function start(){
+    load('timetable_data.js').then(function(){return load('flywan_sim_engine.js');}).then(function(){
+      var e=document.createElement('script');e.textContent=document.getElementById('page-main').textContent;document.body.appendChild(e);
+    }).catch(function(){var o=document.getElementById('sim-loading-overlay');if(o)o.style.display='none';});
+  }
+  requestAnimationFrame(function(){setTimeout(start,30);});
+})();
+</script>
+</body>
+</html>
