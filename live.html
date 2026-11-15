@@ -3530,7 +3530,7 @@
 
                             let isDownhillCruiseOverspeed1s = isDownhill && ((v_predict_1s_kph >= effLimit - 0.2) || (currentKph >= effLimit - 1.0 && curAccKph > 0));
 
-                            let mustHoldDownhillB = isDownhill && (b > 0) && (b === 2 ? atoB2Timer < 1.0 : atoB1Timer < 1.0);
+                            let mustHoldDownhillB = isDownhill && (b === 1 || b === 2) && (b === 2 ? atoB2Timer < 1.0 : atoB1Timer < 1.0);
 
                             if (isDownhillCruiseOverspeed1s || mustHoldDownhillB) {
 
@@ -3546,7 +3546,7 @@
 
                                 let targetDownhillB = desiredDownhillB;
 
-                                if (b > targetDownhillB) {
+                                if ((b === 1 || b === 2) && b > targetDownhillB) {
 
                                     let currentTimer = (b === 2) ? atoB2Timer : atoB1Timer;
 
@@ -8035,7 +8035,7 @@
 
             let isDownhillCruiseOverspeed1s = isDownhill && ((v_predict_1s_kph >= effLimit - 0.2) || (currentKph >= effLimit - 1.0 && curAccKph > 0));
 
-            let mustHoldDownhillB = isDownhill && (st.b > 0) && (st.b === 2 ? (st.atoB2Timer || 0) < 1.0 : (st.atoB1Timer || 0) < 1.0);
+            let mustHoldDownhillB = isDownhill && (st.b === 1 || st.b === 2) && (st.b === 2 ? (st.atoB2Timer || 0) < 1.0 : (st.atoB1Timer || 0) < 1.0);
 
 
 
@@ -8065,7 +8065,7 @@
 
                 let targetDownhillB = desiredDownhillB;
 
-                if (st.b > targetDownhillB) {
+                if ((st.b === 1 || st.b === 2) && st.b > targetDownhillB) {
 
                     let currentTimer = (st.b === 2) ? st.atoB2Timer : st.atoB1Timer;
 
