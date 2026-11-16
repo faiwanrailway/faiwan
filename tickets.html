@@ -1385,7 +1385,10 @@
       const gregStr = val.split(' ')[0];
       const [y, m, d] = gregStr.split('-').map(Number);
       const selectedDateOpt = businessDateSelect.options[businessDateSelect.selectedIndex];
-      const travelDate = (selectedDateOpt && selectedDateOpt.dataset.flywanShort) ? selectedDateOpt.dataset.flywanShort : gregStr;
+      const rawFlywan = (selectedDateOpt && selectedDateOpt.dataset.flywanShort)
+        ? selectedDateOpt.dataset.flywanShort
+        : convertGregorianToFlywan(new Date(y, m - 1, d)).short;
+      const travelDate = rawFlywan.startsWith('飛灣曆') ? rawFlywan : `飛灣曆 ${rawFlywan}`;
       const travelEnd = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
       return { travelDate, travelEnd };
     };
