@@ -1380,13 +1380,27 @@
     let validPeriodText = '';
     let unlockedThemeClass = '';
 
+    const getTravelDateInfo = () => {
+      const val = businessDateSelect.value || '';
+      const gregStr = val.split(' ')[0];
+      const [y, m, d] = gregStr.split('-').map(Number);
+      const selectedDateOpt = businessDateSelect.options[businessDateSelect.selectedIndex];
+      const travelDate = (selectedDateOpt && selectedDateOpt.dataset.flywanShort) ? selectedDateOpt.dataset.flywanShort : gregStr;
+      const travelEnd = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+      return { travelDate, travelEnd };
+    };
+
     if (type === 'single') {
       typeName = '一般單程票';
-      displayName = `單程票 (${startName} → ${endName}, ${dist.toFixed(1)}km, ${trainTrip}次)`;
+      const { travelDate, travelEnd } = getTravelDateInfo();
+      expiryTime = travelEnd;
+      validPeriodText = `乘車日 ${travelDate} 當日有效（至 23:59 止）`;
+      displayName = `單程票 [乘車日: ${travelDate}] (${startName} → ${endName}, ${dist.toFixed(1)}km, ${trainTrip}次)`;
     } else if (type === 'business') {
       typeName = '快速列車商務艙票';
-      const selectedDateOpt = businessDateSelect.options[businessDateSelect.selectedIndex];
-      const travelDate = (selectedDateOpt && selectedDateOpt.dataset.flywanShort) ? selectedDateOpt.dataset.flywanShort : businessDateSelect.value;
+      const { travelDate, travelEnd } = getTravelDateInfo();
+      expiryTime = travelEnd;
+      validPeriodText = `乘車日 ${travelDate} 當日有效（至 23:59 止）`;
       const method = document.querySelector('input[name="seat-method"]:checked').value;
       let seat = '';
       if (method === 'manual') {
