@@ -321,6 +321,10 @@
       }
     }
     const { fest, startDt, endDt } = best;
+    const announceStartDt = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate() - 7);
+    if (todayStart < announceStartDt || todayStart > endDt) {
+      return null;
+    }
     const saleStartDt = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate() - 1);
     const isOnSale = todayStart >= saleStartDt && todayStart <= endDt;
     return {
@@ -353,6 +357,12 @@
       }
     }
 
+    if (!blockStart) return null;
+    const announceStartDt = new Date(blockStart.getFullYear(), blockStart.getMonth(), blockStart.getDate() - 7);
+    if (todayStart < announceStartDt || todayStart > blockEnd) {
+      return null;
+    }
+
     const preDay = new Date(blockStart.getFullYear(), blockStart.getMonth(), blockStart.getDate() - 1);
     const postDay = new Date(blockEnd.getFullYear(), blockEnd.getMonth(), blockEnd.getDate() + 1);
     const isNow = todayStart >= blockStart && todayStart <= blockEnd;
@@ -381,8 +391,10 @@
     for (let i = 0; i < NEWS_COUNT; i++) {
       items.push(generateNews(i));
     }
-    items.push(generateHolidayPackageNews(now));
-    items.push(generateLongHolidayScheduleNews(now));
+    const holidayPkgNews = generateHolidayPackageNews(now);
+    if (holidayPkgNews) items.push(holidayPkgNews);
+    const longHolidayNews = generateLongHolidayScheduleNews(now);
+    if (longHolidayNews) items.push(longHolidayNews);
 
     let html = '';
     items.forEach(news => {

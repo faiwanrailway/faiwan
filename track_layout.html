@@ -130,6 +130,7 @@ const TRACK_SEQUENCE = [
   { d: '19,800 m',        name: 'FR07 文化中心',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
   { d: '21,700 m',        name: 'FR08 飛灣新站',           cat: '雙島車站', cls: '',          desc: '雙島式月台：正線 ±2m、外側待避線 ±20m' },
   { d: '24,000 m',        name: 'FR09 科創園',             cat: '待避車站', cls: '',          desc: '待避側式月台（passing_side）：正線 ±2m、待避側線 ±6m' },
+  { d: '24,350 ~ 24,450 m', name: 'FR09 站後剪式橫渡線',   cat: '橫渡線',   cls: 'is-switch', desc: '站後折返/調度交叉橫渡線：-2m ↔ +2m' },
   { d: '25,200 m',        name: 'FR10 飛灣學區',           cat: '側式車站', cls: '',          desc: '側式月台：雙正線 ±2m' },
   { d: '26,900 m',        name: 'FR11 飛灣大道',           cat: '島式車站', cls: '',          desc: '島式月台：正線開展至 ±9m' },
   { d: '27,750 ~ 27,850 m', name: 'FR12 袋形軌西側轉轍器', cat: '轉轍器',   cls: 'is-switch', desc: '正線 (±4.2m) 匯入中央袋形軌 (0m)' },
@@ -266,6 +267,7 @@ drawStationBox(1750, 'FR07', '文化中心', 'side', '19.8 km');
 drawCrossover(1815, 1855, '21300~21400m');
 drawStationBox(1930, 'FR08', '飛灣新站', 'double_island', '21.7 km');
 drawStationBox(2110, 'FR09', '科創園', 'passing_side', '24.0 km');
+drawCrossover(2180, 2220, '24350~24450m');
 drawStationBox(2260, 'FR10', '飛灣學區', 'side', '25.2 km');
 drawStationBox(2410, 'FR11', '飛灣大道', 'island', '26.9 km');
 

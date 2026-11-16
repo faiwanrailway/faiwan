@@ -209,7 +209,7 @@
 <section class="hero">
   <div class="container">
     <h1>22 × 22 OD 旅運矩陣熱力圖與前五大熱門走廊</h1>
-    <p>支援「近一年」、「近一個月」、「年度（2020 起至今）」、「年度月（2020 年起選月至今）」及「近一年年平均日」查詢；錦湖（FR13）與鷺島（FR14）依車站規模 3 計列，並自動於跨年新增年度。</p>
+    <p>支援「近一年」、「近一個月」、「年度（2020 起至今）」、「年度月（2020 年起選月至今）」及「近一年年平均日」查詢，並可切換不同時刻表情境（實際日曆權重／平日／假日／連續假日／平日接連假／連假接平日）；錦湖（FR13）與鷺島（FR14）依車站規模 3 計列，並自動於跨年新增年度。</p>
   </div>
 </section>
 
@@ -234,6 +234,17 @@
         <label for="sel-month">選擇月份</label>
         <select id="sel-month"></select>
       </div>
+      <div class="control-group" id="grp-sched">
+        <label for="sel-sched">時刻表情境</label>
+        <select id="sel-sched" style="min-width:220px;">
+          <option value="all" selected>實際營運權重（綜合平假日）</option>
+          <option value="weekday">平日時刻表 (Weekday)</option>
+          <option value="holiday">假日時刻表 (Holiday)</option>
+          <option value="holiday_long">連續假日時刻表 (24H)</option>
+          <option value="weekday_to_long">平日接連假時刻表 (Eve)</option>
+          <option value="long_to_weekday">連假接平日時刻表 (Return)</option>
+        </select>
+      </div>
     </div>
     <div id="period-badge" style="font-size:0.9rem; color:var(--primary); font-weight:600;"></div>
   </article>
@@ -247,7 +258,7 @@
     <div class="kpi-card cyan">
       <div class="kpi-label">期間日均 OD 旅次</div>
       <div class="kpi-value" id="kpi-avg-daily">-</div>
-      <div class="kpi-sub">含平日、週五、假日與連假實際權重</div>
+      <div class="kpi-sub" id="kpi-avg-sub">含平日、週五、假日與連假實際權重</div>
     </div>
     <div class="kpi-card accent">
       <div class="kpi-label" id="kpi-rev-label">客運推算票務收入</div>
@@ -303,8 +314,17 @@
   const selMode = document.getElementById('sel-mode');
   const selYear = document.getElementById('sel-year');
   const selMonth = document.getElementById('sel-month');
+  const selSched = document.getElementById('sel-sched');
   const grpYear = document.getElementById('grp-year');
   const grpMonth = document.getElementById('grp-month');
+  const SCHED_LABELS = {
+    all: '實際營運權重（綜合平假日）',
+    weekday: '平日時刻表 (Weekday)',
+    holiday: '假日時刻表 (Holiday)',
+    holiday_long: '連續假日時刻表 (24H)',
+    weekday_to_long: '平日接連假時刻表 (Eve)',
+    long_to_weekday: '連假接平日時刻表 (Return)'
+  };
 
   // 動態建立 2020 ~ 當年度選單（新年度會自動新增）
   for (let y = dateCtx.currentYear; y >= 2020; y--) {
@@ -414,22 +434,30 @@
       periodKey = `${selYear.value}-${selMonth.value}`;
     }
 
-    const pSim = E.simulatePeriodStats(periodKey, 'all', dateCtx.refDate);
+    const sched = selSched.value || 'all';
+    const schedLabel = SCHED_LABELS[sched] || sched;
+
+    const pSim = E.simulatePeriodStats(periodKey, sched, dateCtx.refDate);
     const s = pSim.summary;
     const isDaily = !!pSim.isDailyAvg;
 
-    document.getElementById('seed-indicator').textContent = `SEED: ${pSim.seedIndicator}`;
-    document.getElementById('period-badge').textContent = `統計區間：${pSim.periodLabel}`;
+    document.getElementById('seed-indicator').textContent = `SEED: ${pSim.seedIndicator}${sched !== 'all' ? `-${sched}` : ''}`;
+    document.getElementById('period-badge').textContent = sched === 'all'
+      ? `統計區間：${pSim.periodLabel}`
+      : `統計區間：${pSim.periodLabel}｜情境：${schedLabel}`;
 
     document.getElementById('kpi-od-label').textContent = isDaily ? '近一年平均單日 OD 旅次' : '期間 OD 旅運總量';
     document.getElementById('kpi-od-trips').textContent = isDaily
       ? `${s.totalOdTrips.toLocaleString()} 人次/日`
       : `${s.totalOdTrips.toLocaleString()} 人次`;
     document.getElementById('kpi-od-days').textContent = isDaily
-      ? `以近 ${pSim.totalDays} 個營運日加權平均計算`
+      ? (sched === 'all' ? `以近 ${pSim.totalDays} 個營運日加權平均計算` : `以近 ${pSim.totalDays} 日套用「${schedLabel}」加權平均`)
       : `涵蓋 ${pSim.totalDays} 日營運區間`;
 
     document.getElementById('kpi-avg-daily').textContent = `${s.avgDailyTrips.toLocaleString()} 人次/日`;
+    document.getElementById('kpi-avg-sub').textContent = sched === 'all'
+      ? '含平日、週五、假日與連假實際權重'
+      : `全區間套用「${schedLabel}」情境推演`;
 
     document.getElementById('kpi-rev-label').textContent = isDaily ? '平均單日客運推算收入' : '客運推算票務收入';
     document.getElementById('kpi-rev-fwc').textContent = isDaily
@@ -482,6 +510,7 @@
   });
   selMode.addEventListener('change', () => runWithLoading(updateAll));
   selMonth.addEventListener('change', () => runWithLoading(updateAll));
+  selSched.addEventListener('change', () => runWithLoading(updateAll));
 
   rebuildMonthOptions();
   runWithLoading(updateAll);

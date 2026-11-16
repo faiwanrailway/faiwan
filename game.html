@@ -10840,6 +10840,19 @@
 
             scene.background = new THREE.Color(0x87CEEB);
 
+            const skyGeo = new THREE.SphereGeometry(850, 32, 20);
+            const skyMat = new THREE.MeshBasicMaterial({
+                map: getSkyUVTexture('day', 'sunny'),
+                side: THREE.BackSide,
+                depthWrite: false,
+                fog: false
+            });
+            window._skyDome = new THREE.Mesh(skyGeo, skyMat);
+            window._skyDome.renderOrder = -100;
+            window._skyDome.frustumCulled = false;
+            window._skyKey = 'day_sunny';
+            scene.add(window._skyDome);
+
             camera = new THREE.PerspectiveCamera(60, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
 
             scene.add(new THREE.AmbientLight(0xffffff, 0.7));
@@ -10910,6 +10923,400 @@
 
             return tex;
 
+        }
+
+        function getTrackUVTextures() {
+            if (window._trackUVTextures) return window._trackUVTextures;
+            const maxAniso = (typeof renderer !== 'undefined' && renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy)
+                ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
+            const makeRepeatTex = (w, h, drawFn, wrapS = THREE.RepeatWrapping, wrapT = THREE.RepeatWrapping) => {
+                const c = document.createElement('canvas');
+                c.width = w;
+                c.height = h;
+                const ctx = c.getContext('2d');
+                drawFn(ctx, w, h);
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = wrapS;
+                tex.wrapT = wrapT;
+                tex.magFilter = THREE.LinearFilter;
+                tex.minFilter = THREE.LinearMipmapLinearFilter;
+                tex.anisotropy = maxAniso;
+                if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+                tex.needsUpdate = true;
+                return tex;
+            };
+
+            // 1. 鋼軌 UV 貼圖 (256x512): u=0.5 為亮面踏面, u=0.22 為軌肩/軌腰暗鋼, u=0.02 為鏽蝕軌底
+            const railUvTex = makeRepeatTex(256, 512, (ctx, w, h) => {
+                const grad = ctx.createLinearGradient(0, 0, w, 0);
+                grad.addColorStop(0.00, '#36271f');
+                grad.addColorStop(0.10, '#47362b');
+                grad.addColorStop(0.22, '#5a6470');
+                grad.addColorStop(0.36, '#8d98a5');
+                grad.addColorStop(0.45, '#d5dde6');
+                grad.addColorStop(0.50, '#eef3f8');
+                grad.addColorStop(0.55, '#d5dde6');
+                grad.addColorStop(0.64, '#8d98a5');
+                grad.addColorStop(0.78, '#5a6470');
+                grad.addColorStop(0.90, '#47362b');
+                grad.addColorStop(1.00, '#36271f');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                // 縱向鋼軌拉絲微紋與磨耗光澤
+                for (let i = 0; i < 180; i++) {
+                    const x = Math.floor(((Math.sin(i * 19.7) * 0.5 + 0.5) * 0.92 + 0.04) * w);
+                    const alpha = (i % 3 === 0) ? 0.14 : 0.07;
+                    ctx.fillStyle = (Math.abs(x - w * 0.5) < w * 0.12)
+                        ? `rgba(255,255,255,${alpha})`
+                        : `rgba(20,16,12,${alpha})`;
+                    ctx.fillRect(x, 0, 1 + (i % 2), h);
+                }
+                // 4m 長度焊縫/接縫細痕
+                ctx.fillStyle = 'rgba(20,24,28,0.45)';
+                ctx.fillRect(0, 0, w, 3);
+                ctx.fillStyle = 'rgba(255,255,255,0.18)';
+                ctx.fillRect(0, 3, w, 2);
+            }, THREE.ClampToEdgeWrapping, THREE.RepeatWrapping);
+
+            // 2. 無道碴水泥道床 UV 貼圖 (512x512, 對應寬 2.50m x 長 5.00m, 含 8 組扣件/承台)
+            const slabTrackbedUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                // 水泥道床基底
+                ctx.fillStyle = '#8b9198';
+                ctx.fillRect(0, 0, w, h);
+
+                // 細緻混凝土骨材噪點與縱向模板紋理
+                for (let i = 0; i < 4200; i++) {
+                    const rx = Math.floor((Math.sin(i * 12.9898) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 78.233) * 43758.5453 % 1 + 1) % 1 * h);
+                    const shade = (i % 2 === 0) ? 'rgba(255,255,255,0.08)' : 'rgba(30,35,40,0.09)';
+                    ctx.fillStyle = shade;
+                    ctx.fillRect(rx, ry, 2, 2);
+                }
+
+                // 兩側倒角陰影邊緣 (對應斜邊 u=0..0.05 與 u=0.95..1.0)
+                const leftBevel = ctx.createLinearGradient(0, 0, w * 0.06, 0);
+                leftBevel.addColorStop(0, '#4f555c');
+                leftBevel.addColorStop(0.75, '#686f77');
+                leftBevel.addColorStop(1, 'rgba(139,145,152,0)');
+                ctx.fillStyle = leftBevel;
+                ctx.fillRect(0, 0, w * 0.06, h);
+
+                const rightBevel = ctx.createLinearGradient(w * 0.94, 0, w, 0);
+                rightBevel.addColorStop(0, 'rgba(139,145,152,0)');
+                rightBevel.addColorStop(0.25, '#686f77');
+                rightBevel.addColorStop(1, '#4f555c');
+                ctx.fillStyle = rightBevel;
+                ctx.fillRect(w * 0.94, 0, w * 0.06, h);
+
+                // 中央凹槽排水溝 (u = 0.43..0.57)
+                const troughX = w * 0.43;
+                const troughW = w * 0.14;
+                const troughGrad = ctx.createLinearGradient(troughX, 0, troughX + troughW, 0);
+                troughGrad.addColorStop(0.0, '#626870');
+                troughGrad.addColorStop(0.18, '#717880');
+                troughGrad.addColorStop(0.5, '#787f87');
+                troughGrad.addColorStop(0.82, '#717880');
+                troughGrad.addColorStop(1.0, '#626870');
+                ctx.fillStyle = troughGrad;
+                ctx.fillRect(troughX, 0, troughW, h);
+                ctx.fillStyle = 'rgba(255,255,255,0.16)';
+                ctx.fillRect(troughX - 2, 0, 2, h);
+                ctx.fillRect(troughX + troughW, 0, 2, h);
+
+                // 雙塊式無道碴軌枕承台與扣件 (軌距 1.435m / 2.5m -> 中心 0.5 ± 0.287 -> 0.213 與 0.787)
+                const railCenters = [w * 0.213, w * 0.787];
+                const numFasteners = 8;
+                const stepY = h / numFasteners;
+                for (let k = 0; k < numFasteners; k++) {
+                    const cy = (k + 0.5) * stepY;
+                    for (const cx of railCenters) {
+                        // 水泥承台塊 (Sleeper plinth)
+                        const pw = w * 0.21;
+                        const ph = stepY * 0.46;
+                        const px = cx - pw * 0.5;
+                        const py = cy - ph * 0.5;
+                        ctx.fillStyle = 'rgba(35,40,48,0.28)';
+                        ctx.fillRect(px - 2, py + 2, pw + 4, ph + 2);
+                        ctx.fillStyle = '#9ca3ac';
+                        ctx.fillRect(px, py, pw, ph);
+                        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                        ctx.fillRect(px, py, pw, 2);
+
+                        // 黑色絕緣墊片與鋼製扣件底座 (Baseplate)
+                        const bw = w * 0.115;
+                        const bh = stepY * 0.30;
+                        ctx.fillStyle = '#262b31';
+                        ctx.fillRect(cx - bw * 0.5, cy - bh * 0.5, bw, bh);
+
+                        // 兩側彈性鋼夾 (Pandrol/Vossloh clip) 與螺栓
+                        ctx.fillStyle = '#4b5563';
+                        ctx.fillRect(cx - bw * 0.46, cy - bh * 0.26, bw * 0.22, bh * 0.52);
+                        ctx.fillRect(cx + bw * 0.24, cy - bh * 0.26, bw * 0.22, bh * 0.52);
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.fillRect(cx - bw * 0.39, cy - 2, 4, 4);
+                        ctx.fillRect(cx + bw * 0.31, cy - 2, 4, 4);
+                    }
+                }
+
+                // 預鑄軌道版 5m 橫向伸縮縫 (v=0 與 v=1 交界)
+                ctx.fillStyle = 'rgba(28,32,38,0.65)';
+                ctx.fillRect(0, 0, w, 3);
+                ctx.fillRect(0, h - 2, w, 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.20)';
+                ctx.fillRect(0, 3, w, 2);
+            }, THREE.ClampToEdgeWrapping, THREE.RepeatWrapping);
+
+            // 3. 高架橋/隧道無道碴水泥道床底版 UV 貼圖 (512x512, 4m x 4m 重複)
+            const concreteDeckUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#636971';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 4800; i++) {
+                    const rx = Math.floor((Math.sin(i * 23.14) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 91.71) * 43758.5453 % 1 + 1) % 1 * h);
+                    ctx.fillStyle = (i % 2 === 0) ? 'rgba(255,255,255,0.06)' : 'rgba(20,24,28,0.08)';
+                    ctx.fillRect(rx, ry, 2 + (i % 2), 2);
+                }
+                // 縱向模板分縫與排水痕
+                for (let x = 0; x < w; x += 128) {
+                    ctx.fillStyle = 'rgba(30,34,40,0.28)';
+                    ctx.fillRect(x, 0, 2, h);
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillRect(x + 2, 0, 1, h);
+                }
+                // 橫向 4m 橋面伸縮縫
+                ctx.fillStyle = 'rgba(25,28,34,0.45)';
+                ctx.fillRect(0, 0, w, 3);
+                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                ctx.fillRect(0, 3, w, 2);
+            });
+
+            // 4. 機廠地面/碎石道床 UV 貼圖 (512x512, 4m x 4m 重複)
+            const depotBallastUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#4c525a';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 6000; i++) {
+                    const rx = Math.floor((Math.sin(i * 31.7) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 67.3) * 43758.5453 % 1 + 1) % 1 * h);
+                    const sz = 2 + (i % 3);
+                    const col = (i % 3 === 0) ? '#646b75' : (i % 3 === 1 ? '#3b4048' : '#585f68');
+                    ctx.fillStyle = col;
+                    ctx.fillRect(rx, ry, sz, sz);
+                }
+            });
+
+            // 5. 地下隧道牆壁 UV 貼圖 (512x512, 6m 寬 x 6.1m 高隧道襯砌壁板)
+            const tunnelWallUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#5c626a';
+                ctx.fillRect(0, 0, w, h);
+
+                // 混凝土骨材噪點
+                for (let i = 0; i < 4500; i++) {
+                    const rx = Math.floor((Math.sin(i * 17.31) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 53.17) * 43758.5453 % 1 + 1) % 1 * h);
+                    ctx.fillStyle = (i % 2 === 0) ? 'rgba(255,255,255,0.06)' : 'rgba(15,18,22,0.08)';
+                    ctx.fillRect(rx, ry, 2, 2);
+                }
+
+                // 襯砌環片垂直伸縮縫 (每 2m 一道)
+                for (let x = 0; x < w; x += Math.floor(w / 3)) {
+                    ctx.fillStyle = 'rgba(20,24,28,0.55)';
+                    ctx.fillRect(x, 0, 3, h);
+                    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                    ctx.fillRect(x + 3, 0, 1, h);
+                }
+
+                // 水平澆置分層線
+                for (const yFrac of [0.22, 0.52, 0.80]) {
+                    const y = Math.floor(yFrac * h);
+                    ctx.fillStyle = 'rgba(20,24,28,0.28)';
+                    ctx.fillRect(0, y, w, 2);
+                }
+
+                // 底部防撞牆角與潮濕/剎車粉塵漸層 (Canvas 下緣對應 v=0 底部)
+                const botGrad = ctx.createLinearGradient(0, h * 0.78, 0, h);
+                botGrad.addColorStop(0, 'rgba(28,32,36,0)');
+                botGrad.addColorStop(0.6, 'rgba(28,32,36,0.35)');
+                botGrad.addColorStop(1, 'rgba(18,20,24,0.68)');
+                ctx.fillStyle = botGrad;
+                ctx.fillRect(0, h * 0.78, w, h * 0.22);
+
+                // 緊急避難步道反光黃線 (距底約 1.1m)
+                ctx.fillStyle = '#eab308';
+                ctx.fillRect(0, Math.floor(h * 0.82), w, 5);
+
+                // 隧道壁電纜托架/管線槽 (中段)
+                ctx.fillStyle = '#374151';
+                ctx.fillRect(0, Math.floor(h * 0.56), w, 18);
+                ctx.fillStyle = '#4b5563';
+                ctx.fillRect(0, Math.floor(h * 0.56), w, 4);
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.fillRect(0, Math.floor(h * 0.56) + 18, w, 4);
+
+                // 隧道壁誘導/照明燈具 (每 6m 一盞)
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(Math.floor(w * 0.44), Math.floor(h * 0.24), Math.floor(w * 0.12), 10);
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(Math.floor(w * 0.45), Math.floor(h * 0.24) + 2, Math.floor(w * 0.10), 6);
+            }, THREE.RepeatWrapping, THREE.ClampToEdgeWrapping);
+
+            // 6. 地下隧道頂部 UV 貼圖 (512x512, 4m x 4m 重複)
+            const tunnelRoofUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#343940';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 3600; i++) {
+                    const rx = Math.floor((Math.sin(i * 41.2) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 83.6) * 43758.5453 % 1 + 1) % 1 * h);
+                    ctx.fillStyle = (i % 2 === 0) ? 'rgba(255,255,255,0.05)' : 'rgba(10,12,15,0.10)';
+                    ctx.fillRect(rx, ry, 2, 2);
+                }
+                // 縱向風管/電纜橋架陰影
+                ctx.fillStyle = 'rgba(18,22,26,0.45)';
+                ctx.fillRect(Math.floor(w * 0.20), 0, 24, h);
+                ctx.fillRect(Math.floor(w * 0.76), 0, 24, h);
+                // 橫向襯砌接縫
+                ctx.fillStyle = 'rgba(15,18,22,0.60)';
+                ctx.fillRect(0, 0, w, 3);
+                ctx.fillRect(0, Math.floor(h * 0.5), w, 2);
+            });
+
+            // 7. 高架/地面側牆與護欄檔板 UV 貼圖 (512x512, 4m 寬預鑄混凝土護欄/隔音牆)
+            const barrierWallUvTex = makeRepeatTex(512, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#787f88';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 4000; i++) {
+                    const rx = Math.floor((Math.sin(i * 19.1) * 43758.5453 % 1 + 1) % 1 * w);
+                    const ry = Math.floor((Math.sin(i * 71.9) * 43758.5453 % 1 + 1) % 1 * h);
+                    ctx.fillStyle = (i % 2 === 0) ? 'rgba(255,255,255,0.07)' : 'rgba(20,24,28,0.08)';
+                    ctx.fillRect(rx, ry, 2, 2);
+                }
+                // 頂部混凝土壓條 (Coping cap, v=0.88..1.0)
+                ctx.fillStyle = '#8b939d';
+                ctx.fillRect(0, 0, w, Math.floor(h * 0.12));
+                ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                ctx.fillRect(0, 0, w, 4);
+                ctx.fillStyle = 'rgba(20,24,28,0.35)';
+                ctx.fillRect(0, Math.floor(h * 0.12), w, 4);
+
+                // 中段隔音/預鑄板凹槽紋理
+                for (let y = Math.floor(h * 0.22); y < Math.floor(h * 0.78); y += 32) {
+                    ctx.fillStyle = 'rgba(30,35,40,0.16)';
+                    ctx.fillRect(0, y, w, 3);
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillRect(0, y + 3, w, 2);
+                }
+
+                // 底部緣石陰影 (v=0..0.12)
+                const botG = ctx.createLinearGradient(0, h * 0.85, 0, h);
+                botG.addColorStop(0, 'rgba(25,28,32,0)');
+                botG.addColorStop(1, 'rgba(25,28,32,0.45)');
+                ctx.fillStyle = botG;
+                ctx.fillRect(0, h * 0.85, w, h * 0.15);
+
+                // 垂直預鑄伸縮縫 (每 2m 一道)
+                for (let x = 0; x < w; x += Math.floor(w / 2)) {
+                    ctx.fillStyle = 'rgba(22,26,30,0.48)';
+                    ctx.fillRect(x, 0, 3, h);
+                    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+                    ctx.fillRect(x + 3, 0, 2, h);
+                }
+            }, THREE.RepeatWrapping, THREE.ClampToEdgeWrapping);
+
+            window._trackUVTextures = {
+                railUvTex, slabTrackbedUvTex, concreteDeckUvTex, depotBallastUvTex,
+                tunnelWallUvTex, tunnelRoofUvTex, barrierWallUvTex
+            };
+            return window._trackUVTextures;
+        }
+
+        function getSkyUVTexture(timeSlot, weather) {
+            window._skyUVCache = window._skyUVCache || {};
+            const key = `${timeSlot}_${weather}`;
+            if (window._skyUVCache[key]) return window._skyUVCache[key];
+
+            const w = 1024, h = 512;
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            const ctx = c.getContext('2d');
+
+            // 依時段與天氣決定天頂 / 中層 / 地平線色彩 (SphereGeometry UV: y=0 為天頂, y=h*0.5 為地平線, y=h 為地面下方)
+            const palettes = {
+                day_sunny:    { zenith: '#2563eb', mid: '#60a5fa', horizon: '#bae6fd', ground: '#87CEEB', cloud: 'rgba(255,255,255,0.82)', cloudShade: 'rgba(203,213,225,0.45)', count: 26 },
+                day_cloudy:   { zenith: '#475569', mid: '#788696', horizon: '#cbd5e1', ground: '#94a3b8', cloud: 'rgba(241,245,249,0.72)', cloudShade: 'rgba(148,163,184,0.55)', count: 46 },
+                day_rainy:    { zenith: '#1e293b', mid: '#3f4a5a', horizon: '#64748b', ground: '#475569', cloud: 'rgba(148,163,184,0.68)', cloudShade: 'rgba(71,85,105,0.65)', count: 56 },
+                dusk_sunny:   { zenith: '#1e1b4b', mid: '#9d4edd', horizon: '#fb923c', ground: '#c26538', cloud: 'rgba(253,186,116,0.78)', cloudShade: 'rgba(154,52,18,0.42)', count: 24 },
+                dusk_cloudy:  { zenith: '#1e293b', mid: '#6b4c6e', horizon: '#b47b60', ground: '#7c5c52', cloud: 'rgba(203,166,148,0.65)', cloudShade: 'rgba(82,63,76,0.55)', count: 44 },
+                dusk_rainy:   { zenith: '#0f172a', mid: '#334155', horizon: '#57534e', ground: '#3f3f46', cloud: 'rgba(120,113,108,0.62)', cloudShade: 'rgba(41,37,36,0.65)', count: 52 },
+                night_sunny:  { zenith: '#020617', mid: '#0b1120', horizon: '#172554', ground: '#0c1222', cloud: 'rgba(148,163,184,0.16)', cloudShade: 'rgba(30,41,59,0.28)', count: 18 },
+                night_cloudy: { zenith: '#020617', mid: '#0f172a', horizon: '#1e293b', ground: '#0f172a', cloud: 'rgba(100,116,139,0.24)', cloudShade: 'rgba(15,23,42,0.40)', count: 38 },
+                night_rainy:  { zenith: '#02040a', mid: '#090d16', horizon: '#161b26', ground: '#0a0d14', cloud: 'rgba(71,85,105,0.28)', cloudShade: 'rgba(15,23,42,0.50)', count: 48 }
+            };
+            const pal = palettes[key] || palettes.day_sunny;
+
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+            skyGrad.addColorStop(0.00, pal.zenith);
+            skyGrad.addColorStop(0.28, pal.mid);
+            skyGrad.addColorStop(0.50, pal.horizon);
+            skyGrad.addColorStop(0.56, pal.ground);
+            skyGrad.addColorStop(1.00, pal.ground);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // 夜晚晴天繪製星空
+            if (timeSlot === 'night' && weather === 'sunny') {
+                for (let s = 0; s < 260; s++) {
+                    const sx = Math.floor(((Math.sin(s * 12.9898) * 43758.5453) % 1 + 1) % 1 * w);
+                    const sy = Math.floor(((Math.sin(s * 78.233) * 43758.5453) % 1 + 1) % 1 * (h * 0.45));
+                    const alpha = 0.35 + ((s % 5) * 0.14);
+                    ctx.fillStyle = `rgba(248,250,252,${alpha})`;
+                    ctx.fillRect(sx, sy, (s % 7 === 0) ? 2 : 1, (s % 7 === 0) ? 2 : 1);
+                }
+            }
+
+            // 繪製環繞無縫雲層 (u 方向左右 wrap)
+            for (let i = 0; i < pal.count; i++) {
+                const cx = (((Math.sin(i * 37.13 + 1.2) * 43758.5453) % 1 + 1) % 1) * w;
+                const cy = (0.14 + (((Math.sin(i * 91.7 + 0.5) * 43758.5453) % 1 + 1) % 1) * 0.31) * h;
+                const rw = 55 + (i % 5) * 24;
+                const rh = 14 + (i % 3) * 7;
+                for (const dx of [0, -w, w]) {
+                    const x0 = cx + dx;
+                    if (x0 + rw < 0 || x0 - rw > w) continue;
+                    // 雲底陰影
+                    ctx.fillStyle = pal.cloudShade;
+                    ctx.beginPath();
+                    ctx.ellipse(x0, cy + rh * 0.25, rw * 0.95, rh * 0.72, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 雲體主層
+                    ctx.fillStyle = pal.cloud;
+                    ctx.beginPath();
+                    ctx.ellipse(x0, cy, rw, rh, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x0 - rw * 0.38, cy + 2, rw * 0.55, rh * 0.8, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x0 + rw * 0.35, cy + 3, rw * 0.50, rh * 0.75, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 地平線柔霧過渡帶，使 3D 遠景霧氣與天空無縫融合
+            const hazeGrad = ctx.createLinearGradient(0, h * 0.42, 0, h * 0.54);
+            hazeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            hazeGrad.addColorStop(0.65, pal.horizon);
+            hazeGrad.addColorStop(1, pal.ground);
+            ctx.globalAlpha = 0.55;
+            ctx.fillStyle = hazeGrad;
+            ctx.fillRect(0, h * 0.42, w, h * 0.12);
+            ctx.globalAlpha = 1.0;
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.magFilter = THREE.LinearFilter;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+            tex.needsUpdate = true;
+            window._skyUVCache[key] = tex;
+            return tex;
         }
 
 
@@ -12232,6 +12639,16 @@
 
             const trackPositions = [], trackColors = [], trackUvs = [];
 
+            const deckPositions = [], deckUvs = [];
+
+            const tunnelWallPositions = [], tunnelWallUvs = [];
+
+            const tunnelRoofPositions = [], tunnelRoofUvs = [];
+
+            const barrierWallPositions = [], barrierWallUvs = [];
+
+            const { concreteDeckUvTex, tunnelWallUvTex, tunnelRoofUvTex, barrierWallUvTex } = getTrackUVTextures();
+
             const roadPositions = [], roadColors = [];
 
             const bldPos = [], bldCol = [], bldUv = [];
@@ -12330,6 +12747,18 @@
 
                 else { trackUvs.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); }
 
+            };
+
+            const addDeckQuad = (v1, v2, v3, v4, u1, t1, u2, t2, u3, t3, u4, t4) => {
+                deckPositions.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z);
+                deckPositions.push(v1.x, v1.y, v1.z, v3.x, v3.y, v3.z, v4.x, v4.y, v4.z);
+                deckUvs.push(u1, t1, u2, t2, u3, t3, u1, t1, u3, t3, u4, t4);
+            };
+
+            const addUvQuad = (posArr, uvArr, v1, v2, v3, v4, u1, t1, u2, t2, u3, t3, u4, t4) => {
+                posArr.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z);
+                posArr.push(v1.x, v1.y, v1.z, v3.x, v3.y, v3.z, v4.x, v4.y, v4.z);
+                uvArr.push(u1, t1, u2, t2, u3, t3, u1, t1, u3, t3, u4, t4);
             };
 
 
@@ -12707,21 +13136,42 @@
                     let wtA = getWallTop(pA.y), wtB = getWallTop(pB.y);
                     let bedA = pA.y - 0.1, bedB = pB.y - 0.1;
 
-                    // 1. 軌道本體
-                    addTrackQuad(pt(pA, nxA, nzA, bA.wR, bedA), pt(pB, nxB, nzB, bB.wR, bedB), pt(pB, nxB, nzB, bB.wL, bedB), pt(pA, nxA, nzA, bA.wL, bedA), 0x4a4a4a, true);
+                    // 1. 軌道本體 (水泥道床底版 UV 貼圖，依實際公尺座標展開避免伸縮變形)
+                    addDeckQuad(
+                        pt(pA, nxA, nzA, bA.wR, bedA), pt(pB, nxB, nzB, bB.wR, bedB),
+                        pt(pB, nxB, nzB, bB.wL, bedB), pt(pA, nxA, nzA, bA.wL, bedA),
+                        bA.wR / 4.0, pA.d / 4.0, bB.wR / 4.0, pB.d / 4.0,
+                        bB.wL / 4.0, pB.d / 4.0, bA.wL / 4.0, pA.d / 4.0
+                    );
 
-                    // 2. 側牆 (隔音牆/護欄，引道開始匯入至完全匯入完成區間免除主線對應側牆，避免穿牆擋道)
+                    // 2. 側牆 (地下段為隧道壁 UV 貼圖，地面/高架段為隔音牆/護欄檔板 UV 貼圖)
                     let midSegD = (pA.d + pB.d) * 0.5;
+                    let isTunnelSeg = (pA.y < -5 || pB.y < -5);
+                    let wPosArr = isTunnelSeg ? tunnelWallPositions : barrierWallPositions;
+                    let wUvArr  = isTunnelSeg ? tunnelWallUvs : barrierWallUvs;
+                    let wallScaleU = isTunnelSeg ? 6.0 : 4.0;
                     if (!(midSegD >= 1764 && midSegD <= 1802)) {
-                        addTrackQuad(pt(pA, nxA, nzA, bA.wL, bedA), pt(pB, nxB, nzB, bB.wL, bedB), pt(pB, nxB, nzB, bB.wL, wtB), pt(pA, nxA, nzA, bA.wL, wtA), 0x777777, false);
+                        addUvQuad(wPosArr, wUvArr,
+                            pt(pA, nxA, nzA, bA.wL, bedA), pt(pB, nxB, nzB, bB.wL, bedB),
+                            pt(pB, nxB, nzB, bB.wL, wtB), pt(pA, nxA, nzA, bA.wL, wtA),
+                            pA.d / wallScaleU, 0, pB.d / wallScaleU, 0, pB.d / wallScaleU, 1, pA.d / wallScaleU, 1
+                        );
                     }
                     if (!(midSegD >= 818 && midSegD <= 856)) {
-                        addTrackQuad(pt(pA, nxA, nzA, bA.wR, wtA), pt(pB, nxB, nzB, bB.wR, wtB), pt(pB, nxB, nzB, bB.wR, bedB), pt(pA, nxA, nzA, bA.wR, bedA), 0x777777, false);
+                        addUvQuad(wPosArr, wUvArr,
+                            pt(pA, nxA, nzA, bA.wR, wtA), pt(pB, nxB, nzB, bB.wR, wtB),
+                            pt(pB, nxB, nzB, bB.wR, bedB), pt(pA, nxA, nzA, bA.wR, bedA),
+                            pA.d / wallScaleU, 1, pB.d / wallScaleU, 1, pB.d / wallScaleU, 0, pA.d / wallScaleU, 0
+                        );
                     }
 
-                    // 3. 隧道頂
+                    // 3. 隧道頂 (UV 貼圖)
                     if (pA.y < -5) {
-                        addTrackQuad(pt(pA, nxA, nzA, bA.wL, wtA), pt(pB, nxB, nzB, bB.wL, wtB), pt(pB, nxB, nzB, bB.wR, wtB), pt(pA, nxA, nzA, bA.wR, wtA), 0x333333, false);
+                        addUvQuad(tunnelRoofPositions, tunnelRoofUvs,
+                            pt(pA, nxA, nzA, bA.wL, wtA), pt(pB, nxB, nzB, bB.wL, wtB),
+                            pt(pB, nxB, nzB, bB.wR, wtB), pt(pA, nxA, nzA, bA.wR, wtA),
+                            bA.wL / 4.0, pA.d / 4.0, bB.wL / 4.0, pB.d / 4.0, bB.wR / 4.0, pB.d / 4.0, bA.wR / 4.0, pA.d / 4.0
+                        );
                     }
 
                     // 4. 地面基礎草地 (飛灣基地機廠南側展開至 +1050m)
@@ -12761,8 +13211,14 @@
                         let swtM = getWallTop(spMid.y), sbedM = spMid.y - 0.1;
                         emitScenerySegment(sp1, spMid, sb1, sb1);
                         emitScenerySegment(spMid, sp2, sb2, sb2);
-                        addTrackQuad(pt(spMid, snxM, snzM, sb1.wL, sbedM), pt(spMid, snxM, snzM, sb2.wL, sbedM), pt(spMid, snxM, snzM, sb2.wL, swtM), pt(spMid, snxM, snzM, sb1.wL, swtM), 0x777777, false);
-                        addTrackQuad(pt(spMid, snxM, snzM, sb2.wR, sbedM), pt(spMid, snxM, snzM, sb1.wR, sbedM), pt(spMid, snxM, snzM, sb1.wR, swtM), pt(spMid, snxM, snzM, sb2.wR, swtM), 0x777777, false);
+                        let isMidTunnel = (spMid.y < -5);
+                        let mPosArr = isMidTunnel ? tunnelWallPositions : barrierWallPositions;
+                        let mUvArr  = isMidTunnel ? tunnelWallUvs : barrierWallUvs;
+                        let mScaleU = isMidTunnel ? 6.0 : 4.0;
+                        let uSpanL = Math.abs(sb2.wL - sb1.wL) / mScaleU;
+                        let uSpanR = Math.abs(sb2.wR - sb1.wR) / mScaleU;
+                        addUvQuad(mPosArr, mUvArr, pt(spMid, snxM, snzM, sb1.wL, sbedM), pt(spMid, snxM, snzM, sb2.wL, sbedM), pt(spMid, snxM, snzM, sb2.wL, swtM), pt(spMid, snxM, snzM, sb1.wL, swtM), 0, 0, uSpanL, 0, uSpanL, 1, 0, 1);
+                        addUvQuad(mPosArr, mUvArr, pt(spMid, snxM, snzM, sb2.wR, sbedM), pt(spMid, snxM, snzM, sb1.wR, sbedM), pt(spMid, snxM, snzM, sb1.wR, swtM), pt(spMid, snxM, snzM, sb2.wR, swtM), 0, 0, uSpanR, 0, uSpanR, 1, 0, 1);
                     } else {
                         emitScenerySegment(sp1, sp2, sb1, sb2);
                     }
@@ -13025,6 +13481,34 @@
 
             scene.add(trackMesh);
 
+            if (deckPositions.length > 0) {
+                const deckGeo = new THREE.BufferGeometry();
+                deckGeo.setAttribute('position', new THREE.Float32BufferAttribute(deckPositions, 3));
+                deckGeo.setAttribute('uv', new THREE.Float32BufferAttribute(deckUvs, 2));
+                deckGeo.computeVertexNormals();
+                const deckMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: concreteDeckUvTex, side: THREE.DoubleSide }), 1000, 850);
+                const deckMesh = new THREE.Mesh(deckGeo, deckMat);
+                deckMesh.matrixAutoUpdate = false;
+                deckMesh.updateMatrix();
+                scene.add(deckMesh);
+            }
+
+            const addStaticUvMesh = (posArr, uvArr, tex) => {
+                if (posArr.length === 0) return;
+                const g = new THREE.BufferGeometry();
+                g.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+                g.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+                g.computeVertexNormals();
+                const m = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }), 1000, 850);
+                const mesh = new THREE.Mesh(g, m);
+                mesh.matrixAutoUpdate = false;
+                mesh.updateMatrix();
+                scene.add(mesh);
+            };
+            addStaticUvMesh(tunnelWallPositions, tunnelWallUvs, tunnelWallUvTex);
+            addStaticUvMesh(tunnelRoofPositions, tunnelRoofUvs, tunnelRoofUvTex);
+            addStaticUvMesh(barrierWallPositions, barrierWallUvs, barrierWallUvTex);
+
 
 
             // 2. 馬路合併網格 (統一 100M GPU 著色器渲染)
@@ -13187,14 +13671,23 @@
 
 
 
-            const railMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0xffffff }), 1000, 850);
+            const { railUvTex, slabTrackbedUvTex, concreteDeckUvTex, depotBallastUvTex, barrierWallUvTex } = getTrackUVTextures();
+            const railMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: railUvTex }), 1000, 850);
+            const slabMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: slabTrackbedUvTex, side: THREE.DoubleSide }), 1000, 850);
 
             function buildDoubleTrack(ptsDetail, generateSlab = true, elevate = 0) {
                 if (ptsDetail.length < 2) return;
+                const n = ptsDetail.length;
+                const cumDist = new Float32Array(n);
+                for (let i = 1; i < n; i++) {
+                    const p0 = ptsDetail[i - 1], p1 = ptsDetail[i];
+                    cumDist[i] = cumDist[i - 1] + Math.hypot(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+                }
                 const r = 0.08;
+                const railU = [0.22, 0.50, 0.22, 0.02];
                 function buildRailGeo(railOffset) {
-                    const n = ptsDetail.length;
                     const positions = new Float32Array(n * 4 * 3);
+                    const uvs = new Float32Array(n * 4 * 2);
                     const indices = [];
                     for (let i = 0; i < n; i++) {
                         const pt = ptsDetail[i];
@@ -13206,6 +13699,12 @@
                         positions[base + 3] = cx;             positions[base + 4]  = cy + r; positions[base + 5]  = cz;
                         positions[base + 6] = cx - pt.nx * r; positions[base + 7]  = cy;     positions[base + 8]  = cz - pt.nz * r;
                         positions[base + 9] = cx;             positions[base + 10] = cy - r; positions[base + 11] = cz;
+                        const vCoord = cumDist[i] / 4.0;
+                        const uvBase = i * 8;
+                        for (let k = 0; k < 4; k++) {
+                            uvs[uvBase + k * 2] = railU[k];
+                            uvs[uvBase + k * 2 + 1] = vCoord;
+                        }
                         if (i < n - 1) {
                             const a = i * 4, b = (i + 1) * 4;
                             for (let k = 0; k < 4; k++) {
@@ -13217,13 +13716,63 @@
                     }
                     const geo = new THREE.BufferGeometry();
                     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+                    geo.setIndex(indices);
+                    geo.computeVertexNormals();
+                    return geo;
+                }
+                function buildSlabGeo() {
+                    // 無道碴水泥道床：4 點倒角剖面 (左底 -1.32, 左頂 -1.20, 右頂 +1.20, 右底 +1.32)
+                    const positions = new Float32Array(n * 4 * 3);
+                    const uvs = new Float32Array(n * 4 * 2);
+                    const indices = [];
+                    const slabOffs = [-1.32, -1.20, 1.20, 1.32];
+                    const slabU = [0.0, 0.05, 0.95, 1.0];
+                    for (let i = 0; i < n; i++) {
+                        const pt = ptsDetail[i];
+                        const yBase = pt.y - 0.095 + (elevate > 0 ? 0 : elevate);
+                        const yTop = pt.y + (elevate > 0 ? 0.0195 : 0.018);
+                        const slabY = [yBase, yTop, yTop, yBase];
+                        const base = i * 12;
+                        const uvBase = i * 8;
+                        const vCoord = cumDist[i] / 5.0;
+                        for (let k = 0; k < 4; k++) {
+                            positions[base + k * 3]     = pt.x + pt.nx * slabOffs[k];
+                            positions[base + k * 3 + 1] = slabY[k];
+                            positions[base + k * 3 + 2] = pt.z + pt.nz * slabOffs[k];
+                            uvs[uvBase + k * 2]     = slabU[k];
+                            uvs[uvBase + k * 2 + 1] = vCoord;
+                        }
+                        if (i < n - 1) {
+                            const a = i * 4, b = (i + 1) * 4;
+                            for (let k = 0; k < 3; k++) {
+                                indices.push(a + k, a + k + 1, b + k + 1);
+                                indices.push(a + k, b + k + 1, b + k);
+                            }
+                        }
+                    }
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
                     geo.setIndex(indices);
                     geo.computeVertexNormals();
                     return geo;
                 }
                 const group = new THREE.Group();
-                group.add(new THREE.Mesh(buildRailGeo(-0.7175), railMat));
-                group.add(new THREE.Mesh(buildRailGeo(0.7175), railMat));
+                if (generateSlab) {
+                    const slabMesh = new THREE.Mesh(buildSlabGeo(), slabMat);
+                    slabMesh.matrixAutoUpdate = false;
+                    slabMesh.updateMatrix();
+                    group.add(slabMesh);
+                }
+                const leftRail = new THREE.Mesh(buildRailGeo(-0.7175), railMat);
+                leftRail.matrixAutoUpdate = false;
+                leftRail.updateMatrix();
+                const rightRail = new THREE.Mesh(buildRailGeo(0.7175), railMat);
+                rightRail.matrixAutoUpdate = false;
+                rightRail.updateMatrix();
+                group.add(leftRail);
+                group.add(rightRail);
                 scene.add(group);
             }
 
@@ -13257,7 +13806,7 @@
 
                 }
 
-                buildDoubleTrack(enrichCurveNormals(pts), false, 0.02);
+                buildDoubleTrack(enrichCurveNormals(pts), true, 0.02);
 
             }
 
@@ -13265,13 +13814,7 @@
 
             buildCrossover(21300, -2, 21400, 2); buildCrossover(21300, 2, 21400, -2);
 
-            buildCrossover(22000, -2, 22100, 2); buildCrossover(22000, 2, 22100, -2);
-
-            buildCrossover(57520, -2, 57600, 2); buildCrossover(57520, 2, 57600, -2);
-
             buildCrossover(57720, -2, 57800, 2); buildCrossover(57720, 2, 57800, -2);
-
-            buildCrossover(58300, -2, 58380, 2); buildCrossover(58300, 2, 58380, -2);
 
             buildCrossover(59410, -2, 59490, 2); buildCrossover(59410, 2, 59490, -2);
 
@@ -13283,27 +13826,11 @@
 
             // 側線與待避/反線橫渡線
 
-            buildCrossover(6900, -2, 7000, 2); buildCrossover(6900, 2, 7000, -2);
-
-            buildCrossover(7600, -2, 7700, 2); buildCrossover(7600, 2, 7700, -2);
-
-            buildCrossover(9300, -2, 9380, 2); buildCrossover(9300, 2, 9380, -2);
-
             buildCrossover(9800 + 300, 2, 9800 + 500, -2); buildCrossover(9800 + 300, -2, 9800 + 500, 2);
-
-            buildCrossover(18050, -2, 18150, 2); buildCrossover(18050, 2, 18150, -2);
-
-            buildCrossover(18850, -2, 18950, 2); buildCrossover(18850, 2, 18950, -2);
-
-            buildCrossover(23550, -2, 23650, 2); buildCrossover(23550, 2, 23650, -2);
 
             buildCrossover(24350, -2, 24450, 2); buildCrossover(24350, 2, 24450, -2);
 
             buildCrossover(33200 + 300, 2, 33200 + 500, -2); buildCrossover(33200 + 300, -2, 33200 + 500, 2);
-
-            buildCrossover(38400, -2, 38500, 2); buildCrossover(38400, 2, 38500, -2);
-
-            buildCrossover(46050, -2, 46150, 2); buildCrossover(46050, 2, 46150, -2);
 
             buildCrossover(46500 + 300, 2, 46500 + 500, -2); buildCrossover(46500 + 300, -2, 46500 + 500, 2);
 
@@ -13313,11 +13840,24 @@
                 buildDoubleTrack(pts, generateSlab, 0);
             }
 
-            const depotRampMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0x4a4a4a, side: THREE.DoubleSide }), 1000, 850);
-            const depotWallMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0x777777, side: THREE.DoubleSide }), 1000, 850);
-            const depotBallastMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0x4b5563, side: THREE.DoubleSide }), 1000, 850);
+            const depotRampMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: concreteDeckUvTex, side: THREE.DoubleSide }), 1000, 850);
+            const depotWallMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: barrierWallUvTex, side: THREE.DoubleSide }), 1000, 850);
+            const depotBallastMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: depotBallastUvTex, side: THREE.DoubleSide }), 1000, 850);
             const depotPillarGeo = new THREE.BoxGeometry(1.2, 1, 1.2);
             const depotPillarMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0x555555 }), 1000, 850);
+            const pushWorldQuad = (posArr, uvArr, a, b, c, d) => {
+                posArr.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+                posArr.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+                if (uvArr) {
+                    uvArr.push(a.x / 4.0, a.z / 4.0, b.x / 4.0, b.z / 4.0, c.x / 4.0, c.z / 4.0);
+                    uvArr.push(a.x / 4.0, a.z / 4.0, c.x / 4.0, c.z / 4.0, d.x / 4.0, d.z / 4.0);
+                }
+            };
+            const pushWallQuad = (posArr, uvArr, a, b, c, d, u0, v0, u1, v1, u2, v2, u3, v3) => {
+                posArr.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+                posArr.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+                uvArr.push(u0, v0, u1, v1, u2, v2, u0, v0, u2, v2, u3, v3);
+            };
 
             function buildDepotLine(dStart, offStart, yDropStart, dEnd, offEnd, yDropEnd, stepsCount, mode = 'auto') {
                 let pts = [];
@@ -13341,12 +13881,16 @@
                     arr.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
                 };
 
-                const deckPos = [], wallPos = [], ballastPos = [];
+                const deckPos = [], deckUv = [], wallPos = [], wallUv = [], ballastPos = [], ballastUv = [];
                 const hw = 2.6, wallH = 1.1;
                 const isForceBallast = (mode === 'ballast' || dStart >= 59900);
+                let wallDist = 0;
 
                 for (let i = 0; i < pts.length - 1; i++) {
                     let pA = pts[i], pB = pts[i + 1];
+                    let segLen = Math.hypot(pB.x - pA.x, pB.y - pA.y, pB.z - pA.z);
+                    let uA = wallDist / 4.0, uB = (wallDist + segLen) / 4.0;
+                    wallDist += segLen;
                     let offMid = (offs[i] + offs[i + 1]) * 0.5;
                     let ydMid = (yDrops[i] + yDrops[i + 1]) * 0.5;
                     let yA = pA.y - 0.12, yB = pB.y - 0.12;
@@ -13357,17 +13901,17 @@
 
                     if (isForceBallast || ydMid >= 9.4) {
                         // 地面段基地股道與地下穿過正線段：鋪設碎石道碴底床
-                        pushQ(ballastPos, aR, bR, bL, aL);
+                        pushWorldQuad(ballastPos, ballastUv, aR, bR, bL, aL);
                     } else {
                         // 高架引道／水平分歧段：鋪設獨立橋面板，外側淨空處建護欄與橋墩
-                        pushQ(deckPos, aR, bR, bL, aL);
+                        pushWorldQuad(deckPos, deckUv, aR, bR, bL, aL);
                         let leftClearOfMainline = (offMid - hw <= -6.0) || (offMid - hw >= 6.05);
                         let rightClearOfMainline = (offMid + hw >= 6.0) || (offMid + hw <= -6.05);
                         if (leftClearOfMainline) {
-                            pushQ(wallPos, aL, bL, { x: bL.x, y: yB + wallH, z: bL.z }, { x: aL.x, y: yA + wallH, z: aL.z });
+                            pushWallQuad(wallPos, wallUv, aL, bL, { x: bL.x, y: yB + wallH, z: bL.z }, { x: aL.x, y: yA + wallH, z: aL.z }, uA, 0, uB, 0, uB, 1, uA, 1);
                         }
                         if (rightClearOfMainline) {
-                            pushQ(wallPos, { x: aR.x, y: yA + wallH, z: aR.z }, { x: bR.x, y: yB + wallH, z: bR.z }, bR, aR);
+                            pushWallQuad(wallPos, wallUv, { x: aR.x, y: yA + wallH, z: aR.z }, { x: bR.x, y: yB + wallH, z: bR.z }, bR, aR, uA, 1, uB, 1, uB, 0, uA, 0);
                         }
                         if (i % 10 === 0 && pA.y > 0.8 && (offMid - hw >= 6.05 || offMid + hw <= -6.05)) {
                             let pH = pA.y + 2.0;
@@ -13381,29 +13925,28 @@
                 if (deckPos.length > 0) {
                     let dGeo = new THREE.BufferGeometry();
                     dGeo.setAttribute('position', new THREE.Float32BufferAttribute(deckPos, 3));
+                    dGeo.setAttribute('uv', new THREE.Float32BufferAttribute(deckUv, 2));
                     dGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(dGeo, depotRampMat));
                 }
                 if (wallPos.length > 0) {
                     let wGeo = new THREE.BufferGeometry();
                     wGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
+                    wGeo.setAttribute('uv', new THREE.Float32BufferAttribute(wallUv, 2));
                     wGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(wGeo, depotWallMat));
                 }
                 if (ballastPos.length > 0) {
                     let bGeo = new THREE.BufferGeometry();
                     bGeo.setAttribute('position', new THREE.Float32BufferAttribute(ballastPos, 3));
+                    bGeo.setAttribute('uv', new THREE.Float32BufferAttribute(ballastUv, 2));
                     bGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(bGeo, depotBallastMat));
                 }
             }
 
             function buildDepotGroundApron(dStart, dEnd, offMin, offMax, yDropVal) {
-                const apronPos = [];
-                const pushApron = (a, b, c, d) => {
-                    apronPos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-                    apronPos.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
-                };
+                const apronPos = [], apronUv = [];
                 const stepD = 10;
                 for (let dCur = dStart; dCur < dEnd; dCur += stepD) {
                     let dNext = Math.min(dEnd, dCur + stepD);
@@ -13414,14 +13957,15 @@
                     let aR = { x: pA.x + pA.nx * offMax, y: yA, z: pA.z + pA.nz * offMax };
                     let bL = { x: pB.x + pB.nx * offMin, y: yB, z: pB.z + pB.nz * offMin };
                     let bR = { x: pB.x + pB.nx * offMax, y: yB, z: pB.z + pB.nz * offMax };
-                    pushApron(aR, bR, bL, aL);
+                    pushWorldQuad(apronPos, apronUv, aR, bR, bL, aL);
                     // 兩側路基邊坡銜接至地面 (-2.0m)
-                    pushApron(aL, bL, { x: bL.x - pB.nx * 2.5, y: -2.0, z: bL.z - pB.nz * 2.5 }, { x: aL.x - pA.nx * 2.5, y: -2.0, z: aL.z - pA.nz * 2.5 });
-                    pushApron({ x: aR.x + pA.nx * 2.5, y: -2.0, z: aR.z + pA.nz * 2.5 }, { x: bR.x + pB.nx * 2.5, y: -2.0, z: bR.z + pB.nz * 2.5 }, bR, aR);
+                    pushWorldQuad(apronPos, apronUv, aL, bL, { x: bL.x - pB.nx * 2.5, y: -2.0, z: bL.z - pB.nz * 2.5 }, { x: aL.x - pA.nx * 2.5, y: -2.0, z: aL.z - pA.nz * 2.5 });
+                    pushWorldQuad(apronPos, apronUv, { x: aR.x + pA.nx * 2.5, y: -2.0, z: aR.z + pA.nz * 2.5 }, { x: bR.x + pB.nx * 2.5, y: -2.0, z: bR.z + pB.nz * 2.5 }, bR, aR);
                 }
                 if (apronPos.length > 0) {
                     let g = new THREE.BufferGeometry();
                     g.setAttribute('position', new THREE.Float32BufferAttribute(apronPos, 3));
+                    g.setAttribute('uv', new THREE.Float32BufferAttribute(apronUv, 2));
                     g.computeVertexNormals();
                     scene.add(new THREE.Mesh(g, depotBallastMat));
                 }
@@ -13436,11 +13980,15 @@
                     arr.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
                     arr.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
                 };
-                const deckPos = [], wallPos = [], ballastPos = [];
+                const deckPos = [], deckUv = [], wallPos = [], wallUv = [], ballastPos = [], ballastUv = [];
                 const hw = 2.6, wallH = 1.1;
                 let firstOuterR = null, lastOuterL = null;
+                let wallDist = 0;
                 for (let i = 0; i < pts.length - 1; i++) {
                     const pA = pts[i], pB = pts[i + 1];
+                    const segLen = Math.hypot(pB.x - pA.x, pB.y - pA.y, pB.z - pA.z);
+                    const uA = wallDist / 4.0, uB = (wallDist + segLen) / 4.0;
+                    wallDist += segLen;
                     const yMid = (pA.y + pB.y) * 0.5;
                     const yA = pA.y - 0.12, yB = pB.y - 0.12;
                     const aL = { x: pA.x - pA.nx * hw, y: yA, z: pA.z - pA.nz * hw };
@@ -13448,9 +13996,9 @@
                     const bL = { x: pB.x - pB.nx * hw, y: yB, z: pB.z - pB.nz * hw };
                     const bR = { x: pB.x + pB.nx * hw, y: yB, z: pB.z + pB.nz * hw };
                     if (mode === 'ballast' || yMid <= 0.35) {
-                        pushQ(ballastPos, aR, bR, bL, aL);
+                        pushWorldQuad(ballastPos, ballastUv, aR, bR, bL, aL);
                     } else {
-                        pushQ(deckPos, aR, bR, bL, aL);
+                        pushWorldQuad(deckPos, deckUv, aR, bR, bL, aL);
                         const xMid = (pA.x + pB.x) * 0.5;
                         const zMid = (pA.z + pB.z) * 0.5;
                         const xL = (aL.x + bL.x) * 0.5;
@@ -13460,11 +14008,11 @@
                         const clearLeft = !nearMainline || (xL <= -6.0 || xL >= 6.0);
                         const clearRight = !nearMainline || (xR <= -6.0 || xR >= 6.0);
                         if (clearLeft) {
-                            pushQ(wallPos, aL, bL, { x: bL.x, y: yB + wallH, z: bL.z }, { x: aL.x, y: yA + wallH, z: aL.z });
+                            pushWallQuad(wallPos, wallUv, aL, bL, { x: bL.x, y: yB + wallH, z: bL.z }, { x: aL.x, y: yA + wallH, z: aL.z }, uA, 0, uB, 0, uB, 1, uA, 1);
                             if (nearMainline && xL <= -6.0) lastOuterL = { bot: bL, top: { x: bL.x, y: yB + wallH, z: bL.z } };
                         }
                         if (clearRight) {
-                            pushQ(wallPos, { x: aR.x, y: yA + wallH, z: aR.z }, { x: bR.x, y: yB + wallH, z: bR.z }, bR, aR);
+                            pushWallQuad(wallPos, wallUv, { x: aR.x, y: yA + wallH, z: aR.z }, { x: bR.x, y: yB + wallH, z: bR.z }, bR, aR, uA, 1, uB, 1, uB, 0, uA, 0);
                             if (nearMainline && xR >= 6.0 && !firstOuterR) firstOuterR = { bot: aR, top: { x: aR.x, y: yA + wallH, z: aR.z } };
                         }
                         if (i % 6 === 0 && pA.y > 0.8 && (!isMainlineOverlapCheck || Math.abs(pA.x) >= 6.5)) {
@@ -13481,29 +14029,32 @@
                     const pMainR = getPtDetail(818, 6.0, 0);
                     const mBot = { x: pMainR.x, y: pMainR.y - 0.1, z: pMainR.z };
                     const mTop = { x: pMainR.x, y: pMainR.y + 1.2, z: pMainR.z };
-                    pushQ(wallPos, mTop, firstOuterR.top, firstOuterR.bot, mBot);
+                    pushWallQuad(wallPos, wallUv, mTop, firstOuterR.top, firstOuterR.bot, mBot, 0, 1, 1, 1, 1, 0, 0, 0);
                 }
                 if (isMainlineOverlapCheck && lastOuterL && pts[pts.length - 1].z <= FW_DEPOT_CFG.uToZ(1785) && pts[pts.length - 1].z >= FW_DEPOT_CFG.uToZ(1815)) {
                     const pMainL = getPtDetail(1802, -6.0, 0);
                     const mBot = { x: pMainL.x, y: pMainL.y - 0.1, z: pMainL.z };
                     const mTop = { x: pMainL.x, y: pMainL.y + 1.2, z: pMainL.z };
-                    pushQ(wallPos, lastOuterL.bot, mBot, mTop, lastOuterL.top);
+                    pushWallQuad(wallPos, wallUv, lastOuterL.bot, mBot, mTop, lastOuterL.top, 0, 0, 1, 0, 1, 1, 0, 1);
                 }
                 if (deckPos.length > 0) {
                     const dGeo = new THREE.BufferGeometry();
                     dGeo.setAttribute('position', new THREE.Float32BufferAttribute(deckPos, 3));
+                    dGeo.setAttribute('uv', new THREE.Float32BufferAttribute(deckUv, 2));
                     dGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(dGeo, depotRampMat));
                 }
                 if (wallPos.length > 0) {
                     const wGeo = new THREE.BufferGeometry();
                     wGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
+                    wGeo.setAttribute('uv', new THREE.Float32BufferAttribute(wallUv, 2));
                     wGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(wGeo, depotWallMat));
                 }
                 if (ballastPos.length > 0) {
                     const bGeo = new THREE.BufferGeometry();
                     bGeo.setAttribute('position', new THREE.Float32BufferAttribute(ballastPos, 3));
+                    bGeo.setAttribute('uv', new THREE.Float32BufferAttribute(ballastUv, 2));
                     bGeo.computeVertexNormals();
                     scene.add(new THREE.Mesh(bGeo, depotBallastMat));
                 }
@@ -13523,24 +14074,21 @@
             }
 
             function buildDepotUVApron(uMin, uMax, vMin, vMax, yVal = 0) {
-                const aPos = [];
-                const pushA = (a, b, c, d) => {
-                    aPos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-                    aPos.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
-                };
+                const aPos = [], aUv = [];
                 const yTop = yVal - 0.16, yBot = -2.0, sMargin = 3.0;
                 const zMin = FW_DEPOT_CFG.uToZ(uMin), zMax = FW_DEPOT_CFG.uToZ(uMax);
                 const zMinM = FW_DEPOT_CFG.uToZ(uMin - sMargin), zMaxM = FW_DEPOT_CFG.uToZ(uMax + sMargin);
                 const p00 = { x: vMin, y: yTop, z: zMin }, p10 = { x: vMax, y: yTop, z: zMin };
                 const p11 = { x: vMax, y: yTop, z: zMax }, p01 = { x: vMin, y: yTop, z: zMax };
-                pushA(p10, p11, p01, p00);
+                pushWorldQuad(aPos, aUv, p10, p11, p01, p00);
                 // Side slopes down to -2.0m
-                pushA(p00, p01, { x: vMin - sMargin, y: yBot, z: zMax }, { x: vMin - sMargin, y: yBot, z: zMin });
-                pushA({ x: vMax + sMargin, y: yBot, z: zMin }, { x: vMax + sMargin, y: yBot, z: zMax }, p11, p10);
-                pushA(p00, { x: vMin, y: yBot, z: zMinM }, { x: vMax, y: yBot, z: zMinM }, p10);
-                pushA(p11, { x: vMax, y: yBot, z: zMaxM }, { x: vMin, y: yBot, z: zMaxM }, p01);
+                pushWorldQuad(aPos, aUv, p00, p01, { x: vMin - sMargin, y: yBot, z: zMax }, { x: vMin - sMargin, y: yBot, z: zMin });
+                pushWorldQuad(aPos, aUv, { x: vMax + sMargin, y: yBot, z: zMin }, { x: vMax + sMargin, y: yBot, z: zMax }, p11, p10);
+                pushWorldQuad(aPos, aUv, p00, { x: vMin, y: yBot, z: zMinM }, { x: vMax, y: yBot, z: zMinM }, p10);
+                pushWorldQuad(aPos, aUv, p11, { x: vMax, y: yBot, z: zMaxM }, { x: vMin, y: yBot, z: zMaxM }, p01);
                 const g = new THREE.BufferGeometry();
                 g.setAttribute('position', new THREE.Float32BufferAttribute(aPos, 3));
+                g.setAttribute('uv', new THREE.Float32BufferAttribute(aUv, 2));
                 g.computeVertexNormals();
                 scene.add(new THREE.Mesh(g, depotBallastMat));
             }
@@ -13759,7 +14307,7 @@
             const psdFrameMat = applyScenery100mShader(new THREE.MeshLambertMaterial({ color: 0x2b2b2b, side: THREE.DoubleSide }));
             const psdHeaderMat = applyScenery100mShader(new THREE.MeshLambertMaterial({ color: 0x0088cc, side: THREE.DoubleSide }));
             const psdWarningMat = applyScenery100mShader(new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide }));
-            const psdUpperWallMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ color: 0x767b82, side: THREE.DoubleSide }), 1000, 850);
+            const psdUpperWallMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: getTrackUVTextures().barrierWallUvTex, side: THREE.DoubleSide }), 1000, 850);
 
             // 行李處理區方型盒子材質 (7M 寬 × 25M 長)
             const baggageCanvas = document.createElement('canvas');
@@ -30810,29 +31358,41 @@
 
 
 
-            // --- 修改開始：天色邏輯 ---
+            // --- 修改開始：天色與天氣 UV 天空穹頂邏輯 ---
 
-            let r, g, b;
+            let r, g, b, timeSlot;
 
-
+            const curWeather = (state.weather === 'rainy' || state.weather === 'cloudy') ? state.weather : 'sunny';
 
             if (hours >= 6 && hours < 17) {
 
-                // 白天 (06:00 - 16:59) - 藍天
+                timeSlot = 'day';
 
-                r = 0.53; g = 0.81; b = 0.92;
+                if (curWeather === 'rainy') { r = 0.28; g = 0.33; b = 0.40; }
+
+                else if (curWeather === 'cloudy') { r = 0.58; g = 0.64; b = 0.72; }
+
+                else { r = 0.53; g = 0.81; b = 0.92; }
 
             } else if (hours >= 17 && hours < 19) {
 
-                // 黃昏 (17:00 - 18:59) - 橘紅夕陽
+                timeSlot = 'dusk';
 
-                r = 0.8; g = 0.5; b = 0.2;
+                if (curWeather === 'rainy') { r = 0.25; g = 0.25; b = 0.28; }
+
+                else if (curWeather === 'cloudy') { r = 0.49; g = 0.36; b = 0.32; }
+
+                else { r = 0.76; g = 0.40; b = 0.22; }
 
             } else {
 
-                // 晚上 (19:00 - 05:59) - 深藍黑夜
+                timeSlot = 'night';
 
-                r = 0.05; g = 0.05; b = 0.1;
+                if (curWeather === 'rainy') { r = 0.04; g = 0.05; b = 0.08; }
+
+                else if (curWeather === 'cloudy') { r = 0.06; g = 0.09; b = 0.14; }
+
+                else { r = 0.05; g = 0.07; b = 0.13; }
 
             }
 
@@ -30844,9 +31404,33 @@
 
             }
 
-            if (scene.fog && scene.fog.color && typeof scene.fog.color.setRGB === 'function') {
+            if (scene.fog) {
 
-                scene.fog.color.setRGB(r, g, b);
+                if (scene.fog.color && typeof scene.fog.color.setRGB === 'function') {
+
+                    scene.fog.color.setRGB(r, g, b);
+
+                }
+
+                scene.fog.density = (curWeather === 'rainy') ? 0.00095 : (curWeather === 'cloudy' ? 0.00075 : 0.0006);
+
+            }
+
+            if (window._skyDome && window._skyDome.material) {
+
+                const nextSkyKey = `${timeSlot}_${curWeather}`;
+
+                if (window._skyKey !== nextSkyKey) {
+
+                    window._skyKey = nextSkyKey;
+
+                    window._skyDome.material.map = getSkyUVTexture(timeSlot, curWeather);
+
+                    window._skyDome.material.needsUpdate = true;
+
+                }
+
+                window._skyDome.rotation.y += 0.00005;
 
             }
 
@@ -30870,6 +31454,7 @@
             const camEyeY = p.y + 2.1 - scrollYOff;
 
             camera.position.set(p.x, camEyeY, p.z);
+            if (window._skyDome) window._skyDome.position.copy(camera.position);
 
             // 沿軌道局部真實切線方向注視 (取 ±1.5m 切線投影，消除道岔與彎道預轉/側滑感)
             let dirSign = (state.dir === 'down') ? 1 : -1;
