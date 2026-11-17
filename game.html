@@ -2629,15 +2629,14 @@
             </div>
 
             <div id="story-home-confirm-wrap" style="display:none; margin-top:18px; text-align:center;">
-
-                <button id="story-home-confirm-btn" onclick="confirmHomeEnd()"
-
-                    style="width:auto; padding:11px 28px; font-size:16px; background:#22c55e; color:#000; font-weight:bold; border-radius:8px; cursor:pointer; border:none; box-shadow:0 4px 14px rgba(34,197,94,0.35);">
-
-                    ✔ 確認並返回開始畫面
-
+                <button id="story-export-img-btn" onclick="exportDutyRecordImage()"
+                    style="width:auto; padding:11px 22px; font-size:15px; background:#0284c7; color:#fff; font-weight:bold; border-radius:8px; cursor:pointer; border:none; box-shadow:0 4px 14px rgba(2,132,199,0.35); margin-right:10px;">
+                    📸 匯出執勤紀錄圖片 (PNG)
                 </button>
-
+                <button id="story-home-confirm-btn" onclick="confirmHomeEnd()"
+                    style="width:auto; padding:11px 28px; font-size:16px; background:#22c55e; color:#000; font-weight:bold; border-radius:8px; cursor:pointer; border:none; box-shadow:0 4px 14px rgba(34,197,94,0.35);">
+                    ✔ 確認並返回開始畫面
+                </button>
             </div>
 
         </div>
@@ -2849,12 +2848,12 @@
             <h1 id="res-title">檢定失敗</h1>
 
             <p id="res-desc" style="font-size:1.2em; white-space: pre-line;"></p>
-
-            <button onclick="resetToStartScreen()"
-
-                style="background:var(--color-ok); color:#000; font-size:18px; font-weight:bold; cursor:pointer;">返回開始遊戲
-
-                (MAIN MENU)</button>
+            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:12px;">
+                <button onclick="exportDutyRecordImage()"
+                    style="background:#0284c7; color:#fff; font-size:16px; font-weight:bold; cursor:pointer; padding:10px 20px; border:none; border-radius:8px;">📸 匯出執勤紀錄圖片 (PNG)</button>
+                <button onclick="resetToStartScreen()"
+                    style="background:var(--color-ok); color:#000; font-size:18px; font-weight:bold; cursor:pointer; padding:10px 22px; border:none; border-radius:8px;">返回開始遊戲 (MAIN MENU)</button>
+            </div>
 
         </div>
 
@@ -3287,12 +3286,12 @@
             if (platQJ.includes('駐車') || platQJ.includes('反駐')) {
                 return {
                     name: platQJ.includes('反駐') ? "全京車輛基地(反駐線)" : "全京車輛基地(駐車線)",
-                    dist: 60400,
+                    dist: 59647.5,
                     type: "stabling",
                     exp: true
                 };
             }
-            return { name: "全京車輛基地", dist: 60400, type: "stabling", exp: true };
+            return { name: "全京車輛基地", dist: 60250, type: "stabling", exp: true };
         }
 
         function buildRouteStationList(origName, destName, dir, trainMatch, fallbackSIdx, fallbackEIdx) {
@@ -3657,7 +3656,7 @@
 
             { start: 59100, end: 60000, limit: 90 },  // FR22 全京大道 <-> 全京車輛基地 90KM
 
-            { start: 59410, end: 59490, limit: 45 },  // FR22 Switch
+            { start: 59450, end: 59530, limit: 45 },  // FR22 Switch
 
             { start: 60000, end: 61900, limit: 45 },  // 全京車輛基地側線 45KM
 
@@ -5319,94 +5318,262 @@
 
         }
 
+        function formatSecsToHHMMSS(secs) {
+            if (typeof secs !== 'number' || isNaN(secs)) return '--:--:--';
+            let s = Math.round(secs) % 86400;
+            if (s < 0) s += 86400;
+            let hh = Math.floor(s / 3600);
+            let mm = Math.floor((s % 3600) / 60);
+            let ss = s % 60;
+            return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        }
+
         function registerStationStopGScore(stationIdx, stationName, distDiffMeters) {
-
             if (!state || !state.active) return;
-
             if (state.gForceLastScoredIdx === stationIdx) return;
-
             state.gForceLastScoredIdx = stationIdx;
 
             let exceedSecs = state.gForceStationExceedSecs || 0;
-
             let deduct = (exceedSecs > 0) ? (Math.ceil(exceedSecs) * 10) : 0;
-
             let gScore = Math.max(0, 100 - deduct);
-
             let errMm = Math.round(Math.abs(distDiffMeters || 0) * 1000);
-
+            let signedDiffM = Number((distDiffMeters || 0).toFixed(3));
             let atoMatched = (state.stationEntryModeIdx === stationIdx) ? !!state.stationEntryWasATO : !!state.isATO;
-
             let distScore = atoMatched ? 0 : Math.max(0, 500 - errMm);
-
             let atoScore = atoMatched ? 100 : 0;
-
             let stationScore = gScore + distScore + atoScore;
 
             state.gForceCurrentRunScore = (state.gForceCurrentRunScore || 0) + stationScore;
-
             let totalScore = getSavedTotalGScore() + stationScore;
-
             state.gForceTotalCumulativeScore = totalScore;
-
             try {
-
                 localStorage.setItem('flywan_railway_g_score_total', String(totalScore));
-
             } catch (e) {}
 
+            // 計算表定時間與實際停車時間誤差
+            let actualSecs = (typeof normalizeTimetableSecs === 'function')
+                ? normalizeTimetableSecs(state.gameTimeSecs || 0)
+                : (state.gameTimeSecs || 0);
+            let schedSecs = null;
+            if (state.route && state.route[stationIdx]) {
+                let nd = state.route[stationIdx];
+                if (typeof nd.arrSecs === 'number' && !isNaN(nd.arrSecs)) schedSecs = nd.arrSecs;
+                else if (typeof nd.depSecs === 'number' && !isNaN(nd.depSecs)) schedSecs = nd.depSecs;
+            }
+            if (schedSecs === null && typeof getPlayerStationScheduledSecs === 'function' && stationName) {
+                let cleanSt = String(stationName).replace(/^FR\d+\s*/, '').trim();
+                let sVal = getPlayerStationScheduledSecs(cleanSt);
+                if (typeof sVal === 'number' && !isNaN(sVal)) schedSecs = sVal;
+            }
+            let timeErrSecs = null;
+            if (schedSecs !== null) {
+                timeErrSecs = Math.round(actualSecs - schedSecs);
+                if (timeErrSecs > 43200) timeErrSecs -= 86400;
+                if (timeErrSecs < -43200) timeErrSecs += 86400;
+            }
+
+            let stationMaxG = Number((state.gForceStationMaxG || 0).toFixed(3));
+
             if (!Array.isArray(state.gForceStationScores)) state.gForceStationScores = [];
-
             state.gForceStationScores.push({
-
                 idx: stationIdx,
-
                 name: stationName || '車站',
-
                 score: stationScore,
-
                 gScore: gScore,
-
                 distScore: distScore,
-
                 errMm: errMm,
-
+                signedDiffM: signedDiffM,
                 atoScore: atoScore,
-
                 exceedSecs: Number(exceedSecs.toFixed(2)),
-
-                deduct: deduct
-
+                deduct: deduct,
+                stationMaxG: stationMaxG,
+                schedSecs: schedSecs,
+                actualSecs: actualSecs,
+                schedTimeStr: schedSecs !== null ? formatSecsToHHMMSS(schedSecs) : '--:--:--',
+                actualTimeStr: formatSecsToHHMMSS(actualSecs),
+                timeErrSecs: timeErrSecs
             });
 
             state.gForceStationExceedSecs = 0;
-
+            state.gForceStationMaxG = 0;
         }
 
         function getGForceSummaryText() {
-
             let runScore = (state && typeof state.gForceCurrentRunScore === 'number') ? state.gForceCurrentRunScore : 0;
-
             let totalScore = (state && typeof state.gForceTotalCumulativeScore === 'number') ? state.gForceTotalCumulativeScore : getSavedTotalGScore();
-
             let stopList = (state && Array.isArray(state.gForceStationScores)) ? state.gForceStationScores : [];
-
             let gTotal = stopList.reduce((acc, s) => acc + (typeof s.gScore === 'number' ? s.gScore : (s.score || 0)), 0);
-
             let distTotal = stopList.reduce((acc, s) => acc + (s.distScore || 0), 0);
-
             let atoTotal = stopList.reduce((acc, s) => acc + (s.atoScore || 0), 0);
-
             let deductTotal = stopList.reduce((acc, s) => acc + (s.deduct || 0), 0);
-
+            let maxGVal = (state && typeof state.gForceMaxG === 'number') ? state.gForceMaxG.toFixed(3) : '0.000';
             let gNote = deductTotal > 0 ? `扣分 -${deductTotal}` : `無超標`;
-
             return `📊 本次值勤評分：${runScore} 分（停靠 ${stopList.length} 站）\n` +
-                `・G值平穩 (${gNote})：${gTotal} 分\n` +
+                `・G值平穩 (${gNote} · 最大 ${maxGVal} G)：${gTotal} 分\n` +
                 `・停止距離 (500/站，少1mm-1分)：${distTotal} 分\n` +
                 `・ATO進站停車 (100/站)：${atoTotal} 分\n` +
                 `🏆 歷史累積總分：${totalScore} 分`;
+        }
 
+        function exportDutyRecordImage() {
+            const stopList = (state && Array.isArray(state.gForceStationScores)) ? state.gForceStationScores : [];
+            const runScore = (state && typeof state.gForceCurrentRunScore === 'number') ? state.gForceCurrentRunScore : 0;
+            const maxG = (state && typeof state.gForceMaxG === 'number') ? state.gForceMaxG : 0;
+            const avgErrMm = stopList.length > 0
+                ? Math.round(stopList.reduce((a, s) => a + (s.errMm || 0), 0) / stopList.length)
+                : 0;
+            const trainNum = (state && state.matchedTrain && state.matchedTrain.num) ? state.matchedTrain.num : (document.getElementById('train-num-input')?.value || '----');
+            const is6 = (typeof isPlayerSixCar === 'function') ? isPlayerSixCar() : (state && state.type === 'express');
+            const modelName = is6 ? 'E300E (6輛直達 · 135M)' : 'E300C (4輛普通 · 85M)';
+            const dirName = (state && state.dir === 'up') ? '上行 (UP)' : '下行 (DOWN)';
+            const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
+
+            const rowH = 44;
+            const headerH = 265;
+            const footerH = 75;
+            const canvasW = 1200;
+            const canvasH = Math.max(460, headerH + Math.max(1, stopList.length) * rowH + 65 + footerH);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasW;
+            canvas.height = canvasH;
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasH);
+            bgGrad.addColorStop(0, '#0b1120');
+            bgGrad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvasW, canvasH);
+
+            // Outer border
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(16, 16, canvasW - 32, canvasH - 32);
+
+            // Title bar
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(18, 18, canvasW - 36, 76);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = "bold 28px 'Microsoft JhengHei', sans-serif";
+            ctx.fillText('🚆 飛灣鐵路 執勤紀錄表 (FLYWAN RAILWAY DUTY RECORD)', 42, 66);
+
+            ctx.font = "15px 'Microsoft JhengHei', monospace";
+            ctx.fillStyle = '#e0f2fe';
+            ctx.textAlign = 'right';
+            ctx.fillText(`匯出時間：${nowStr}`, canvasW - 42, 64);
+            ctx.textAlign = 'left';
+
+            // Meta info line
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = "bold 18px 'Microsoft JhengHei', sans-serif";
+            ctx.fillText(`車次：${trainNum} 次    |    編組車型：${modelName}    |    方向：${dirName}`, 42, 128);
+
+            // 4 KPI Cards
+            const kpis = [
+                { label: '停靠站數', val: `${stopList.length} 站`, color: '#38bdf8' },
+                { label: '本次執勤總分', val: `${runScore} 分`, color: '#22c55e' },
+                { label: '全程最大 G 值', val: `${maxG.toFixed(3)} G`, color: maxG > 0.20 ? '#f97316' : '#2dd4bf' },
+                { label: '平均停車誤差', val: `${(avgErrMm / 10).toFixed(1)} cm (${avgErrMm} mm)`, color: '#facc15' }
+            ];
+            kpis.forEach((k, i) => {
+                const kx = 42 + i * 282;
+                const ky = 148;
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.roundRect(kx, ky, 266, 86, 10);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148,163,184,0.3)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = "14px 'Microsoft JhengHei', sans-serif";
+                ctx.fillText(k.label, kx + 18, ky + 30);
+
+                ctx.fillStyle = k.color;
+                ctx.font = "bold 24px 'Microsoft JhengHei', monospace";
+                ctx.fillText(k.val, kx + 18, ky + 66);
+            });
+
+            // Table Header
+            const tblY = 258;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(42, tblY, canvasW - 84, 40);
+            ctx.fillStyle = '#7dd3fc';
+            ctx.font = "bold 16px 'Microsoft JhengHei', sans-serif";
+            const cols = [
+                { text: '停靠車站', x: 58 },
+                { text: '表定時間', x: 270 },
+                { text: '實際停車', x: 405 },
+                { text: '停車時間誤差', x: 540 },
+                { text: '停車距離誤差', x: 735 },
+                { text: '區間最大 G 值', x: 935 },
+                { text: '得分', x: 1090 }
+            ];
+            cols.forEach(c => ctx.fillText(c.text, c.x, tblY + 26));
+
+            if (stopList.length === 0) {
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = "16px 'Microsoft JhengHei', sans-serif";
+                ctx.fillText('（本次執勤尚無已完成之停靠站紀錄）', 58, tblY + 75);
+            } else {
+                stopList.forEach((s, idx) => {
+                    const ry = tblY + 40 + idx * rowH;
+                    ctx.fillStyle = idx % 2 === 0 ? 'rgba(30,41,59,0.45)' : 'rgba(15,23,42,0.45)';
+                    ctx.fillRect(42, ry, canvasW - 84, rowH);
+
+                    ctx.font = "16px 'Microsoft JhengHei', monospace";
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillText(String(s.name || '車站').slice(0, 14), 58, ry + 28);
+
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillText(s.schedTimeStr || '--:--:--', 270, ry + 28);
+                    ctx.fillText(s.actualTimeStr || '--:--:--', 405, ry + 28);
+
+                    // Time error
+                    let tErrStr = '--';
+                    let tErrCol = '#cbd5e1';
+                    if (typeof s.timeErrSecs === 'number' && !isNaN(s.timeErrSecs)) {
+                        const sign = s.timeErrSecs > 0 ? '+' : (s.timeErrSecs < 0 ? '-' : '');
+                        const absS = Math.abs(s.timeErrSecs);
+                        tErrStr = absS === 0 ? '準點 (0s)' : `${sign}${absS} 秒 (${s.timeErrSecs > 0 ? '晚' : '早'})`;
+                        tErrCol = absS <= 5 ? '#4ade80' : (absS <= 15 ? '#facc15' : '#f87171');
+                    }
+                    ctx.fillStyle = tErrCol;
+                    ctx.fillText(tErrStr, 540, ry + 28);
+
+                    // Distance error
+                    const dCm = typeof s.signedDiffM === 'number' ? Math.round(s.signedDiffM * 100) : Math.round((s.errMm || 0) / 10);
+                    const dText = (s.errMm === 0)
+                        ? '完美 0 cm'
+                        : `${dCm >= 0 ? '未達' : '超過'} ${Math.abs(dCm)} cm (${s.errMm} mm)`;
+                    ctx.fillStyle = (s.errMm <= 100) ? '#4ade80' : ((s.errMm <= 300) ? '#facc15' : '#f87171');
+                    ctx.fillText(dText, 735, ry + 28);
+
+                    // Station Max G
+                    const sg = typeof s.stationMaxG === 'number' ? s.stationMaxG : 0;
+                    ctx.fillStyle = sg > 0.20 ? '#fb923c' : '#5eead4';
+                    ctx.fillText(`${sg.toFixed(3)} G`, 935, ry + 28);
+
+                    // Score
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillText(`${s.score || 0}`, 1090, ry + 28);
+                });
+            }
+
+            // Footer
+            ctx.fillStyle = '#64748b';
+            ctx.font = "13px 'Microsoft JhengHei', sans-serif";
+            ctx.fillText('飛灣鐵路股份有限公司 Flywan Railway · 數位雙生駕駛模擬系統自動產出', 42, canvasH - 34);
+
+            const link = document.createElement('a');
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            link.download = `flywan_duty_record_${trainNum}_${ts}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function triggerWinCutscene() {
@@ -6722,9 +6889,9 @@
             state.vehicleStopDuration = 0; state.brakeReleaseTimer = 0; state.lastBrakeBc = 2.2; state.carLastBc = []; state.lastB = 4;
 
             state.gForceCurrentRunScore = 0;
-
             state.gForceStationExceedSecs = 0;
-
+            state.gForceMaxG = 0;
+            state.gForceStationMaxG = 0;
             state.gForceStationScores = [];
 
             state.gForceLastScoredIdx = -1;
@@ -7106,11 +7273,11 @@
 
             headlightActive = !headlightActive;
 
-            if (spotLightLeft) spotLightLeft.visible = headlightActive;
+            if (spotLightLeft) spotLightLeft.intensity = headlightActive ? 7.5 : 0.0;
 
-            if (spotLightRight) spotLightRight.visible = headlightActive;
+            if (spotLightRight) spotLightRight.intensity = headlightActive ? 7.5 : 0.0;
 
-            if (headlightFrontFill) headlightFrontFill.visible = headlightActive;
+            if (headlightFrontFill) headlightFrontFill.intensity = headlightActive ? 2.5 : 0.0;
 
 
 
@@ -10867,6 +11034,19 @@
 
             initCockpit();
 
+            // 預先載入對向/AI 列車 UV 貼圖與幾何資產，並預編譯場景著色器，避免遊戲中首次出現或切換時閃爍
+            if (typeof ensureE300AssetsInitialized === 'function') {
+                ensureE300AssetsInitialized();
+                if (typeof e300AssetCache !== 'undefined' && e300AssetCache.textures && typeof renderer.initTexture === 'function') {
+                    Object.values(e300AssetCache.textures).forEach(tex => {
+                        if (tex) renderer.initTexture(tex);
+                    });
+                }
+            }
+            if (typeof renderer.compile === 'function') {
+                renderer.compile(scene, camera);
+            }
+
             window.addEventListener('resize', onWindowResize);
 
         }
@@ -13816,7 +13996,7 @@
 
             buildCrossover(57720, -2, 57800, 2); buildCrossover(57720, 2, 57800, -2);
 
-            buildCrossover(59410, -2, 59490, 2); buildCrossover(59410, 2, 59490, -2);
+            buildCrossover(59450, -2, 59530, 2); buildCrossover(59450, 2, 59530, -2);
 
             buildCrossover(27750, -4.2, 27850, 0); buildCrossover(27750, 4.2, 27850, 0);
 
@@ -14185,25 +14365,270 @@
                     shedMesh.position.set(575, 3.75, FW_DEPOT_CFG.uToZ(uCenter));
                     scene.add(shedMesh);
                 });
+
+                // 5. 飛灣鐵路 10 層樓企業總部大樓 (設於飛灣車輛基地西側引道 Lead L x=-103m 與正線 x=0m 間之開闊空地)
+                // 基地園區 72m × 130m (9,360 m²)，1-2F 裙樓 36m × 72m (2,592 m²，建蔽率約 27.7%，含雨庇門廊約 30%)
+                // 3-10F 主塔樓 24m × 52m，總高 10 層樓 + 屋頂企業識別冠頂 (約 41.8m 高)
+                (function buildFlywanHeadquarters() {
+                    const hqGroup = new THREE.Group();
+                    const hqX = -52.0; // 置中於 Lead L (-103m) 與正線 (0m) 之間
+                    const hqZ = C.uToZ(1200); // u=1200m (z=-1282m)，兩側軌道均為直線且淨空充足
+                    const groundY = -2.0;
+                    hqGroup.position.set(hqX, groundY, hqZ);
+
+                    const matDist = (mat) => applySceneryDistanceShader(mat, 1200, 1000);
+
+                    // A. 園區景觀基地與廣場 (72m × 130m，建蔽率 ~28-30%)
+                    const lawnMat = matDist(new THREE.MeshLambertMaterial({ color: 0x3b6e4c }));
+                    const lawnMesh = new THREE.Mesh(new THREE.BoxGeometry(72, 0.16, 130), lawnMat);
+                    lawnMesh.position.set(0, 0.08, 0);
+                    hqGroup.add(lawnMesh);
+
+                    const plazaMat = matDist(new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+                    const plazaMesh = new THREE.Mesh(new THREE.BoxGeometry(54, 0.24, 96), plazaMat);
+                    plazaMesh.position.set(0, 0.12, 0);
+                    hqGroup.add(plazaMesh);
+
+                    // 園區車道與出入口鋪面 (南北向環繞與東西向迎賓車道)
+                    const roadMat = matDist(new THREE.MeshLambertMaterial({ color: 0x334155 }));
+                    const driveE = new THREE.Mesh(new THREE.BoxGeometry(10, 0.26, 120), roadMat);
+                    driveE.position.set(27, 0.13, 0);
+                    hqGroup.add(driveE);
+                    const driveW = new THREE.Mesh(new THREE.BoxGeometry(10, 0.26, 120), roadMat);
+                    driveW.position.set(-27, 0.13, 0);
+                    hqGroup.add(driveW);
+
+                    // B. 10 層樓建築貼圖生成 (1-2F 裙樓石材帷幕 + 3-10F 玻璃帷幕 8 層)
+                    function makePodiumTex() {
+                        const c = document.createElement('canvas');
+                        c.width = 512; c.height = 256;
+                        const ctx = c.getContext('2d');
+                        ctx.fillStyle = '#cbd5e1';
+                        ctx.fillRect(0, 0, 512, 256);
+                        // 2F 水平窗帶
+                        ctx.fillStyle = '#0f2942';
+                        ctx.fillRect(0, 28, 512, 82);
+                        // 1F 挑高玻璃大廳
+                        ctx.fillStyle = '#0c2238';
+                        ctx.fillRect(0, 142, 512, 106);
+                        // 垂直窗框格柵
+                        ctx.fillStyle = '#64748b';
+                        for (let x = 0; x < 512; x += 32) {
+                            ctx.fillRect(x, 28, 3, 82);
+                            ctx.fillRect(x, 142, 3, 106);
+                        }
+                        // 1F 室內暖光點綴
+                        ctx.fillStyle = 'rgba(253, 224, 140, 0.35)';
+                        for (let x = 36; x < 480; x += 64) {
+                            ctx.fillRect(x, 152, 26, 86);
+                        }
+                        // 1F/2F 分層鋁板帶
+                        ctx.fillStyle = '#e2e8f0';
+                        ctx.fillRect(0, 0, 512, 22);
+                        ctx.fillRect(0, 114, 512, 24);
+                        const tex = new THREE.CanvasTexture(c);
+                        tex.wrapS = THREE.RepeatWrapping;
+                        return tex;
+                    }
+
+                    function makeTowerTex() {
+                        const c = document.createElement('canvas');
+                        c.width = 512; c.height = 1024;
+                        const ctx = c.getContext('2d');
+                        ctx.fillStyle = '#1e293b';
+                        ctx.fillRect(0, 0, 512, 1024);
+                        const floors = 8; // 3F ~ 10F
+                        const fh = 1024 / floors;
+                        for (let f = 0; f < floors; f++) {
+                            const y0 = f * fh;
+                            // 樓層鋁合金層間板
+                            ctx.fillStyle = '#475569';
+                            ctx.fillRect(0, y0, 512, 24);
+                            ctx.fillStyle = '#94a3b8';
+                            ctx.fillRect(0, y0 + 22, 512, 4);
+                            // 深海藍綠玻璃帷幕
+                            const grad = ctx.createLinearGradient(0, y0 + 26, 0, y0 + fh);
+                            grad.addColorStop(0, '#0e3454');
+                            grad.addColorStop(1, '#164e63');
+                            ctx.fillStyle = grad;
+                            ctx.fillRect(0, y0 + 26, 512, fh - 26);
+                            // 隨機辦公室內燈光 (自然分布)
+                            for (let col = 0; col < 16; col++) {
+                                const seed = Math.sin((f + 1) * 73.1 + col * 19.7);
+                                if (seed > 0.12) {
+                                    ctx.fillStyle = (seed > 0.65) ? 'rgba(254, 240, 178, 0.42)' : 'rgba(186, 230, 253, 0.25)';
+                                    ctx.fillRect(col * 32 + 3, y0 + 30, 26, fh - 34);
+                                }
+                            }
+                            // 垂直鋁窗框
+                            ctx.fillStyle = '#334155';
+                            for (let x = 0; x < 512; x += 32) {
+                                ctx.fillRect(x, y0 + 26, 3, fh - 26);
+                            }
+                        }
+                        const tex = new THREE.CanvasTexture(c);
+                        tex.wrapS = THREE.RepeatWrapping;
+                        return tex;
+                    }
+
+                    const podiumTex = makePodiumTex();
+                    const towerTex = makeTowerTex();
+
+                    // C. 裙樓 (1F-2F: 高 9.0m, 36m × 72m)
+                    const podiumGeo = new THREE.BoxGeometry(36, 9.0, 72);
+                    const podiumMat = matDist(new THREE.MeshLambertMaterial({ map: podiumTex }));
+                    const podiumMesh = new THREE.Mesh(podiumGeo, podiumMat);
+                    podiumMesh.position.set(0, 0.2 + 4.5, 0);
+                    hqGroup.add(podiumMesh);
+
+                    // 東西兩側 1F 迎賓雨庇
+                    const canopyMat = matDist(new THREE.MeshLambertMaterial({ color: 0x0ea5e9 }));
+                    const canopyFrameMat = matDist(new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }));
+                    [-1, 1].forEach(side => {
+                        const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.45, 22), canopyFrameMat);
+                        canopy.position.set(side * 20.5, 4.6, 0);
+                        hqGroup.add(canopy);
+                        const canopyAccent = new THREE.Mesh(new THREE.BoxGeometry(5.1, 0.14, 22.1), canopyMat);
+                        canopyAccent.position.set(side * 20.5, 4.88, 0);
+                        hqGroup.add(canopyAccent);
+                    });
+
+                    // D. 主塔樓 (3F-10F: 高 29.0m, 24m × 52m，底部接於裙樓頂面 y=9.2m)
+                    const towerGeo = new THREE.BoxGeometry(24, 29.0, 52);
+                    const towerMat = matDist(new THREE.MeshLambertMaterial({ map: towerTex }));
+                    const towerMesh = new THREE.Mesh(towerGeo, towerMat);
+                    towerMesh.position.set(0, 9.2 + 14.5, 0);
+                    hqGroup.add(towerMesh);
+
+                    // 四角建築鋁板飾柱
+                    const finMat = matDist(new THREE.MeshLambertMaterial({ color: 0x64748b }));
+                    [[-12.1, -26.1], [12.1, -26.1], [-12.1, 26.1], [12.1, 26.1]].forEach(([fx, fz]) => {
+                        const fin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 33.2, 1.4), finMat);
+                        fin.position.set(fx, 9.2 + 16.6, fz);
+                        hqGroup.add(fin);
+                    });
+
+                    // E. 屋頂女兒牆與設備層冠頂 (y=38.2m ~ 42.0m)
+                    const parapetMat = matDist(new THREE.MeshLambertMaterial({ color: 0x1e293b }));
+                    const parapetMesh = new THREE.Mesh(new THREE.BoxGeometry(24.6, 3.6, 52.6), parapetMat);
+                    parapetMesh.position.set(0, 38.2 + 1.8, 0);
+                    hqGroup.add(parapetMesh);
+
+                    const crownTrimMat = matDist(new THREE.MeshLambertMaterial({ color: 0x0ea5e9 }));
+                    const crownTrim = new THREE.Mesh(new THREE.BoxGeometry(24.9, 0.35, 52.9), crownTrimMat);
+                    crownTrim.position.set(0, 41.85, 0);
+                    hqGroup.add(crownTrim);
+
+                    const mechPenthouse = new THREE.Mesh(new THREE.BoxGeometry(14, 3.0, 28), matDist(new THREE.MeshLambertMaterial({ color: 0x334155 })));
+                    mechPenthouse.position.set(0, 41.8 + 1.5, 0);
+                    hqGroup.add(mechPenthouse);
+
+                    // 雙通訊天線塔尖
+                    const spireMat = matDist(new THREE.MeshLambertMaterial({ color: 0xcbd5e1 }));
+                    [-8, 8].forEach(sz => {
+                        const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 6.5, 8), spireMat);
+                        spire.position.set(0, 44.8 + 3.25, sz);
+                        hqGroup.add(spire);
+                    });
+
+                    // F. 園區景觀行道樹 (環繞廣場與草坪)
+                    const trunkMat = matDist(new THREE.MeshLambertMaterial({ color: 0x5c4033 }));
+                    const leafMat = matDist(new THREE.MeshLambertMaterial({ color: 0x2e7d32 }));
+                    for (let tz = -56; tz <= 56; tz += 16) {
+                        [-32.5, 32.5].forEach(tx => {
+                            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 2.8, 6), trunkMat);
+                            trunk.position.set(tx, 1.5, tz);
+                            hqGroup.add(trunk);
+                            const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(2.1, 0), leafMat);
+                            crown.position.set(tx, 3.8, tz);
+                            hqGroup.add(crown);
+                        });
+                    }
+
+                    // G. 企業識別標誌 (圖片上的 FR 標誌，嵌入並製成高對比發光企業招牌)
+                    const logoCanvas = document.createElement('canvas');
+                    logoCanvas.width = 512;
+                    logoCanvas.height = 256;
+                    const lCtx = logoCanvas.getContext('2d');
+                    lCtx.fillStyle = '#f8fafc';
+                    lCtx.fillRect(0, 0, 512, 256);
+                    const logoTex = new THREE.CanvasTexture(logoCanvas);
+
+                    const logoImg = new Image();
+                    logoImg.onload = function () {
+                        lCtx.fillStyle = '#f8fafc';
+                        lCtx.fillRect(0, 0, 512, 256);
+                        lCtx.strokeStyle = '#0ea5e9';
+                        lCtx.lineWidth = 6;
+                        lCtx.strokeRect(8, 8, 496, 240);
+                        const padX = 36, padY = 18;
+                        lCtx.drawImage(logoImg, padX, padY, 512 - padX * 2, 256 - padY * 2 - 22);
+                        lCtx.fillStyle = '#0f2942';
+                        lCtx.font = 'bold 22px sans-serif';
+                        lCtx.textAlign = 'center';
+                        lCtx.textBaseline = 'middle';
+                        lCtx.fillText('飛灣鐵路總部  FLYWAN RAILWAY HQ', 256, 224);
+                        logoTex.needsUpdate = true;
+                    };
+                    logoImg.src = 'data:image/jpeg;base64,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aQ0GigQL06UopBS1SELSfjRRQwQfSjFLQaBjaQ0tBpoQlHagUvamAgoHrS0UAJ+FFLjFHakIKKKOKBiUUd6UCgBPzo60HrQBQTsFFL0FFABR0oooGBoz70Uc4pMa3AHiigUp6Ui2JS4Gc0UooAKO9LTT170AKKWkHWloAPxpaKO9ABSU6igBD1ooooAD7UtFFABRRRQAlBpe9FACUdqWigAooooAKKKKACig0lABRilooATFLiiigAooooAKTNLRQAUlFHegAopaKADFFFFAAaKKKACkoFAoAM0UtFACfjRS0UAFFFFABRQaB0oATmj8aWkoAOKKWkoAKKKWgBBS0UUAJRRRQAUdqKBQAfjRQKWgBCBTWHpT6Q9aAG0Ud6KADrTfxpaOaAA0lKfrRTRDE5oxRxSii4De1LRQaYg/Cj6Ud6O1AwoopKYBxiilFHFIBKMetLRQAc5opDRQAClpKUYpiD8aKKWkMSlFGKPakxhQKKWkCEo7Ud+KKQw60GhqTtQIVfel+tIKXNUhCUYooHtSYIXvSfhQetBpjEoxRQPxpiCgUUcCgQtIelGaSmAuaQ9aO9FACmgUlHekMKWiigQUdKD9KM0CsGaKDSfjQNIXNFNpwpgJil6UUcVLGnqLQRS8Uh6CpKYCndqb+VLnimMCfekyKQ9e1OoAWgDmilFAAOtLikpaACikooAWk/OigmgBaSiigBaKKKACiiigAooooAKKSgUALRRRQAfhRRRQAUUUcUAFFGaTIoAWikBpaACiiigAooooAKKKM0AFFFJQAZpaBR70AFFAooAKKKKACiiigAoozSCgBaKKKACiiigAooooAKKKKACikoFABiloooATvS0GkoAWikooAWikzRQA00lONN9qAFpOaWkoAOoooxxRj2oJaENFBNIKZNhc0UlH41QIWkxS9qAPWkAUUUcelABQelH4Uh9MUALRmkBo96YBwTxQBQM5pe9ACYpRRiikAoopDRQAoozzSfhSikxoWk7Uoo/GkVYQUvak5pe1IBveg9KDRTEKKO9A/Og0xCjpSCigUAH4UnWl/GjtSGxDRRSGqRNg74oNFHBpjCijvRQAUCilFAAOKDSfSikAv40lBopgBoo/OkoAWigCigA96WjrR2pABpabilqWNCmkNH1/lRQMWjHFJ3paBiCnUijmnYoAWigUUAFFFAoAD6UA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KM0g74zigBxppzTuO4pOKQCUd6PwoPUZqrkNB2oFLj3oxjvUlBRQelGRQAUd6Sl/X6UxWDtSdqXsOtIfegYlHal6dKQe9UiRRRRR+NACUppKORTAKXtSde1FIEL1pKPwpe1ABQKDRSAKKUUnfpQAh6Hmmn86efrTDSQEg5FJ0PFKORRikhu4opDSjpQaokTg9aPpR60GpKCkB5oP1o7dKYXEoFL7UlUSLig9ORRmigAoFFFAB3ooooGFFHaigLgKPwoo4oEHaiiigAxRRQKBgaT68UtFACUU7FJQTawtA9aD04NB6VBog47UdqBRTGGaAfeikoAeKUU0flTqAFooooASil7UUAFFJSigBM0UtJigApaKKACiiigAooooAKKKKACgUUUAFFFFABRRRQAUUUUAFFFFACYpaKKACiiigAooooAKKKKACkpaKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAozzSUUALSGjvRQAUUtFABSGlppNACGijIpDQAd6D70UhoAD0oHtRSigTAfWjFJRQTcXFJjmil5oAWkPFGRRnmgYH+lJ3pTnrQBQAUCjvR2oC4Y+tGKB0ooC4lFAopoQUlLSUxMOKKKUUAmJSig0dutAB9aO9Ao70h3CiiigBaSijpQAhprU80w/WgCQdKTvS4pMc0h6ijg0pxTaKYkHegilopDE5xyKKUmk70wYd6TFLR3pisGKKQUetAC5opKKAD6UtB4o70AHvRQaQUCFNGaSgUxi0lGaO9ABQPWjtS0AFKPpSGgdKkBe1JS54pDQDQc4pc+lI3AFFIsDng0Ud6D19qAF/GijijFACjr2pRTaAcGgB4ozSZNLQAtJRRQAUDNGKWgBOaXtSd6WgAoopM0ALRSZNFAC0UlFAC0UUUAFFFFABRSZozQAtGaTntS0AJmlooFABRRRQAUUUUAFFJRQAtFIPwpaACigUUAFFFFABRRSZoAWikoH4UAFLSUd6AFooooAKKKKACikzRk+lABS0gozQAe1A6UUUAAoozSigAo6UU0nPFAA3rTc56UE9qO1ABSZpepooAKBmij6UAHahaCaQe1HUTF780UUHOaZIcZpCaO9BosMSlo6UtFhBR+FFGaADt0oPFFJSsMKWm+9KPemID7Un407NJ+lA7BzR+FGeKPxoF1ExS/hRRTEkHej9KKQg0BYBSk0m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';
+
+                    const logoSignMat = new THREE.MeshBasicMaterial({ map: logoTex, side: THREE.FrontSide });
+                    const signBackMat = matDist(new THREE.MeshLambertMaterial({ color: 0x0f172a }));
+
+                    // 1. 東側正線方向與西側引道方向高層冠頂大型 FR 標誌招牌 (15m × 7.5m，面對列車行駛視野)
+                    [-1, 1].forEach(side => {
+                        const signFrame = new THREE.Mesh(new THREE.BoxGeometry(0.6, 7.8, 15.6), signBackMat);
+                        signFrame.position.set(side * 12.6, 37.8, 0);
+                        hqGroup.add(signFrame);
+
+                        const signFace = new THREE.Mesh(new THREE.PlaneGeometry(15.0, 7.5), logoSignMat);
+                        signFace.position.set(side * 12.95, 37.8, 0);
+                        signFace.rotation.y = (side > 0) ? (Math.PI / 2) : (-Math.PI / 2);
+                        hqGroup.add(signFace);
+                    });
+
+                    // 2. 南北兩側屋頂冠頂 FR 標誌招牌 (11m × 5.5m)
+                    [-1, 1].forEach(sideZ => {
+                        const signFrameZ = new THREE.Mesh(new THREE.BoxGeometry(11.6, 5.8, 0.6), signBackMat);
+                        signFrameZ.position.set(0, 38.2, sideZ * 26.6);
+                        hqGroup.add(signFrameZ);
+
+                        const signFaceZ = new THREE.Mesh(new THREE.PlaneGeometry(11.0, 5.5), logoSignMat);
+                        signFaceZ.position.set(0, 38.2, sideZ * 26.95);
+                        signFaceZ.rotation.y = (sideZ > 0) ? 0 : Math.PI;
+                        hqGroup.add(signFaceZ);
+                    });
+
+                    // 3. 地面東側 (面向正線) 企業識別碑 (7.2m × 3.6m)
+                    const monumentBase = new THREE.Mesh(new THREE.BoxGeometry(1.4, 4.4, 7.8), signBackMat);
+                    monumentBase.position.set(22.5, 2.2, 22);
+                    hqGroup.add(monumentBase);
+                    const monumentFace = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 3.6), logoSignMat);
+                    monumentFace.position.set(23.25, 2.5, 22);
+                    monumentFace.rotation.y = Math.PI / 2;
+                    hqGroup.add(monumentFace);
+
+                    scene.add(hqGroup);
+                })();
             }
 
             // 全京車輛基地 3D 場站軌道群：60000~60060m 維持 ±2m 平行與完整 X 橫渡線 (60010~60050m)，隨後於 60060~60140m 展開 ±6m 駐車/反駐線及 10 股基地軌道 + 碎石道床
-            buildDepotGroundApron(59990, 60710, -28, 28, 0);
+            buildDepotGroundApron(59990, 60810, -28, 28, 0);
             buildCrossover(60010, -2, 60050, 2);
             buildCrossover(60010, 2, 60050, -2);
             buildDepotLine(60060, -2, 0, 60140, -6, 0, 40, 'ballast');
             buildDepotLine(60060, 2, 0, 60140, 6, 0, 40, 'ballast');
-            buildDepotLine(60140, -6, 0, 60700, -6, 0, 120, 'ballast');
-            buildDepotLine(60140, 6, 0, 60700, 6, 0, 120, 'ballast');
+            buildDepotLine(60140, -6, 0, 60800, -6, 0, 120, 'ballast');
+            buildDepotLine(60140, 6, 0, 60800, 6, 0, 120, 'ballast');
             [-24, -18, -12, 12, 18, 24].forEach((offQ, idx) => {
                 let dBranch = 60180 + (idx % 3) * 45;
                 let srcOff = offQ < 0 ? -6 : 6;
                 buildDepotLine(60150, srcOff, 0, dBranch, offQ, 0, 20, 'ballast');
-                buildDepotLine(dBranch, offQ, 0, 60700, offQ, 0, 80, 'ballast');
-                createBufferStop(60700, offQ, false, 0);
+                buildDepotLine(dBranch, offQ, 0, 60800, offQ, 0, 80, 'ballast');
+                createBufferStop(60800, offQ, false, 0);
             });
-            createBufferStop(60700, -6, false, 0);
-            createBufferStop(60700, 6, false, 0);
+            createBufferStop(60800, -6, false, 0);
+            createBufferStop(60800, 6, false, 0);
             {
                 let qjShedPt = getPtDetail(60550, 0, 0);
                 let qjShed = new THREE.Mesh(
@@ -14561,10 +14986,16 @@
             createFwStopSignAtD('L', FW_DEPOT_CFG.DIST_STOP_L, true, 'full');
             createFwStopSignAtD('L', FW_DEPOT_CFG.DIST_STOP_L, false, 'full');
 
-            // 全京車輛基地停車標：以基地中心 60400m (60000m 往後 400m) 依 6 輛編組長度 (±65m => 60465m / 60335m) 於各股道 (-6, -2, +2, +6m) 設全編組停車標
+            // 全京車輛基地停車標：
+            // 1) 駐車/反駐線：中心 59647.5m (確保 135m 編組飛灣工業區端距 59530m 橫渡線 50m => 59580m)，依 ±65m (59712.5m / 59582.5m) 於 ±2m 設全編組停車標
+            [-2, 2].forEach(off => {
+                createStopSign(59647.5 + 65, off, true, 'full', 0);
+                createStopSign(59647.5 - 65, off, false, 'full', 0);
+            });
+            // 2) 全京車輛基地本體 (其他番線)：中心 60250m (±65m => 60315m / 60185m) 於 -6, -2, +2, +6m 設全編組停車標
             [-6, -2, 2, 6].forEach(off => {
-                createStopSign(60400 + 65, off, true, 'full', 0);
-                createStopSign(60400 - 65, off, false, 'full', 0);
+                createStopSign(60250 + 65, off, true, 'full', 0);
+                createStopSign(60250 - 65, off, false, 'full', 0);
             });
 
         }
@@ -15085,8 +15516,8 @@
                 return { offset: p.x, yDrop: p.yDrop };
             }
 
-            // 2. 全京車輛基地區間 (>= 59900m)
-            if (d >= 59900) {
+            // 2. 全京車輛基地區間 (駐車線/反駐線 59400~59600m + 基地本體 >= 59900m)
+            if (d >= 59380) {
                 let platQJ = '';
                 if (trainCtx && trainCtx.platforms) {
                     platQJ = String(trainCtx.platforms['全京車輛基地'] || trainCtx.platforms['全京基地'] || '');
@@ -15109,38 +15540,25 @@
                 let isOppositeStabling = platQJ.includes('反駐');
                 let isFanStabling = platQJ.includes('駐車') && !isOppositeStabling;
 
-                if (isDestQJ || isOriginQJ) {
+                // 2a. 全京車輛基地駐車線/反駐線 (中心 59647.5m，經 FR22 站後橫渡線 59450~59530m；待 FR22 島式月台於 59425m 完全收斂後才接手，避免 59400m 鏡頭跳動)
+                if ((isDestQJ || isOriginQJ) && (isFanStabling || isOppositeStabling) && d >= 59430) {
                     if (dir === 'down') {
-                        // 下行全京車輛基地駐車線(+6m)走直線；反駐線(-6m)走橫渡線；其他走直線(+2m)
-                        if (isFanStabling) {
-                            if (d <= 60060) return { offset: 2, yDrop: 0 };
-                            if (d < 60140) return { offset: 2 + 4 * easeInOut((d - 60060) / 80), yDrop: 0 };
-                            return { offset: 6, yDrop: 0 };
-                        } else if (isOppositeStabling) {
-                            if (d <= 60010) return { offset: 2, yDrop: 0 };
-                            if (d < 60050) return { offset: 2 - 4 * easeInOut((d - 60010) / 40), yDrop: 0 };
-                            if (d <= 60060) return { offset: -2, yDrop: 0 };
-                            if (d < 60140) return { offset: -2 - 4 * easeInOut((d - 60060) / 80), yDrop: 0 };
-                            return { offset: -6, yDrop: 0 };
-                        }
-                        return { offset: 2, yDrop: 0 };
+                        if (isFanStabling) return { offset: 2, yDrop: 0 };
+                        if (d <= 59450) return { offset: 2, yDrop: 0 };
+                        if (d < 59530) return { offset: 2 - 4 * easeInOut((d - 59450) / 80), yDrop: 0 };
+                        return { offset: -2, yDrop: 0 };
                     } else {
-                        // 上行全京車輛基地反駐線(-6m)走直線；駐車線(+6m)走橫渡線；其他走直線(-2m)
-                        if (isOppositeStabling) {
-                            if (d >= 60140) return { offset: -6, yDrop: 0 };
-                            if (d > 60060) return { offset: -2 - 4 * easeInOut((d - 60060) / 80), yDrop: 0 };
-                            return { offset: -2, yDrop: 0 };
-                        } else if (isFanStabling) {
-                            if (d >= 60140) return { offset: 6, yDrop: 0 };
-                            if (d > 60060) return { offset: 2 + 4 * easeInOut((d - 60060) / 80), yDrop: 0 };
-                            if (d >= 60050) return { offset: 2, yDrop: 0 };
-                            if (d > 60010) return { offset: -2 + 4 * easeInOut((d - 60010) / 40), yDrop: 0 };
-                            return { offset: -2, yDrop: 0 };
-                        }
+                        if (isOppositeStabling) return { offset: -2, yDrop: 0 };
+                        if (d >= 59530) return { offset: 2, yDrop: 0 };
+                        if (d > 59450) return { offset: -2 + 4 * easeInOut((d - 59450) / 80), yDrop: 0 };
                         return { offset: -2, yDrop: 0 };
                     }
                 }
-                return { offset: (dir === 'down') ? 2 : -2, yDrop: 0 };
+
+                // 2b. 全京車輛基地本體 (>= 59900m)：其他番線下行始終走下行側(+2m)，上行始終走上行側(-2m)
+                if (d >= 59900) {
+                    return { offset: (dir === 'down') ? 2 : -2, yDrop: 0 };
+                }
             }
 
             return null;
@@ -15912,7 +16330,7 @@
 
                 }
 
-                // 全京大道 (FR22, dist=59100) 反線月台 (上行月台1 / 下行月台2) 與 59410..59490 東側橫渡線
+                // 全京大道 (FR22, dist=59100) 反線月台 (上行月台1 / 下行月台2) 與 59450..59530 東側橫渡線
 
                 if (d > 58380 && d < 60000 && typeof getTrainPlatformAtStation === 'function') {
 
@@ -15920,11 +16338,11 @@
 
                     if ((dir === 'up' && pFR22.includes('1')) || (dir === 'down' && pFR22.includes('2'))) {
 
-                        if (d <= 59410) return (dir === 'up') ? R_in : L_in;
+                        if (d <= 59450) return (dir === 'up') ? R_in : L_in;
 
-                        if (d < 59490) {
+                        if (d < 59530) {
 
-                            const t = (d - 59410) / 80;
+                            const t = (d - 59450) / 80;
 
                             return (dir === 'up') ? (2 - 4 * easeInOut(t)) : (-2 + 4 * easeInOut(t));
 
@@ -20489,52 +20907,51 @@
                 const myIsFan = myPlatQJ.includes('駐車') && !myIsOpp;
 
                 if (dir === 'down' && myIsOpp) {
-                    // 下行反駐線：需跨越 60010~60050m X橫渡線 (+2m -> -2m -> -6m)，檢查上行側 -2m 離庫列車
-                    let stopPos60009 = 60009.0;
-                    let distToSwQJ = stopPos60009 - curD;
+                    // 下行反駐線 (中心 59647.5m)：需跨越 FR22 站後橫渡線 59450~59530m (+2m -> -2m)，檢查上行側離庫/出站列車
+                    let stopPos59449 = 59449.0;
+                    let distToSwQJ = stopPos59449 - curD;
                     if (distToSwQJ >= -40.0 && distToSwQJ <= 900.0) {
                         let myArrQJ = observerTl ? getTimelineScheduledSecsAtStation(observerTl, '全京車輛基地') : getPlayerStationScheduledSecs('全京車輛基地');
                         for (let tr of allTrains) {
-                            if (tr.dir === 'up' && tr.dHead >= 60000.0 - tr.length - 50.0 && tr.dHead <= 60470.0) {
+                            if (tr.dir === 'up' && tr.dHead >= 59400.0 - tr.length - 50.0 && tr.dHead <= 60350.0) {
                                 let trDepQJ = tr.timeline ? getTimelineScheduledSecsAtStation(tr.timeline, '全京車輛基地') : null;
-                                let isUpEarlier = (!tr.isStopped && tr.dHead < 60400.0) || (trDepQJ !== null && myArrQJ !== null && toDayCycleSecs(trDepQJ) <= toDayCycleSecs(myArrQJ) + 15.0);
+                                let isUpEarlier = (!tr.isStopped && tr.dHead < 59720.0) || (trDepQJ !== null && myArrQJ !== null && toDayCycleSecs(trDepQJ) <= toDayCycleSecs(myArrQJ) + 15.0);
                                 if (!isUpEarlier) continue;
-                                let cleared = (tr.dHead <= 60010.0 - tr.length - 5.0);
+                                let cleared = (tr.dHead <= 59450.0 - tr.length - 5.0);
                                 let key4fD = `R4f_QJ_DO_${tr.num}`;
                                 if (cleared) {
                                     if (!conflictClearedTimes[key4fD]) conflictClearedTimes[key4fD] = tNow;
                                     if (tNow - conflictClearedTimes[key4fD] < 15.0 && distToSwQJ < blockDist) {
-                                        blockDist = distToSwQJ; clampPos = stopPos60009; isStationPointTarget = true;
+                                        blockDist = distToSwQJ; clampPos = stopPos59449; isStationPointTarget = true;
                                         isStationStopBefore5mHold = (distToSwQJ <= 5.0);
-                                        holdInfo = { stationName: '全京車輛基地(反駐線橫渡線)', leadNum: tr.num, stopBefore1mPos: stopPos60009, distToStopBefore1m: distToSwQJ, isArrivalCrossoverHold: true };
+                                        holdInfo = { stationName: '全京車輛基地(反駐線橫渡線)', leadNum: tr.num, stopBefore1mPos: stopPos59449, distToStopBefore1m: distToSwQJ, isArrivalCrossoverHold: true };
                                     }
                                 } else {
                                     conflictClearedTimes[key4fD] = null;
                                     if (distToSwQJ < blockDist) {
-                                        blockDist = distToSwQJ; clampPos = stopPos60009; isStationPointTarget = true;
+                                        blockDist = distToSwQJ; clampPos = stopPos59449; isStationPointTarget = true;
                                         isStationStopBefore5mHold = (distToSwQJ <= 5.0);
-                                        holdInfo = { stationName: '全京車輛基地(反駐線橫渡線)', leadNum: tr.num, stopBefore1mPos: stopPos60009, distToStopBefore1m: distToSwQJ, isArrivalCrossoverHold: true };
+                                        holdInfo = { stationName: '全京車輛基地(反駐線橫渡線)', leadNum: tr.num, stopBefore1mPos: stopPos59449, distToStopBefore1m: distToSwQJ, isArrivalCrossoverHold: true };
                                     }
                                 }
                             }
                         }
                     }
-                } else if (dir === 'up' && curD >= 59950.0 && curD <= 60460.0) {
-                    // 上行從全京基地出庫：駐車線 (+6m -> +2m -> 60050~60010 X橫渡線 -> -2m) 與下行入庫列車交會檢查；反駐線/上行線檢查 60050~60010 是否被下行反駐線占用
-                    let stopPosQJ = myIsFan ? 60061.0 : 60051.0;
+                } else if (dir === 'up' && curD >= 59450.0 && curD <= 60350.0) {
+                    // 上行從全京駐車線(59582.5m)或基地(60185m)出庫：檢查與下行反駐線經 59450~59530m 橫渡線交會衝突
+                    let stopPosQJ = 59531.0;
                     let distToSwQJ = curD - stopPosQJ;
-                    if (distToSwQJ >= -40.0 && distToSwQJ <= 450.0) {
+                    if (distToSwQJ >= -40.0 && distToSwQJ <= 900.0) {
                         let myDepQJ = observerTl ? getTimelineScheduledSecsAtStation(observerTl, '全京車輛基地') : getPlayerStationScheduledSecs('全京車輛基地');
                         for (let tr of allTrains) {
-                            if (tr.dir === 'down' && tr.dHead >= 59300.0 && tr.dHead <= 60460.0) {
+                            if (tr.dir === 'down' && tr.dHead >= 59000.0 && tr.dHead <= 59750.0) {
                                 let trPlatQJ = tr.isPlayer ? getPlayerPlatformAtStation('全京車輛基地', 'down') : getQjPlatStr(tr.timeline, 'down');
                                 let trIsOpp = trPlatQJ.includes('反駐');
-                                if (!myIsFan && !trIsOpp) continue; // 反駐線/上行線走直線(-2m)，僅與下行反駐線跨 X 橫渡線衝突
+                                if (!myIsFan && !trIsOpp) continue;
                                 let trArrQJ = tr.timeline ? getTimelineScheduledSecsAtStation(tr.timeline, '全京車輛基地') : null;
-                                let isDownFirst = (tr.dHead >= 60000.0 && tr.dHead <= 60145.0) || (trArrQJ !== null && myDepQJ !== null && toDayCycleSecs(trArrQJ) <= toDayCycleSecs(myDepQJ) + 15.0);
+                                let isDownFirst = (tr.dHead >= 59430.0 && tr.dHead <= 59720.0) || (trArrQJ !== null && myDepQJ !== null && toDayCycleSecs(trArrQJ) <= toDayCycleSecs(myDepQJ) + 15.0);
                                 if (!isDownFirst) continue;
-                                let clearEnd = myIsFan ? 60145.0 : 60145.0;
-                                let cleared = (tr.dHead >= clearEnd);
+                                let cleared = (tr.dHead >= 59712.5);
                                 let key4fU = `R4f_QJ_U_${tr.num}`;
                                 if (cleared) {
                                     if (!conflictClearedTimes[key4fU]) conflictClearedTimes[key4fU] = tNow;
@@ -20575,7 +20992,7 @@
             const rule2NodesList = [
                 ...STATIONS,
                 { name: "飛灣車輛基地", dist: obsFwDist2, type: "depot", exp: false },
-                { name: "全京車輛基地", dist: 60400, type: "stabling", exp: true }
+                { name: "全京車輛基地", dist: 60250, type: "stabling", exp: true }
             ];
 
             for (let st of rule2NodesList) {
@@ -20585,10 +21002,11 @@
                 // 閉塞停車點一律以最前端的停車點為準 (±65M 或 ±42.5M)
                 let obsDepotNode = observerTl && observerTl.nodes ? observerTl.nodes.find(n => normalizeDepotStationKey(n.cleanName || n.name || '') === cleanName)
                     : (typeof state !== 'undefined' && state.route ? state.route.find(n => normalizeDepotStationKey(n.name || '') === cleanName) : null);
-                if (st.type === 'depot' && !obsDepotNode) continue;
-                let effStObj = (st.type === 'depot' && obsDepotNode) ? { name: obsDepotNode.name || st.name, dist: obsDepotNode.pos || (obsDepotNode.data ? obsDepotNode.data.dist : st.dist), type: (obsDepotNode.pos === 60400 || (obsDepotNode.data && obsDepotNode.data.type === 'stabling')) ? 'stabling' : 'depot', exp: false } : st;
-                let stopMarkerPos = (st.type === 'depot' && obsDepotNode && typeof obsDepotNode.pos === 'number') ? obsDepotNode.pos : getFrontStopMarkerPos(effStObj, dir);
-                let ownStopMarkerPos = (st.type === 'depot' && obsDepotNode && typeof obsDepotNode.pos === 'number') ? obsDepotNode.pos : getTrainStopMarkerPos(effStObj, dir, isObs6Cars);
+                if ((st.type === 'depot' || cleanName === '全京車輛基地') && !obsDepotNode) continue;
+                let obsNodeType = (obsDepotNode && (obsDepotNode.type || (obsDepotNode.data && obsDepotNode.data.type))) || st.type;
+                let effStObj = ((st.type === 'depot' || cleanName === '全京車輛基地') && obsDepotNode) ? { name: obsDepotNode.name || st.name, dist: (obsDepotNode.data && obsDepotNode.data.dist) || obsDepotNode.dist || st.dist, type: obsNodeType, exp: true } : st;
+                let stopMarkerPos = ((st.type === 'depot' || cleanName === '全京車輛基地') && obsDepotNode && typeof obsDepotNode.pos === 'number') ? obsDepotNode.pos : getFrontStopMarkerPos(effStObj, dir);
+                let ownStopMarkerPos = ((st.type === 'depot' || cleanName === '全京車輛基地') && obsDepotNode && typeof obsDepotNode.pos === 'number') ? obsDepotNode.pos : getTrainStopMarkerPos(effStObj, dir, isObs6Cars);
 
                 let nominalStopPointPos = (dir === 'down') ? (stopMarkerPos + 1.0) : (stopMarkerPos - 1.0);
 
@@ -27044,112 +27462,678 @@
 
 
 
-        function getOrCreateOtherTrainMesh(idx) {
+        // =========================================================================
+        // E300C (4輛 85M) & E300E (6輛 22.5M+25M 總長 135M) 3D 實車模型與沿軌轉彎系統
+        // =========================================================================
+        const otherTrainModelMap = new Map();
+        const e300AssetCache = { initialized: false, textures: {}, materials: {}, geometries: {} };
 
-            while (otherTrainMeshPool.length <= idx) {
-
-                const grp = new THREE.Group();
-
-                const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
-
-                const stripeMat = new THREE.MeshBasicMaterial({ color: 0x15803d });
-
-                const lightLeftMat = new THREE.MeshBasicMaterial({ color: 0xff1111 });
-
-                const lightRightMat = new THREE.MeshBasicMaterial({ color: 0xff1111 });
-
-
-
-                const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(2.9, 3.6, 20.0), bodyMat);
-
-                bodyMesh.position.set(0, 2.0, 10.0);
-
-                const stripeMesh = new THREE.Mesh(new THREE.BoxGeometry(2.94, 0.45, 20.05), stripeMat);
-
-                stripeMesh.position.set(0, 2.1, 10.0);
-
-                const lLeft = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.12), lightLeftMat);
-
-                lLeft.position.set(-1.0, 1.5, -0.06);
-
-                const lRight = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.12), lightRightMat);
-
-                lRight.position.set(1.0, 1.5, -0.06);
-
-
-
-                grp.add(bodyMesh, stripeMesh, lLeft, lRight);
-
-                grp.visible = false;
-
-                grp.userData = { stripeMat, lightLeftMat, lightRightMat };
-
-                if (typeof scene !== 'undefined' && scene) scene.add(grp);
-
-                otherTrainMeshPool.push(grp);
-
+        function e300DrawStylizedFLogo(ctx, cx, cy, scale, isCyanScheme) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            const gradTop = ctx.createLinearGradient(-45, -35, 55, 25);
+            if (isCyanScheme) {
+                gradTop.addColorStop(0, '#00e5ff');
+                gradTop.addColorStop(1, '#2dd4bf');
+            } else {
+                gradTop.addColorStop(0, '#0284c7');
+                gradTop.addColorStop(1, '#14b8a6');
             }
+            ctx.fillStyle = gradTop;
+            ctx.beginPath();
+            ctx.moveTo(-36, 36); ctx.lineTo(-14, -26);
+            ctx.quadraticCurveTo(-6, -42, 14, -42);
+            ctx.lineTo(52, -42); ctx.lineTo(42, -18); ctx.lineTo(6, -18); ctx.lineTo(-12, 36);
+            ctx.closePath(); ctx.fill();
 
-            return otherTrainMeshPool[idx];
-
+            ctx.fillStyle = isCyanScheme ? '#67e8f9' : '#2dd4bf';
+            ctx.beginPath();
+            ctx.moveTo(-4, -3); ctx.lineTo(38, -3); ctx.lineTo(28, 17); ctx.lineTo(-12, 17);
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
         }
 
+        function e300DrawBriefcaseIcon(ctx, cx, cy, scale) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            const grad = ctx.createLinearGradient(0, -45, 0, 55);
+            grad.addColorStop(0, '#22d3ee'); grad.addColorStop(1, '#0d9488');
+            ctx.lineWidth = 5; ctx.strokeStyle = '#083344'; ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.roundRect(-22, -56, 44, 20, 6); ctx.stroke();
+            ctx.beginPath(); ctx.roundRect(-62, -38, 124, 88, 12); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-62, -2); ctx.quadraticCurveTo(0, 14, 62, -2); ctx.stroke();
+            ctx.fillStyle = '#ecfeff';
+            ctx.beginPath(); ctx.roundRect(-9, -9, 18, 22, 4); ctx.fill(); ctx.stroke();
+            ctx.restore();
+        }
 
+        function e300DrawLargeLuggageGraphic(ctx, cx, cy, scale) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            const gradSuit1 = ctx.createLinearGradient(-150, -170, -10, 170);
+            gradSuit1.addColorStop(0, '#67e8f9'); gradSuit1.addColorStop(0.5, '#06b6d4'); gradSuit1.addColorStop(1, '#0f766e');
+            ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 8;
+            ctx.beginPath(); ctx.moveTo(-105, -145); ctx.lineTo(-105, -208); ctx.lineTo(-55, -208); ctx.lineTo(-55, -145); ctx.stroke();
+            ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 14;
+            ctx.beginPath(); ctx.roundRect(-145, -150, 130, 275, 22); ctx.stroke();
+            ctx.fillStyle = gradSuit1; ctx.strokeStyle = '#083344'; ctx.lineWidth = 7;
+            ctx.beginPath(); ctx.roundRect(-145, -150, 130, 275, 22); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle = '#ecfeff'; ctx.lineWidth = 5;
+            [-105, -80, -55].forEach(rx => { ctx.beginPath(); ctx.moveTo(rx, -115); ctx.lineTo(rx, 90); ctx.stroke(); });
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath(); ctx.arc(-120, 136, 12, 0, Math.PI * 2); ctx.arc(-40, 136, 12, 0, Math.PI * 2); ctx.fill();
 
-        // 渲染其他列車 3D 空間「車次文字＋線條」標示、以及頂部前後5分鐘路線位置圖
+            const gradSuit2 = ctx.createLinearGradient(15, -40, 175, 130);
+            gradSuit2.addColorStop(0, '#a5f3fc'); gradSuit2.addColorStop(1, '#0891b2');
+            ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 14;
+            ctx.beginPath(); ctx.roundRect(12, -25, 165, 150, 20); ctx.stroke();
+            ctx.strokeStyle = '#083344'; ctx.lineWidth = 8;
+            ctx.beginPath(); ctx.roundRect(65, -52, 60, 28, 8); ctx.stroke();
+            ctx.fillStyle = gradSuit2; ctx.lineWidth = 7;
+            ctx.beginPath(); ctx.roundRect(12, -25, 165, 150, 20); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle = '#ecfeff'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(35, 30); ctx.lineTo(152, 30); ctx.moveTo(35, 70); ctx.lineTo(152, 70); ctx.stroke();
+            ctx.restore();
+        }
 
+        function e300DrawTeardropHeadlight(ctx, cx, cy, isRightSide) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            if (!isRightSide) ctx.scale(-1, 1);
+            ctx.rotate(-0.44);
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.moveTo(-88, 22); ctx.quadraticCurveTo(-15, -38, 84, -22); ctx.quadraticCurveTo(36, 44, -88, 22);
+            ctx.closePath(); ctx.fill();
+            ctx.lineWidth = 5; ctx.strokeStyle = '#e2e8f0'; ctx.stroke();
+            [-42, -10, 20].forEach((lx, i) => {
+                const ly = 6 - i * 2, r = i === 0 ? 13 : 11;
+                ctx.fillStyle = '#e0f2fe'; ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(lx, ly, r * 0.58, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(46, -6, 12, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fca5a5'; ctx.beginPath(); ctx.arc(46, -6, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function e300CreateUVCanvas(modelType, carRole, hasCabFront) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            const isCyan = (modelType === 'E300E');
+
+            const metalGrad = ctx.createLinearGradient(0, 0, 0, 1024);
+            metalGrad.addColorStop(0.00, '#94a3b8'); metalGrad.addColorStop(0.10, '#e2e8f0');
+            metalGrad.addColorStop(0.55, '#cbd5e1'); metalGrad.addColorStop(0.68, '#f8fafc');
+            metalGrad.addColorStop(0.86, '#94a3b8'); metalGrad.addColorStop(1.00, '#334155');
+            ctx.fillStyle = metalGrad; ctx.fillRect(0, 0, 2048, 1024);
+
+            const sideStartX = hasCabFront ? 716 : 40;
+            const topStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
+            if (isCyan) {
+                topStripeGrad.addColorStop(0, '#00f2fe'); topStripeGrad.addColorStop(0.5, '#06b6d4'); topStripeGrad.addColorStop(1, '#0891b2');
+            } else {
+                topStripeGrad.addColorStop(0, '#1d4ed8'); topStripeGrad.addColorStop(0.35, '#0284c7'); topStripeGrad.addColorStop(1, '#0d9488');
+            }
+            ctx.fillStyle = topStripeGrad; ctx.fillRect(sideStartX, 118, 2048 - sideStartX, 44);
+            ctx.fillStyle = '#f8fafc'; ctx.fillRect(sideStartX, 162, 2048 - sideStartX, 12);
+
+            const bandGrad = ctx.createLinearGradient(0, 174, 0, 565);
+            bandGrad.addColorStop(0, '#090d16'); bandGrad.addColorStop(0.5, '#111c2d'); bandGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = bandGrad; ctx.fillRect(sideStartX, 174, 2048 - sideStartX, 391);
+            ctx.fillStyle = '#f8fafc'; ctx.fillRect(sideStartX, 565, 2048 - sideStartX, 14);
+
+            const midStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
+            if (isCyan) {
+                midStripeGrad.addColorStop(0, '#22d3ee'); midStripeGrad.addColorStop(0.5, '#06b6d4'); midStripeGrad.addColorStop(1, '#0e7490');
+            } else {
+                midStripeGrad.addColorStop(0, '#0d9488'); midStripeGrad.addColorStop(0.65, '#14b8a6'); midStripeGrad.addColorStop(1, '#1d4ed8');
+            }
+            ctx.fillStyle = midStripeGrad; ctx.fillRect(sideStartX, 579, 2048 - sideStartX, 58);
+            ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(sideStartX, 637, 2048 - sideStartX, 10);
+
+            if (hasCabFront) {
+                const cx = 358;
+                const domeGrad = ctx.createLinearGradient(0, 0, 0, 120);
+                domeGrad.addColorStop(0, '#475569'); domeGrad.addColorStop(0.5, '#1e293b'); domeGrad.addColorStop(1, '#0f172a');
+                ctx.fillStyle = domeGrad; ctx.fillRect(0, 0, 716, 120);
+                ctx.fillStyle = topStripeGrad; ctx.fillRect(0, 118, 716, 44);
+                ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 162, 716, 12);
+                ctx.fillStyle = bandGrad; ctx.fillRect(0, 174, 716, 391);
+                ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 565, 716, 14);
+                ctx.fillStyle = midStripeGrad; ctx.fillRect(0, 579, 716, 58);
+                ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(0, 637, 716, 10);
+
+                const cheekGrad = ctx.createLinearGradient(0, 95, 0, 790);
+                if (isCyan) {
+                    cheekGrad.addColorStop(0.00, '#00f2fe'); cheekGrad.addColorStop(0.55, '#06b6d4'); cheekGrad.addColorStop(1.00, '#0891b2');
+                } else {
+                    cheekGrad.addColorStop(0.00, '#1d4ed8'); cheekGrad.addColorStop(0.42, '#0284c7'); cheekGrad.addColorStop(0.75, '#0d9488'); cheekGrad.addColorStop(1.00, '#14b8a6');
+                }
+                ctx.fillStyle = cheekGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, 118); ctx.lineTo(65, 118); ctx.lineTo(155, 76); ctx.lineTo(561, 76);
+                ctx.lineTo(651, 118); ctx.lineTo(716, 118); ctx.lineTo(716, 646); ctx.lineTo(652, 646);
+                ctx.quadraticCurveTo(540, 682, 465, 782); ctx.lineTo(251, 782); ctx.quadraticCurveTo(176, 682, 64, 646);
+                ctx.lineTo(0, 646); ctx.closePath(); ctx.fill();
+
+                ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 10;
+                ctx.beginPath(); ctx.moveTo(154, 82); ctx.quadraticCurveTo(128, 495, 224, 696);
+                ctx.lineTo(492, 696); ctx.quadraticCurveTo(588, 495, 562, 82); ctx.stroke();
+
+                const maskGrad = ctx.createLinearGradient(145, 74, 571, 692);
+                maskGrad.addColorStop(0, '#020617'); maskGrad.addColorStop(0.5, '#0f172a'); maskGrad.addColorStop(1, '#090d16');
+                ctx.fillStyle = maskGrad;
+                ctx.beginPath(); ctx.moveTo(156, 74); ctx.lineTo(560, 74);
+                ctx.quadraticCurveTo(585, 492, 490, 692); ctx.lineTo(226, 692);
+                ctx.quadraticCurveTo(131, 492, 156, 74); ctx.closePath(); ctx.fill();
+
+                ctx.fillStyle = '#020617'; ctx.fillRect(386, 116, 134, 30);
+                ctx.fillStyle = '#f97316'; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+                ctx.fillText(isCyan ? 'AIRPORT E300E' : 'METRO E300C', 453, 136); ctx.textAlign = 'left';
+
+                [{ x: 170, w: 172 }, { x: 374, w: 172 }].forEach((p, idx) => {
+                    const winGrad = ctx.createLinearGradient(p.x, 165, p.x + p.w, 502);
+                    winGrad.addColorStop(0, '#475569'); winGrad.addColorStop(0.35, '#1e293b'); winGrad.addColorStop(1, '#0f172a');
+                    ctx.fillStyle = winGrad; ctx.beginPath(); ctx.roundRect(p.x, 165, p.w, 336, 12); ctx.fill();
+                    ctx.lineWidth = 4; ctx.strokeStyle = '#334155'; ctx.stroke();
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.17)';
+                    ctx.beginPath(); ctx.moveTo(p.x + 20, 498); ctx.lineTo(p.x + 88, 168);
+                    ctx.lineTo(p.x + 128, 168); ctx.lineTo(p.x + 60, 498); ctx.closePath(); ctx.fill();
+
+                    const anchorX = idx === 0 ? p.x + 120 : p.x + 115;
+                    ctx.strokeStyle = '#020617'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(anchorX, 512); ctx.lineTo(anchorX - 42, 232);
+                    ctx.moveTo(anchorX - 18, 512); ctx.lineTo(anchorX - 56, 260);
+                    ctx.moveTo(anchorX - 50, 195); ctx.lineTo(anchorX - 30, 435);
+                    ctx.stroke();
+                });
+
+                e300DrawStylizedFLogo(ctx, cx, 595, 1.05, isCyan);
+                e300DrawTeardropHeadlight(ctx, 182, 622, false);
+                e300DrawTeardropHeadlight(ctx, 534, 622, true);
+
+                ctx.fillStyle = '#090d16'; ctx.beginPath(); ctx.roundRect(cx - 88, 822, 176, 118, 10); ctx.fill();
+                ctx.strokeStyle = '#475569'; ctx.lineWidth = 4; ctx.stroke();
+                ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.roundRect(cx - 32, 856, 64, 52, 8); ctx.fill();
+                ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(cx, 882, 16, 0, Math.PI * 2); ctx.fill();
+
+                [128, 488].forEach(bx => {
+                    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.roundRect(bx, 816, 100, 118, 7); ctx.fill();
+                    ctx.strokeStyle = '#020617'; ctx.lineWidth = 7;
+                    [836, 862, 888, 914].forEach(ry => { ctx.beginPath(); ctx.moveTo(bx + 6, ry); ctx.lineTo(bx + 94, ry); ctx.stroke(); });
+                });
+
+                [30, 628].forEach(vx => {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath(); ctx.roundRect(vx, 825, 58, 22, 4); ctx.roundRect(vx, 860, 58, 22, 4); ctx.fill();
+                });
+
+                const cabDoorX = 720, cabDoorW = 98;
+                ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 4; ctx.strokeRect(cabDoorX, 178, cabDoorW, 565);
+                ctx.fillStyle = '#020617'; ctx.beginPath(); ctx.roundRect(cabDoorX + 14, 205, cabDoorW - 28, 265, 12); ctx.fill();
+                ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.roundRect(cabDoorX + 19, 210, cabDoorW - 38, 255, 9); ctx.fill();
+                ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(cabDoorX - 7, 455); ctx.lineTo(cabDoorX - 7, 735);
+                ctx.moveTo(cabDoorX + cabDoorW + 7, 455); ctx.lineTo(cabDoorX + cabDoorW + 7, 735);
+                ctx.stroke();
+            }
+
+            // 3 Doors per car & 4 Panoramic Windows
+            const bodyStart = hasCabFront ? 838 : 40;
+            const sideSpan = 2048 - bodyStart;
+            const doorOffsets = [0.20, 0.51, 0.82];
+            const dw = sideSpan * 0.114;
+
+            doorOffsets.forEach(ratio => {
+                const dc = bodyStart + sideSpan * ratio, dh = 665, dx = dc - dw / 2, dy = 178;
+                ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.roundRect(dx - 4, dy - 4, dw + 8, dh + 8, 8); ctx.fill();
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(dx, dy, dw, 387);
+                ctx.fillStyle = '#cbd5e1'; ctx.fillRect(dx, dy + 387, dw, dh - 387);
+                ctx.fillStyle = '#f8fafc'; ctx.fillRect(dx, 565, dw, 14);
+                ctx.fillStyle = midStripeGrad; ctx.fillRect(dx, 579, dw, 58);
+                ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(dx, 637, dw, 10);
+                ctx.fillStyle = '#020617'; ctx.fillRect(dc - 2.5, dy, 5, dh);
+
+                const winOffset = dw * 0.23, dww = dw * 0.28, dwh = 285;
+                [-winOffset, winOffset].forEach(offset => {
+                    const wx = dc + offset - dww / 2, wy = dy + 38;
+                    ctx.fillStyle = '#020617'; ctx.beginPath(); ctx.roundRect(wx - 3, wy - 3, dww + 6, dwh + 6, 10); ctx.fill();
+                    const wGrad = ctx.createLinearGradient(wx, wy, wx + dww, wy + dwh);
+                    if (carRole === 'business') {
+                        wGrad.addColorStop(0, '#1e293b'); wGrad.addColorStop(0.5, '#78350f'); wGrad.addColorStop(1, '#451a03');
+                    } else {
+                        wGrad.addColorStop(0, '#1e3a5f'); wGrad.addColorStop(0.5, '#334155'); wGrad.addColorStop(1, '#0f172a');
+                    }
+                    ctx.fillStyle = wGrad; ctx.beginPath(); ctx.roundRect(wx, wy, dww, dwh, 8); ctx.fill();
+                });
+            });
+
+            [
+                { ratio: 0.065, wFactor: 0.084 },
+                { ratio: 0.355, wFactor: 0.146 },
+                { ratio: 0.665, wFactor: 0.146 },
+                { ratio: 0.945, wFactor: 0.078 }
+            ].forEach(ws => {
+                const ww = sideSpan * ws.wFactor, wh = 275, wx = (bodyStart + sideSpan * ws.ratio) - ww / 2, wy = 212;
+                ctx.fillStyle = '#020617'; ctx.beginPath(); ctx.roundRect(wx - 4, wy - 4, ww + 8, wh + 8, 14); ctx.fill();
+                const glassGrad = ctx.createLinearGradient(wx, wy, wx, wy + wh);
+                if (carRole === 'business') {
+                    glassGrad.addColorStop(0, '#0f172a'); glassGrad.addColorStop(0.35, '#451a03'); glassGrad.addColorStop(1, '#92400e');
+                } else if (carRole === 'luggage') {
+                    glassGrad.addColorStop(0, '#0f172a'); glassGrad.addColorStop(0.5, '#1e293b'); glassGrad.addColorStop(1, '#334155');
+                } else {
+                    glassGrad.addColorStop(0, '#0f172a'); glassGrad.addColorStop(0.5, '#1e3a5f'); glassGrad.addColorStop(1, '#334155');
+                }
+                ctx.fillStyle = glassGrad; ctx.beginPath(); ctx.roundRect(wx, wy, ww, wh, 11); ctx.fill();
+
+                if (carRole === 'business') {
+                    ctx.fillStyle = '#d97706';
+                    for (let sx = wx + 12; sx < wx + ww - 26; sx += 44) {
+                        ctx.beginPath(); ctx.roundRect(sx, wy + 88, 28, 160, 8); ctx.fill();
+                        ctx.fillStyle = '#fef3c7'; ctx.beginPath(); ctx.roundRect(sx + 3, wy + 96, 22, 22, 4); ctx.fill();
+                        ctx.fillStyle = '#d97706';
+                    }
+                } else if (carRole === 'luggage') {
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)'; ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(wx + 8, wy + 105); ctx.lineTo(wx + ww - 8, wy + 105);
+                    ctx.moveTo(wx + 8, wy + 190); ctx.lineTo(wx + ww - 8, wy + 190);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(148, 163, 184, 0.35)';
+                    for (let sx = wx + 12; sx < wx + ww - 22; sx += 40) {
+                        ctx.beginPath(); ctx.roundRect(sx, wy + 125, 24, 130, 6); ctx.fill();
+                    }
+                }
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+                ctx.beginPath(); ctx.moveTo(wx + 12, wy + wh); ctx.lineTo(wx + 45, wy);
+                ctx.lineTo(wx + 72, wy); ctx.lineTo(wx + 38, wy + wh); ctx.closePath(); ctx.fill();
+            });
+
+            const emblemX = bodyStart + sideSpan * 0.355;
+            if (carRole === 'commuter') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.15, false);
+            else if (carRole === 'business') e300DrawBriefcaseIcon(ctx, emblemX, 732, 0.98);
+            else if (carRole === 'luggage') e300DrawLargeLuggageGraphic(ctx, bodyStart + sideSpan * 0.37, 520, 1.15);
+            else if (carRole === 'express_std') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.10, true);
+
+            return canvas;
+        }
+
+        function e300CreateCenteredCarGeo(hasFrontCab, hasRearCab, targetShellLength) {
+            const key = `${hasFrontCab ? 1 : 0}_${hasRearCab ? 1 : 0}_${targetShellLength.toFixed(3)}`;
+            if (e300AssetCache.geometries[key]) return e300AssetCache.geometries[key];
+
+            const iSteps = 96, jSteps = 48;
+            const frontOverhang = hasFrontCab ? 1.65 : 0;
+            const rearOverhang = hasRearCab ? 1.65 : 0;
+            const bodyLength = targetShellLength - frontOverhang - rearOverhang;
+            const halfL = bodyLength / 2;
+            const shiftX = (frontOverhang - rearOverhang) * 0.5; // Centers geometry so [-targetShellLength/2, +targetShellLength/2]
+
+            const halfW = 1.54, baseH = 0.62, roofH = 3.88, heightSpan = roofH - baseH;
+            const positions = [], uvs = [], indices = [];
+
+            function evalVerticalProfile(v) {
+                let y = baseH + v * heightSpan, zOut = halfW;
+                if (v < 0.06) { zOut = halfW * (0.45 + 0.35 * (v / 0.06)); y = baseH; }
+                else if (v < 0.18) { zOut = halfW * (0.80 + 0.20 * Math.sin(((v - 0.06) / 0.12) * Math.PI * 0.5)); }
+                else if (v < 0.78) { zOut = halfW - Math.pow((v - 0.18) / 0.60, 2.2) * 0.06; }
+                else if (v < 0.92) { zOut = (halfW - 0.06) - (1 - Math.cos(((v - 0.78) / 0.14) * Math.PI * 0.5)) * 0.38; }
+                else { zOut = (halfW - 0.44) * (1 - (v - 0.92) / 0.08); }
+
+                let frontProtrusion = 0;
+                if (v < 0.20) frontProtrusion = 1.15 + Math.sin((v / 0.20) * Math.PI * 0.5) * 0.18;
+                else if (v < 0.84) frontProtrusion = 1.33 - ((v - 0.20) / 0.64) * 0.96;
+                else frontProtrusion = 0.37 * (1 - Math.pow((v - 0.84) / 0.16, 1.5));
+                return { y, zOut, frontProtrusion };
+            }
+
+            const totalPerimeterSteps = iSteps * 2;
+            for (let k = 0; k <= totalPerimeterSteps; k++) {
+                const isRightSide = (k <= iSteps);
+                const sideSign = isRightSide ? 1 : -1;
+                const uParam = isRightSide ? (k / iSteps) : ((totalPerimeterSteps - k) / iSteps);
+
+                for (let j = 0; j <= jSteps; j++) {
+                    const v = j / jSteps;
+                    const prof = evalVerticalProfile(v);
+                    let px = 0, py = prof.y, pz = 0, uTex = uParam;
+                    const frontZone = hasFrontCab ? 0.35 : 0.05;
+                    const rearZone = hasRearCab ? 0.35 : 0.05;
+
+                    if (uParam < frontZone) {
+                        const w = uParam / frontZone;
+                        if (hasFrontCab) {
+                            const angle = w * (Math.PI * 0.5);
+                            const zFraction = Math.sin(angle);
+                            const xCornerCurve = Math.pow(1 - Math.cos(angle), 1.35);
+                            pz = sideSign * prof.zOut * zFraction;
+                            const centerBoost = Math.cos(angle) * 0.32;
+                            px = -halfL - (prof.frontProtrusion + centerBoost) * (1 - xCornerCurve) + 0.65 * xCornerCurve;
+                            uTex = 0.175 + sideSign * (w * 0.175);
+                        } else {
+                            pz = sideSign * prof.zOut * w; px = -halfL; uTex = w * 0.025;
+                        }
+                    } else if (uParam > (1.0 - rearZone)) {
+                        const w = (1.0 - uParam) / rearZone;
+                        if (hasRearCab) {
+                            const angle = w * (Math.PI * 0.5);
+                            const zFraction = Math.sin(angle);
+                            const xCornerCurve = Math.pow(1 - Math.cos(angle), 1.35);
+                            pz = sideSign * prof.zOut * zFraction;
+                            const centerBoost = Math.cos(angle) * 0.32;
+                            px = halfL + (prof.frontProtrusion + centerBoost) * (1 - xCornerCurve) - 0.65 * xCornerCurve;
+                            uTex = 0.175 - sideSign * (w * 0.175);
+                        } else {
+                            pz = sideSign * prof.zOut * w; px = halfL; uTex = 0.975 + (1 - w) * 0.022;
+                        }
+                    } else {
+                        const bodyFraction = (uParam - frontZone) / (1.0 - frontZone - rearZone);
+                        const startX = hasFrontCab ? (-halfL + 0.65) : -halfL;
+                        const endX = hasRearCab ? (halfL - 0.65) : halfL;
+                        px = startX + bodyFraction * (endX - startX);
+                        pz = sideSign * prof.zOut;
+                        if (hasFrontCab) uTex = 0.35 + bodyFraction * 0.645;
+                        else if (hasRearCab) uTex = 0.35 + (1.0 - bodyFraction) * 0.645;
+                        else uTex = 0.025 + bodyFraction * 0.95;
+                    }
+
+                    positions.push(px + shiftX, py, pz);
+                    uvs.push(Math.max(0.002, Math.min(0.998, uTex)), Math.max(0.002, Math.min(0.998, v)));
+                }
+            }
+
+            const stride = jSteps + 1;
+            for (let k = 0; k < totalPerimeterSteps; k++) {
+                for (let j = 0; j < jSteps; j++) {
+                    const a = k * stride + j, b = (k + 1) * stride + j, c = (k + 1) * stride + (j + 1), d = k * stride + (j + 1);
+                    indices.push(a, b, d, b, c, d);
+                }
+            }
+
+            const geo = new THREE.BufferGeometry();
+            geo.setIndex(indices);
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geo.computeVertexNormals();
+            e300AssetCache.geometries[key] = geo;
+            return geo;
+        }
+
+        function ensureE300AssetsInitialized() {
+            if (e300AssetCache.initialized) return;
+            e300AssetCache.initialized = true;
+
+            const specs = [
+                { key: 'E300C_cab', m: 'E300C', r: 'commuter', cab: true },
+                { key: 'E300C_mid', m: 'E300C', r: 'commuter', cab: false },
+                { key: 'E300E_car1', m: 'E300E', r: 'business', cab: true },
+                { key: 'E300E_car2', m: 'E300E', r: 'luggage', cab: false },
+                { key: 'E300E_mid', m: 'E300E', r: 'express_std', cab: false },
+                { key: 'E300E_tail', m: 'E300E', r: 'express_std', cab: true }
+            ];
+            specs.forEach(s => {
+                const tex = new THREE.CanvasTexture(e300CreateUVCanvas(s.m, s.r, s.cab));
+                tex.anisotropy = 4;
+                tex.needsUpdate = true;
+                e300AssetCache.textures[s.key] = tex;
+                e300AssetCache.materials[s.key] = new THREE.MeshStandardMaterial({
+                    map: tex,
+                    roughness: 0.28,
+                    metalness: 0.28
+                });
+            });
+
+            e300AssetCache.bogieFrameGeo = new THREE.BoxGeometry(2.5, 0.28, 2.15);
+            e300AssetCache.bogieMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.5 });
+            e300AssetCache.wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14);
+            e300AssetCache.wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5, metalness: 0.7 });
+            e300AssetCache.gangwayGeo = new THREE.BoxGeometry(0.75, 2.85, 2.46);
+            e300AssetCache.gangwayMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+            e300AssetCache.headLensGeo = new THREE.SphereGeometry(0.16, 10, 10);
+            e300AssetCache.headLensMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+            e300AssetCache.tailLensMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            // 以加法混合光束網格取代動態 PointLight，避免 AI 列車進出或 500M 切換頭燈時改變場景光源數而觸發 Shader 重編譯閃爍
+            e300AssetCache.headBeamGeo = new THREE.ConeGeometry(2.4, 18, 12, 1, true);
+            e300AssetCache.headBeamMat = new THREE.MeshBasicMaterial({
+                color: 0xe0f2fe,
+                transparent: true,
+                opacity: 0.14,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+
+            // 預先建立 4 輛 / 6 輛編組車體幾何體，避免首次會車時才運算 BufferGeometry
+            [22.2, 24.4, 21.275, 21.575, 20.95, 20.65].forEach(len => {
+                e300CreateCenteredCarGeo(true, false, len);
+                e300CreateCenteredCarGeo(false, true, len);
+                e300CreateCenteredCarGeo(false, false, len);
+            });
+        }
+
+        function createE300TrainInstance(is6Cars) {
+            ensureE300AssetsInitialized();
+            const root = new THREE.Group();
+            const gangwayGap = 0.60;
+            const carDefs = is6Cars
+                ? [
+                    { pitch: 22.5,   matKey: 'E300E_car1', lead: true,  tail: false },
+                    { pitch: 25.0,   matKey: 'E300E_car2', lead: false, tail: false },
+                    { pitch: 21.875, matKey: 'E300E_mid',  lead: false, tail: false },
+                    { pitch: 21.875, matKey: 'E300E_mid',  lead: false, tail: false },
+                    { pitch: 21.875, matKey: 'E300E_mid',  lead: false, tail: false },
+                    { pitch: 21.875, matKey: 'E300E_tail', lead: false, tail: true  }
+                  ]
+                : [
+                    { pitch: 21.25, matKey: 'E300C_cab', lead: true,  tail: false },
+                    { pitch: 21.25, matKey: 'E300C_mid', lead: false, tail: false },
+                    { pitch: 21.25, matKey: 'E300C_mid', lead: false, tail: false },
+                    { pitch: 21.25, matKey: 'E300C_cab', lead: false, tail: true  }
+                  ];
+
+            const cars = [];
+            const headlightGroup = new THREE.Group();
+
+            carDefs.forEach((cd, idx) => {
+                const shellLength = cd.pitch - ((cd.lead || cd.tail) ? gangwayGap * 0.5 : gangwayGap);
+                const carMesh = new THREE.Group();
+                const bodyMesh = new THREE.Mesh(
+                    e300CreateCenteredCarGeo(cd.lead, cd.tail, shellLength),
+                    e300AssetCache.materials[cd.matKey]
+                );
+                carMesh.add(bodyMesh);
+
+                // Bogies
+                const bOff = shellLength * 0.33;
+                [-bOff, bOff].forEach(bx => {
+                    const frame = new THREE.Mesh(e300AssetCache.bogieFrameGeo, e300AssetCache.bogieMat);
+                    frame.position.set(bx, 0.50, 0);
+                    carMesh.add(frame);
+                    [-0.82, 0.82].forEach(ax => {
+                        [-1.05, 1.05].forEach(zw => {
+                            const wh = new THREE.Mesh(e300AssetCache.wheelGeo, e300AssetCache.wheelMat);
+                            wh.rotation.x = Math.PI / 2;
+                            wh.position.set(bx + ax, 0.42, zw);
+                            carMesh.add(wh);
+                        });
+                    });
+                });
+
+                // Front Headlights (controlled by 500M distance rule)
+                if (cd.lead) {
+                    [-1.02, 1.02].forEach(hz => {
+                        const lens = new THREE.Mesh(e300AssetCache.headLensGeo, e300AssetCache.headLensMat);
+                        lens.scale.set(0.6, 0.8, 1.2);
+                        lens.position.set(-shellLength * 0.5 + 0.55, 1.65, hz);
+                        headlightGroup.add(lens);
+                    });
+                    const frontBeam = new THREE.Mesh(e300AssetCache.headBeamGeo, e300AssetCache.headBeamMat);
+                    frontBeam.rotation.z = -Math.PI / 2;
+                    frontBeam.position.set(-shellLength * 0.5 - 8.5, 1.5, 0);
+                    headlightGroup.add(frontBeam);
+                    carMesh.add(headlightGroup);
+                }
+
+                // Rear Tail Lights
+                if (cd.tail) {
+                    [-1.02, 1.02].forEach(tz => {
+                        const tLens = new THREE.Mesh(e300AssetCache.headLensGeo, e300AssetCache.tailLensMat);
+                        tLens.scale.set(0.5, 0.7, 1.0);
+                        tLens.position.set(shellLength * 0.5 - 0.55, 1.65, tz);
+                        carMesh.add(tLens);
+                    });
+                }
+
+                let gangwayMesh = null;
+                if (idx < carDefs.length - 1) {
+                    gangwayMesh = new THREE.Mesh(e300AssetCache.gangwayGeo, e300AssetCache.gangwayMat);
+                    root.add(gangwayMesh);
+                }
+
+                root.add(carMesh);
+                cars.push({ mesh: carMesh, gangwayMesh, shellLength });
+            });
+
+            if (typeof scene !== 'undefined' && scene) scene.add(root);
+            return { root, cars, headlightGroup, gangwayGap, is6Cars };
+        }
+
+        function updateOtherTrain3DModels(nearbyTrains) {
+            if (typeof scene === 'undefined' || !scene || typeof getTrainWorldPose !== 'function') return;
+
+            const activeKeys = new Set();
+            const worldUp = new THREE.Vector3(0, 1, 0);
+            const tmpX = new THREE.Vector3();
+            const tmpY = new THREE.Vector3();
+            const tmpZ = new THREE.Vector3();
+            const tmpMat = new THREE.Matrix4();
+
+            for (let i = 0; i < nearbyTrains.length; i++) {
+                const tr = nearbyTrains[i];
+                // 1000M 才會顯示，通過後 200M 刪除模型
+                if (tr.absDist > 1000 || tr.signedDist < -200) continue;
+
+                const key = `${tr.num}_${tr.dir || 'down'}`;
+                activeKeys.add(key);
+
+                const is6Cars = (tr.gameType === 'express' || tr.length === 130 || tr.length === 135);
+                let trainObj = otherTrainModelMap.get(key);
+                if (!trainObj || trainObj.is6Cars !== is6Cars) {
+                    if (trainObj) scene.remove(trainObj.root);
+                    trainObj = createE300TrainInstance(is6Cars);
+                    otherTrainModelMap.set(key, trainObj);
+                }
+
+                // 500M 內關閉頭燈，超過 500M 開啟頭燈
+                trainObj.headlightGroup.visible = (tr.absDist > 500);
+
+                // 沿著軌道曲線依序擺放每節車廂（車頭鼻尖精準對齊標點 dHead）
+                const qDir = tr.dir || 'down';
+                const dirSign = (qDir === 'down') ? 1 : -1;
+                const qType = tr.effTrackType || (tr.timeline && tr.timeline.gameType) || 'local';
+                let dCursor = tr.dHead;
+
+                for (let cIdx = 0; cIdx < trainObj.cars.length; cIdx++) {
+                    const car = trainObj.cars[cIdx];
+                    const dCarCenter = dCursor - dirSign * (car.shellLength * 0.5);
+                    const bogieHalf = car.shellLength * 0.33;
+
+                    const pFront = getTrainWorldPose(dCarCenter + dirSign * bogieHalf, qType, qDir, tr.timeline);
+                    const pRear  = getTrainWorldPose(dCarCenter - dirSign * bogieHalf, qType, qDir, tr.timeline);
+
+                    car.mesh.position.set(
+                        (pFront.x + pRear.x) * 0.5,
+                        (pFront.y + pRear.y) * 0.5,
+                        (pFront.z + pRear.z) * 0.5
+                    );
+
+                    // 車頭朝向為本地 -X，因此 +X 軸指向後方 (pRear - pFront)
+                    tmpX.set(pRear.x - pFront.x, pRear.y - pFront.y, pRear.z - pFront.z).normalize();
+                    if (tmpX.lengthSq() < 1e-6) tmpX.set(0, 0, 1);
+                    tmpZ.crossVectors(tmpX, worldUp).normalize();
+                    if (tmpZ.lengthSq() < 1e-6) tmpZ.set(1, 0, 0);
+                    tmpY.crossVectors(tmpZ, tmpX).normalize();
+                    tmpMat.makeBasis(tmpX, tmpY, tmpZ);
+                    car.mesh.quaternion.setFromRotationMatrix(tmpMat);
+
+                    if (car.gangwayMesh) {
+                        const dGang = dCursor - dirSign * (car.shellLength + trainObj.gangwayGap * 0.5);
+                        const pGF = getTrainWorldPose(dGang + dirSign * 0.5, qType, qDir, tr.timeline);
+                        const pGR = getTrainWorldPose(dGang - dirSign * 0.5, qType, qDir, tr.timeline);
+                        car.gangwayMesh.position.set(
+                            (pGF.x + pGR.x) * 0.5,
+                            (pGF.y + pGR.y) * 0.5 + 2.18,
+                            (pGF.z + pGR.z) * 0.5
+                        );
+                        tmpX.set(pGR.x - pGF.x, pGR.y - pGF.y, pGR.z - pGF.z).normalize();
+                        if (tmpX.lengthSq() >= 1e-6) {
+                            tmpZ.crossVectors(tmpX, worldUp).normalize();
+                            tmpY.crossVectors(tmpZ, tmpX).normalize();
+                            tmpMat.makeBasis(tmpX, tmpY, tmpZ);
+                            car.gangwayMesh.quaternion.setFromRotationMatrix(tmpMat);
+                        }
+                    }
+
+                    dCursor -= dirSign * (car.shellLength + trainObj.gangwayGap);
+                }
+            }
+
+            // 超過 1000M 或通過後超過 200M 時刪除模型
+            for (const [key, trainObj] of otherTrainModelMap.entries()) {
+                if (!activeKeys.has(key)) {
+                    scene.remove(trainObj.root);
+                    otherTrainModelMap.delete(key);
+                }
+            }
+        }
+
+        function getOrCreateOtherTrainMesh(idx) {
+            return otherTrainMeshPool[idx] || null;
+        }
+
+        // 渲染其他列車 3D 空間「車次文字＋線條」標示與 3D 列車模型
         function renderOtherTrainsLabels() {
-
             const svgEl = document.getElementById('other-trains-svg');
-
             const labelsEl = document.getElementById('other-trains-labels');
-
             const barCanvas = document.getElementById('other-trains-linear-bar');
-
             if (barCanvas) barCanvas.style.display = 'none';
-
             const vp = document.getElementById('viewport');
-
             if (!svgEl || !labelsEl || !vp || !camera || !state.active) {
-
                 if (svgEl) svgEl.innerHTML = '';
-
                 if (labelsEl) labelsEl.innerHTML = '';
-
+                for (const [key, trainObj] of otherTrainModelMap.entries()) {
+                    if (typeof scene !== 'undefined' && scene) scene.remove(trainObj.root);
+                    otherTrainModelMap.delete(key);
+                }
                 return;
-
             }
-
-
-
-            // 按下 U 鍵可隱藏/顯示其他車的標籤
-
-            if (state.showOtherTrainLabels === false) {
-
-                svgEl.innerHTML = '';
-
-                labelsEl.innerHTML = '';
-
-                return;
-
-            }
-
-
 
             const nearbyTrains = getOtherTrainsWithin5Min();
 
-            const W = vp.clientWidth || window.innerWidth;
+            // 1. 更新 1000M 內其他列車 3D 模型（每節車廂沿軌轉彎、500M 關頭燈、通過後 200M 刪除）
+            updateOtherTrain3DModels(nearbyTrains);
 
+            // 按下 U 鍵可隱藏/顯示其他車的文字標籤（3D 模型仍正常顯示）
+            if (state.showOtherTrainLabels === false) {
+                svgEl.innerHTML = '';
+                labelsEl.innerHTML = '';
+                return;
+            }
+
+            const W = vp.clientWidth || window.innerWidth;
             const H = vp.clientHeight || window.innerHeight;
 
-
-
-            // 1. 不顯示 3D 車輛模型 (依需求僅保留車次文字加線條標示，隱藏任何既有模型)
-
             for (let j = 0; j < otherTrainMeshPool.length; j++) {
-
                 if (otherTrainMeshPool[j]) otherTrainMeshPool[j].visible = false;
-
             }
 
 
@@ -28202,9 +29186,9 @@
             state.vehicleStopDuration = 0; state.brakeReleaseTimer = 0; state.lastBrakeBc = 2.2; state.carLastBc = []; state.lastB = 4;
 
             state.gForceCurrentRunScore = 0;
-
             state.gForceStationExceedSecs = 0;
-
+            state.gForceMaxG = 0;
+            state.gForceStationMaxG = 0;
             state.gForceStationScores = [];
 
             state.gForceLastScoredIdx = -1;
@@ -29719,7 +30703,7 @@
                 if (state.depotAutoEndPending) {
                     let chkPosDepot = getPlayerStopMarkerPosAtStation(termNodeDepot.data, state.dir, state.type);
                     let chkDiffDepot = (state.dir === 'down') ? (chkPosDepot - state.d) : (state.d - chkPosDepot);
-                    if (Math.abs(state.v) >= 0.05 || Math.abs(chkDiffDepot) > 1.5) {
+                    if (Math.abs(state.v) > 0.001 || Math.abs(chkDiffDepot) > 0.5) {
                         state.depotAutoEndPending = false;
                         state.depotAutoEndTimer = 0;
                     } else {
@@ -29731,7 +30715,8 @@
                             return;
                         }
                     }
-                } else if (!state.isATO && Math.abs(state.v) < 0.05 && !state.door && !state.doorOpening && !state.doorClosing) {
+                } else if (!state.isATO && Math.abs(state.v) < 0.001 && !state.door && !state.doorOpening && !state.doorClosing) {
+                    state.v = 0;
                     let targetPosDepot = getPlayerStopMarkerPosAtStation(termNodeDepot.data, state.dir, state.type);
                     let diffDepot = (state.dir === 'down') ? (targetPosDepot - state.d) : (state.d - targetPosDepot);
                     if (Math.abs(diffDepot) <= 0.5) {
@@ -30336,8 +31321,13 @@
 
 
                 let instAcc = net / currentMass;
-
                 state.currentAcc = instAcc;
+
+                let instG = Math.abs(instAcc) / PHY.G;
+                if (Math.abs(state.v) > 0.05) {
+                    if (instG > (state.gForceMaxG || 0)) state.gForceMaxG = instG;
+                    if (instG > (state.gForceStationMaxG || 0)) state.gForceStationMaxG = instG;
+                }
 
                 let isEmerGExempt = (state.radioEmer && state.radioEmer.triggered && !state.radioEmer.cleared) ||
                     (state.cbtcEmer && state.cbtcEmer.triggered && !state.cbtcEmer.rmReady && !state.cbtcEmer.restored) ||
@@ -30701,7 +31691,9 @@
 
                     if (isNodeDepot(targetStop.data) && targetStop === state.route[state.route.length - 1]) {
 
-                        if (!state.depotAutoEndPending) {
+                        if (!state.depotAutoEndPending && Math.abs(state.v) < 0.001) {
+
+                            state.v = 0;
 
                             let targetPos = getPlayerStopMarkerPosAtStation(targetStop.data, state.dir, state.type);
 
