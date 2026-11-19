@@ -7,6 +7,147 @@
   <meta charset="UTF-8">
   <title>車站與路線資訊｜飛灣鐵路公司</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    .viewer-3d-wrap {
+      width: 100%;
+      max-width: 960px;
+      height: 580px;
+      background: #e5e7eb;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+      box-shadow: inset 0 0 24px rgba(15, 23, 42, 0.08);
+    }
+    .viewer-3d-stage {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    .viewer-3d-stage:active {
+      cursor: grabbing;
+    }
+    .viewer-3d-hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(15, 23, 42, 0.78);
+      color: #f8fafc;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      z-index: 15;
+    }
+    .viewer-3d-hud span {
+      color: #38bdf8;
+    }
+    .viewer-3d-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+      max-width: 65%;
+      z-index: 20;
+    }
+    .v3d-btn {
+      background: rgba(255, 255, 255, 0.92);
+      color: #0f172a;
+      border: 1px solid #94a3b8;
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+      transition: all 0.15s ease;
+    }
+    .v3d-btn:hover {
+      background: #0ea5e9;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+    .v3d-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0369a1;
+    }
+    .viewer-3d-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 12px;
+      background: rgba(255, 255, 255, 0.85);
+      color: #334155;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      pointer-events: none;
+      border: 1px solid #cbd5e1;
+      z-index: 15;
+    }
+    .label-3d-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10;
+    }
+    .label-3d-tag {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(15, 23, 42, 0.84);
+      color: #f8fafc;
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    .label-3d-tag.metro {
+      border-color: #c084fc;
+      background: rgba(59, 7, 100, 0.88);
+    }
+    .label-3d-tag.exit {
+      border-color: #10b981;
+      background: rgba(6, 78, 59, 0.9);
+    }
+    .label-3d-tag.baggage {
+      border-color: #fb923c;
+      background: rgba(124, 45, 18, 0.9);
+    }
+    .blueprint-toolbar {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .level-selector {
+      flex-wrap: wrap;
+    }
+    .level-btn {
+      white-space: nowrap;
+    }
+    .viewer-fallback-banner {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #f59e0b;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      display: none;
+    }
+  </style>
 </head>
 <body>
 <header class="site-header">
@@ -693,6 +834,8 @@
 
   let currentStationId = "FR01";
   let currentLvl = "地面層";
+  let viewMode = "3d_stacked"; // "3d_stacked" | "2d"
+  let show3DLabels = false;
 
   function loadStationData(id) {
     currentStationId = id;
@@ -702,9 +845,58 @@
     renderPage();
   }
 
+  function updateFloorBanner(s) {
+    const banner = document.getElementById("floorSpecBanner");
+    if (!banner) return;
+    if (viewMode === "3d_stacked") {
+      banner.innerHTML = `
+        <span>📍 <strong>目前檢視：【3D 垂直疊層（全棟真實比例）】</strong> <small style="color:#38bdf8;margin-left:6px;">(${s.levels.join(" ↔ ")})</small></span>
+        <span>📋 <strong>架構提示：</strong>依 GAME 實際月台尺寸、全罩/半高月台門與白色列車建模，樓梯與電扶梯皆依真實樓層上下銜接</span>
+      `;
+    } else {
+      banner.innerHTML = `
+        <span>📍 <strong>目前顯示樓層：【${currentLvl}】</strong> <small style="color:#38bdf8;margin-left:6px;">(原本 2D 平面圖)</small></span>
+        <span>📋 <strong>本層設施規格：</strong>${s.level_specs[currentLvl]}</span>
+      `;
+    }
+  }
+
+  function switchFloorOrViewMode(targetMode, targetLvl) {
+    const s = frStations[currentStationId];
+    if (!s) return;
+    viewMode = targetMode;
+    if (targetLvl) currentLvl = targetLvl;
+
+    const is2D = viewMode === "2d";
+    const v3d = document.getElementById("viewer3DContainer");
+    const c2d = document.getElementById("canvas");
+    if (v3d) v3d.style.display = is2D ? "none" : "block";
+    if (c2d) c2d.style.display = is2D ? "block" : "none";
+
+    updateFloorBanner(s);
+    renderLevelsMenu(s);
+
+    if (is2D) {
+      renderCanvas(s);
+    } else {
+      const stage = document.getElementById("viewer3DStage");
+      const needsRebuild = !threeState.stationRoot
+        || threeState.stationRoot.children.length === 0
+        || threeState.builtStationId !== currentStationId
+        || (stage && threeState.renderer && threeState.renderer.domElement.parentElement !== stage);
+      if (needsRebuild) {
+        render3DStation(s);
+      } else {
+        resize3DViewer();
+        requestAnimationFrame(() => resize3DViewer());
+      }
+    }
+  }
+
   function renderPage() {
     const s = frStations[currentStationId];
     const container = document.getElementById("stationDetail");
+    const is2D = viewMode === "2d";
 
     let html = `
       <div class="st-main-header">
@@ -747,7 +939,7 @@
         <tr><th>軌道轉乘 / 公車 / 共享資訊</th><td>${s.trans}</td></tr>
       </table>
 
-      <div class="table-category-title">🗺️ 車站平面配置圖（點擊右方按鈕切換樓層）</div>
+      <div class="table-category-title">🏗️ 車站立體建築與樓層平面配置圖（切換 3D 垂直疊層 / 各樓層原本平面圖）</div>
       <div class="blueprint-frame">
         <div class="blueprint-toolbar">
           <div style="font-size:0.95rem; font-weight:bold; color:#00bcd4;">
@@ -755,12 +947,24 @@
           </div>
           <div class="level-selector" id="levelSelector"></div>
         </div>
-        <div class="floor-spec-banner">
-          <span>📍 <strong>目前顯示樓層：【${currentLvl}】</strong></span>
-          <span>📋 <strong>本層設施規格：</strong>${s.level_specs[currentLvl]}</span>
+        <div class="floor-spec-banner" id="floorSpecBanner"></div>
+        <div class="viewer-fallback-banner" id="webglFallbackBanner">
+          ⚠️ 偵測到您的瀏覽器環境無法啟用 WebGL 3D 加速，已自動為您切換為 2D 平面配置圖。
         </div>
         <div class="canvas-container">
-          <div class="blueprint-canvas" id="canvas"></div>
+          <div class="viewer-3d-wrap" id="viewer3DContainer" style="display:${is2D ? 'none' : 'block'};">
+            <div class="viewer-3d-stage" id="viewer3DStage"></div>
+            <div class="label-3d-overlay" id="labels3DLayer" style="display:${show3DLabels ? 'block' : 'none'};"></div>
+            <div class="viewer-3d-hud" id="viewer3DHud">
+              ${currentStationId} ${s.name} ｜ <span>${s.plat_config}</span>
+            </div>
+            <div class="viewer-3d-controls">
+              <button class="v3d-btn" onclick="reset3DCamera()" title="重置視角">🔄 重置視角</button>
+              <button class="v3d-btn ${show3DLabels ? 'active' : ''}" id="btnToggleLabels" onclick="toggle3DLabels()">🏷️ 設施標籤</button>
+            </div>
+            <div class="viewer-3d-hint">🖱️ 左鍵拖曳旋轉 ｜ 右鍵拖曳平移 ｜ 滾輪縮放 ｜ 雙擊重置視角</div>
+          </div>
+          <div class="blueprint-canvas" id="canvas" style="display:${is2D ? 'block' : 'none'};"></div>
         </div>
         
         <div class="legend-row">
@@ -779,24 +983,34 @@
     `;
 
     container.innerHTML = html;
+    updateFloorBanner(s);
     renderLevelsMenu(s);
-    renderCanvas(s);
+    if (is2D) {
+      renderCanvas(s);
+    } else {
+      render3DStation(s);
+    }
   }
 
   function renderLevelsMenu(s) {
     const selector = document.getElementById("levelSelector");
+    if (!selector) return;
     selector.innerHTML = "";
     const levels = s.levels;
     if (!levels.includes(currentLvl)) currentLvl = levels[0];
 
+    const btnStacked = document.createElement("button");
+    btnStacked.className = `level-btn ${viewMode === "3d_stacked" ? "active" : ""}`;
+    btnStacked.innerText = "🏢 3D 垂直疊層";
+    btnStacked.onclick = () => switchFloorOrViewMode("3d_stacked");
+    selector.appendChild(btnStacked);
+
     levels.forEach(lvl => {
       const btn = document.createElement("button");
-      btn.className = `level-btn ${lvl === currentLvl ? 'active' : ''}`;
+      const isActive = viewMode === "2d" && lvl === currentLvl;
+      btn.className = `level-btn ${isActive ? 'active' : ''}`;
       btn.innerText = lvl;
-      btn.onclick = () => {
-        currentLvl = lvl;
-        renderPage();
-      };
+      btn.onclick = () => switchFloorOrViewMode("2d", lvl);
       selector.appendChild(btn);
     });
   }
@@ -1110,8 +1324,8 @@
     // 付費區：往月台樓梯+電扶梯與電梯
     const platTarget = s.group === "elevated" ? "往3F月台" : "往B2月台";
     const hasBaggage = Array.isArray(s.layout.baggage_platforms) && s.layout.baggage_platforms.length > 0;
-    const x1 = hasBaggage ? 415 : 425;
-    const x2 = hasBaggage ? 588 : 675;
+    const x1 = hasBaggage ? 395 : 425;
+    const x2 = hasBaggage ? 565 : 675;
     if (s.layout.plat_sets_mode === "2+2") {
       // 北側/上側月台 2 組 + 南側/下側月台 2 組
       addZoneOutline(canvas, "outline-paid", 410, 70, 445, 145, `${platTarget} A 動線區 (樓梯+電扶梯*2、電梯*2)`);
@@ -1216,8 +1430,8 @@
 
     // 繪製雙月台 (二島四面 / 二側四面 / 二側二面) 上的垂直動線組
     const hasBaggage = Array.isArray(s.layout.baggage_platforms) && s.layout.baggage_platforms.length > 0;
-    const x1 = hasBaggage ? 415 : 425;
-    const x2 = hasBaggage ? 588 : 675;
+    const x1 = hasBaggage ? 395 : 425;
+    const x2 = hasBaggage ? 565 : 675;
     if (s.layout.plat_sets_mode === "2+2") {
       drawVerticalCluster(canvas, x1, topPlatY, { label: `${concourseTarget} A1` });
       drawVerticalCluster(canvas, x2, topPlatY, { label: `${concourseTarget} A2` });
@@ -1256,6 +1470,12 @@
     addExitSign(canvas, 32, 452, 160, 26, "🚪 出口 2 (地面南側出口)");
     drawVerticalCluster(canvas, 34, 375, { label: "出口2 往2F連通道" });
 
+    // 地面隔離圍牆（防止出口直通月台，旅客須經 2F 跨站連通道進站）
+    const fence = document.createElement("div");
+    fence.style.cssText = "position:absolute;left:211px;top:18px;width:8px;height:504px;background:repeating-linear-gradient(180deg,#ef4444 0,#ef4444 10px,#334155 10px,#334155 20px);border:1px solid #f8fafc;border-radius:3px;z-index:8;";
+    fence.title = "實體隔離圍牆：出口僅連接 2F 跨站連通道，不直通月台";
+    canvas.appendChild(fence);
+
     // 右側：地面月台管制區 (x = 220..885)
     addZoneOutline(canvas, "outline-paid", 220, 15, 665, 510, `${currentStationId} ${s.name} ── 地面月台區（已於 2F 驗票進入，月台配置：${s.plat_config}）`);
 
@@ -1293,8 +1513,8 @@
       drawVerticalCluster(canvas, 680, 102, { label: "月台1 往2F (#2)" });
 
       const hasBaggage = Array.isArray(s.layout.baggage_platforms) && s.layout.baggage_platforms.length > 0;
-      drawVerticalCluster(canvas, hasBaggage ? 405 : 420, 260, { label: "中島 往2F (#1)" });
-      drawVerticalCluster(canvas, hasBaggage ? 585 : 680, 260, { label: "中島 往2F (#2)" });
+      drawVerticalCluster(canvas, hasBaggage ? 375 : 420, 260, { label: "中島 往2F (#1)" });
+      drawVerticalCluster(canvas, hasBaggage ? 560 : 680, 260, { label: "中島 往2F (#2)" });
 
       drawVerticalCluster(canvas, 420, 417, { label: "月台4 往2F (#1)" });
       drawVerticalCluster(canvas, 680, 417, { label: "月台4 往2F (#2)" });
@@ -1391,8 +1611,8 @@
 
       addZoneOutline(canvas, "outline-paid", 245, 215, 605, 105, "往中央島式月台 (2、3號月台) 垂直動線區 (樓梯+電扶梯*2、電梯*2)");
       const hasBaggage = Array.isArray(s.layout.baggage_platforms) && s.layout.baggage_platforms.length > 0;
-      drawVerticalCluster(canvas, hasBaggage ? 405 : 420, 260, { label: "往中島月台 (#1)" });
-      drawVerticalCluster(canvas, hasBaggage ? 585 : 680, 260, { label: "往中島月台 (#2)" });
+      drawVerticalCluster(canvas, hasBaggage ? 375 : 420, 260, { label: "往中島月台 (#1)" });
+      drawVerticalCluster(canvas, hasBaggage ? 560 : 680, 260, { label: "往中島月台 (#2)" });
 
       addZoneOutline(canvas, "outline-paid", 245, 375, 605, 95, "往側式月台 4 垂直動線區 (樓梯+電扶梯*2、電梯*2)");
       drawVerticalCluster(canvas, 420, 412, { label: "往月台4 (#1)" });
@@ -1423,8 +1643,1550 @@
     }
   }
 
+  // ===========================================================================
+  // 7. 3D 垂直疊層建模引擎（依 GAME 實際尺度、正確上下樓樓梯方向與純白車廂建模）
+  // ===========================================================================
+  const STATION_SIM_META = {
+    FR01: { distM: 0,     exp: true,  scale: 4, landUse: { C: 1.0 },                   transfers: ['地鐵工業線 (T1)', '地鐵環狀線 (T1)'], desc: '100% 工業／科技園區' },
+    FR02: { distM: 7300,  exp: false, scale: 3, landUse: { H: 1.0 },                   transfers: ['地鐵環狀線 (T1)'], desc: '100% 港埠倉儲與低密度作業區' },
+    FR03: { distM: 8600,  exp: false, scale: 3, landUse: { H: 1.0 },                   transfers: ['地鐵環狀線 (T1)'], desc: '100% 物流倉儲專用區' },
+    FR04: { distM: 9800,  exp: true,  scale: 5, landUse: { B: 0.2, H: 0.3, G: 0.5 },   transfers: ['WRT環島線', '地鐵中央線 (T1)', '地鐵環狀線 (T1)'], desc: '50% 交通樞紐(郵輪港) + 30% 港區倉儲 + 20% 商辦' },
+    FR05: { distM: 17000, exp: false, scale: 4, landUse: { B: 1.0 },                   transfers: ['地鐵環狀線 (T1)'], desc: '100% 核心商辦／金融區' },
+    FR06: { distM: 18500, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 },           transfers: ['地鐵環狀線 (T1)'], desc: '80% 大型商圈／市政區 + 20% 市民廣場綠地' },
+    FR07: { distM: 19800, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 },           transfers: ['地鐵環狀線 (T1)'], desc: '80% 文化商業區 + 20% 藝文廣場公園' },
+    FR08: { distM: 21700, exp: true,  scale: 5, landUse: { E: 1.0 },                   transfers: ['地鐵南北線 (T1)', '地鐵環狀線 (T1)'], desc: '100% 核心百貨商圈樞紐' },
+    FR09: { distM: 24000, exp: false, scale: 4, landUse: { B: 0.85, C: 0.05, F: 0.1 }, transfers: [], desc: '85% 研發商辦 + 10% 園區綠地 + 5% 科技廠房' },
+    FR10: { distM: 25200, exp: false, scale: 4, landUse: { A: 0.4, D: 0.6 },           transfers: [], desc: '60% 大專文教學區 + 40% 住宅生活圈' },
+    FR11: { distM: 26900, exp: false, scale: 4, landUse: { A: 0.5, E: 0.5 },           transfers: [], desc: '50% 高密度住宅 + 50% 沿街商業圈' },
+    FR12: { distM: 28500, exp: true,  scale: 5, landUse: { A: 0.1, F: 0.9 },           transfers: ['地鐵公園線 (T1)'], desc: '90% 飛灣中央公園與巨蛋體育館 + 10% 住宅' },
+    FR13: { distM: 29900, exp: false, scale: 3, landUse: { A: 1.0 },                   transfers: [], desc: '100% 親水住宅區（東鄰 FR14 鷺島 500M）' },
+    FR14: { distM: 30400, exp: false, scale: 3, landUse: { A: 1.0 },                   transfers: [], desc: '100% 濱水住宅區（西鄰 FR13 錦湖 500M）' },
+    FR15: { distM: 33200, exp: false, scale: 2, landUse: { C: 1.0 },                   transfers: [], desc: '100% 航空城會展／低密度科技產業' },
+    FR16: { distM: 38100, exp: true,  scale: 5, landUse: { G: 1.0 },                   transfers: [], desc: '100% 國際機場航廈與跑道樞紐' },
+    FR17: { distM: 43300, exp: false, scale: 2, landUse: { A: 1.0 },                   transfers: [], desc: '100% 郊區花園住宅社區' },
+    FR18: { distM: 46500, exp: false, scale: 4, landUse: { A: 0.9, E: 0.1 },           transfers: ['地鐵中央線 (T1)'], desc: '90% 密集住宅區 + 10% 社區商業' },
+    FR19: { distM: 54700, exp: false, scale: 1, landUse: { A: 1.0 },                   transfers: [], desc: '100% 低密度鄉村住宅聚落' },
+    FR20: { distM: 56100, exp: false, scale: 1, landUse: { H: 0.7, F: 0.3 },           transfers: [], desc: '70% 自然保育林地濕地 + 30% 生態步道園區' },
+    FR21: { distM: 57900, exp: true,  scale: 5, landUse: { A: 0.7, E: 0.3 },           transfers: ['ART綾京線 (T2)', '觀光紅楓線 (T3)'], desc: '70% 高密度住宅 + 30% 轉乘商業區' },
+    FR22: { distM: 59100, exp: false, scale: 3, landUse: { A: 0.8, E: 0.2 },           transfers: ['ART綾京線 (T2)'], desc: '80% 住宅區 + 20% 社區商業（東鄰全京車輛基地）' }
+  };
+
+  const UV_ATLAS_SIZE = 1024;
+  function pxToUV(x, y, w, h, pad = 2) {
+    return {
+      u0: (x + pad) / UV_ATLAS_SIZE,
+      u1: (x + w - pad) / UV_ATLAS_SIZE,
+      v1: 1 - (y + pad) / UV_ATLAS_SIZE,
+      v0: 1 - (y + h - pad) / UV_ATLAS_SIZE
+    };
+  }
+
+  const UV_REGIONS = {
+    concourse_floor: pxToUV(0, 0, 1024, 240, 2),
+    platform_floor:  pxToUV(0, 240, 1024, 200, 2),
+    wall_clean:      pxToUV(0, 440, 1024, 150, 2),
+    slab_trackbed:   pxToUV(0, 590, 512, 140, 2),
+    psd_upper_wall:  pxToUV(512, 590, 512, 140, 2),
+    escalator_steps: pxToUV(0, 730, 256, 150, 2),
+    elevator_door:   pxToUV(256, 730, 192, 150, 2),
+    ticket_gate:     pxToUV(448, 730, 192, 150, 2),
+    service_booth:   pxToUV(640, 730, 192, 150, 2),
+    baggage_box:     pxToUV(832, 730, 192, 150, 2),
+    store_front:     pxToUV(0, 880, 256, 144, 2),
+    toilet_wall:     pxToUV(256, 880, 256, 144, 2),
+    stop_sign_4:     pxToUV(512, 880, 128, 144, 2),
+    stop_sign_6:     pxToUV(640, 880, 128, 144, 2),
+    stop_sign_full:  pxToUV(768, 880, 128, 144, 2),
+    concrete_white:  pxToUV(896, 880, 128, 144, 2)
+  };
+
+  function drawGraniteTiles(ctx, x, y, w, h, tileSize) {
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(x, y, w, h);
+    let seed = 2026;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+    for (let ty = y; ty < y + h; ty += tileSize) {
+      for (let tx = x; tx < x + w; tx += tileSize) {
+        const shade = Math.floor(146 + rand() * 16);
+        ctx.fillStyle = `rgb(${shade}, ${shade + 4}, ${shade + 9})`;
+        ctx.fillRect(tx, ty, tileSize - 1, tileSize - 1);
+      }
+    }
+    ctx.strokeStyle = "rgba(71, 85, 105, 0.32)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let tx = x; tx <= x + w; tx += tileSize) {
+      ctx.moveTo(tx, y); ctx.lineTo(tx, y + h);
+    }
+    for (let ty = y; ty <= y + h; ty += tileSize) {
+      ctx.moveTo(x, ty); ctx.lineTo(x + w, ty);
+    }
+    ctx.stroke();
+  }
+
+  function drawTactileLine(ctx, x, y, w, h) {
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "rgba(161, 98, 7, 0.4)";
+    if (w >= h) {
+      for (let sx = x + 4; sx < x + w - 2; sx += 8) ctx.fillRect(sx, y + 2, 2, h - 4);
+    } else {
+      for (let sy = y + 4; sy < y + h - 2; sy += 8) ctx.fillRect(x + 2, sy, w - 4, 2);
+    }
+  }
+
+  function generateStationAtlasCanvas() {
+    const c = document.createElement("canvas");
+    c.width = UV_ATLAS_SIZE;
+    c.height = UV_ATLAS_SIZE;
+    const ctx = c.getContext("2d");
+
+    // 1. 大廳層花崗岩地磚 + 黃色導盲磚 (y:0..240)
+    drawGraniteTiles(ctx, 0, 0, 1024, 240, 16);
+    drawTactileLine(ctx, 40, 114, 944, 12);
+    [160, 340, 512, 700, 880].forEach(bx => {
+      drawTactileLine(ctx, bx, 20, 10, 94);
+      drawTactileLine(ctx, bx, 126, 10, 94);
+    });
+
+    // 2. GAME 規格月台面灰石地磚 + 邊緣黃色安全線 (y:240..440)
+    drawGraniteTiles(ctx, 0, 240, 1024, 200, 16);
+    ctx.fillStyle = "#475569";
+    ctx.fillRect(0, 240, 1024, 8);
+    ctx.fillRect(0, 432, 1024, 8);
+    drawTactileLine(ctx, 10, 250, 1004, 12);
+    drawTactileLine(ctx, 10, 418, 1004, 12);
+    drawTactileLine(ctx, 30, 335, 964, 10);
+
+    // 3. 乾淨大廳白牆與出入口門框 (y:440..590)
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 440, 1024, 150);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1.5;
+    for (let wx = 0; wx <= 1024; wx += 64) {
+      ctx.beginPath(); ctx.moveTo(wx, 440); ctx.lineTo(wx, 590); ctx.stroke();
+    }
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(0, 574, 1024, 16);
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(140, 456, 744, 14);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText("FLYWAN RAILWAY   飛灣快線   STATION ARCHITECTURE", 350, 467);
+
+    // 4. GAME 無道碴水泥道床 + 雙塊式軌枕承台 + 扣件 + 鋼軌 (x:0..512, y:590..730)
+    ctx.fillStyle = "#8b9198";
+    ctx.fillRect(0, 590, 512, 140);
+    ctx.fillStyle = "#626870";
+    ctx.fillRect(0, 646, 512, 28); // 中央排水溝
+    for (let rx = 16; rx < 512; rx += 32) {
+      ctx.fillStyle = "#9ca3ac";
+      ctx.fillRect(rx, 608, 18, 30);
+      ctx.fillRect(rx, 682, 18, 30);
+      ctx.fillStyle = "#262b31";
+      ctx.fillRect(rx + 4, 614, 10, 18);
+      ctx.fillRect(rx + 4, 688, 10, 18);
+    }
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(0, 620, 512, 6);
+    ctx.fillRect(0, 694, 512, 6);
+
+    // 5. 月台端水泥牆 (x:512..1024, y:590..730)
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(512, 590, 512, 140);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    for (let x = 512; x < 1024; x += 64) {
+      ctx.strokeRect(x, 590, 64, 140);
+    }
+
+    // 6. 電扶梯踏階 (x:0..256, y:730..880)
+    ctx.fillStyle = "#475569";
+    ctx.fillRect(0, 730, 256, 150);
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(0, 730, 256, 12);
+    ctx.fillRect(0, 868, 256, 12);
+    for (let ex = 0; ex < 256; ex += 10) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(ex, 744, 6, 122);
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(ex + 6, 744, 4, 122);
+    }
+
+    // 7. 無障礙電梯門牆 (x:256..448, y:730..880)
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(256, 730, 192, 150);
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(298, 746, 108, 18);
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("2 電梯 ♿", 320, 759);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(298, 768, 108, 110);
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(298, 768, 108, 110);
+    ctx.beginPath(); ctx.moveTo(352, 768); ctx.lineTo(352, 878); ctx.stroke();
+
+    // 8. 驗票閘門 (x:448..640, y:730..880) & 服務台 (x:640..832, y:730..880)
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(448, 730, 192, 150);
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(448, 730, 192, 32);
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(475, 782, 42, 36);
+    ctx.fillRect(570, 782, 42, 36);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("6 驗票閘門 GATE", 490, 751);
+
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(640, 730, 192, 150);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(640, 730, 192, 26);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("8 服務台 INFO", 690, 748);
+    ctx.fillStyle = "#bae6fd";
+    ctx.fillRect(664, 772, 144, 68);
+
+    // 9. 行李處理區 (x:832..1024, y:730..880 -> 對應 game.html baggageBoxMat)
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(832, 730, 192, 150);
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(832, 730, 192, 20);
+    ctx.fillRect(832, 860, 192, 20);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "bold 11px sans-serif";
+    ctx.fillText("行李處理區 BAGGAGE", 864, 808);
+
+    // 10. 超商 (x:0..256, y:880..1024) & 廁所 (x:256..512, y:880..1024)
+    ctx.fillStyle = "#fef3c7";
+    ctx.fillRect(0, 880, 256, 144);
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(0, 880, 256, 28);
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText("9 車站超商 MART", 64, 900);
+    ctx.fillStyle = "#bae6fd";
+    ctx.fillRect(20, 922, 216, 84);
+
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(256, 880, 256, 144);
+    ctx.fillStyle = "#ec4899";
+    ctx.fillRect(256, 880, 256, 28);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("5 廁所 + ♿ 無障礙廁所", 312, 900);
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(290, 926, 68, 96);
+    ctx.fillRect(408, 926, 68, 96);
+
+    // 11. 停車標：4 輛停 / 6 輛停 / 全編組 (完全對應 game.html createCarStopSignMat)
+    const drawStopUV = (sx, sy, labelTop, labelBot, borderCol, bgCol, numCol) => {
+      ctx.fillStyle = bgCol;
+      ctx.fillRect(sx, sy, 128, 144);
+      ctx.strokeStyle = borderCol;
+      ctx.lineWidth = 10;
+      ctx.strokeRect(sx + 6, sy + 6, 116, 132);
+      ctx.fillStyle = numCol;
+      ctx.font = "bold 54px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(labelTop, sx + 64, sy + 72);
+      ctx.fillStyle = borderCol;
+      ctx.fillRect(sx + 12, sy + 94, 104, 38);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 22px sans-serif";
+      ctx.fillText(labelBot, sx + 64, sy + 121);
+      ctx.textAlign = "left";
+    };
+    drawStopUV(512, 880, "4", "4輛停", "#16a34a", "#ecfdf5", "#15803d");
+    drawStopUV(640, 880, "6", "6輛停", "#e11d48", "#1e3a8a", "#ffffff");
+    drawStopUV(768, 880, "全", "全編組", "#d97706", "#0f172a", "#ffffff");
+
+    // 12. 建築白灰混凝土 (x:896..1024, y:880..1024)
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(896, 880, 128, 144);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.strokeRect(898, 882, 124, 140);
+
+    return c;
+  }
+
+  // 純白色流線型車輛 UV 貼圖（無彩色條紋，對應 GAME e300 車體展開）
+  function generateWhiteTrainUVCanvas(hasCabFront) {
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 512;
+    const ctx = c.getContext("2d");
+
+    // 純白車體漸層
+    const bodyGrad = ctx.createLinearGradient(0, 0, 0, 512);
+    bodyGrad.addColorStop(0.00, "#e2e8f0");
+    bodyGrad.addColorStop(0.12, "#ffffff");
+    bodyGrad.addColorStop(0.65, "#f8fafc");
+    bodyGrad.addColorStop(0.86, "#e2e8f0");
+    bodyGrad.addColorStop(1.00, "#94a3b8");
+    ctx.fillStyle = bodyGrad;
+    ctx.fillRect(0, 0, 1024, 512);
+
+    const sideStartX = hasCabFront ? 358 : 20;
+    // 深色車窗帶與純白門扇
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(sideStartX, 92, 1024 - sideStartX, 180);
+
+    // 車門（純白門體 + 雙小窗）
+    const span = 1024 - sideStartX;
+    [0.20, 0.51, 0.82].forEach(r => {
+      const dc = sideStartX + span * r;
+      const dw = span * 0.114;
+      const dx = dc - dw / 2;
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(dx, 90, dw, 318);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dx, 90, dw, 318);
+      ctx.beginPath(); ctx.moveTo(dc, 90); ctx.lineTo(dc, 408); ctx.stroke();
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(dx + dw * 0.14, 108, dw * 0.28, 128);
+      ctx.fillRect(dx + dw * 0.58, 108, dw * 0.28, 128);
+    });
+
+    // 客室玻璃窗高光
+    [
+      { r: 0.065, wf: 0.084 }, { r: 0.355, wf: 0.146 },
+      { r: 0.665, wf: 0.146 }, { r: 0.945, wf: 0.078 }
+    ].forEach(ws => {
+      const ww = span * ws.wf;
+      const wx = sideStartX + span * ws.r - ww / 2;
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(wx, 104, ww, 146);
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(wx + 8, 112, ww * 0.25, 130);
+    });
+
+    if (hasCabFront) {
+      // 純白車頭與黑色流線擋風玻璃
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 358, 512);
+      ctx.fillStyle = "#090d16";
+      ctx.beginPath();
+      ctx.moveTo(82, 42); ctx.lineTo(276, 42);
+      ctx.quadraticCurveTo(290, 245, 245, 342);
+      ctx.lineTo(113, 342);
+      ctx.quadraticCurveTo(68, 245, 82, 42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(92, 88, 80, 152);
+      ctx.fillRect(186, 88, 80, 152);
+      // 白色頭燈組
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(72, 305, 42, 16);
+      ctx.fillRect(244, 305, 42, 16);
+      // 車下裙板
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(130, 412, 98, 56);
+    }
+
+    return c;
+  }
+
+  function applyBoxRegionUVs(geo, regions) {
+    const uv = geo.attributes.uv;
+    const faceKeys = ["px", "nx", "py", "ny", "pz", "nz"];
+    for (let f = 0; f < 6; f++) {
+      const reg = regions.u0 !== undefined
+        ? regions
+        : (regions[faceKeys[f]] || regions.default || UV_REGIONS.concrete_white);
+      const du = reg.u1 - reg.u0;
+      const dv = reg.v1 - reg.v0;
+      for (let v = 0; v < 4; v++) {
+        const idx = f * 4 + v;
+        uv.setXY(idx, reg.u0 + uv.getX(idx) * du, reg.v0 + uv.getY(idx) * dv);
+      }
+    }
+    uv.needsUpdate = true;
+    return geo;
+  }
+
+  const threeState = {
+    initialized: false,
+    builtStationId: null,
+    renderer: null,
+    scene: null,
+    camera: null,
+    stationRoot: null,
+    atlasCanvas: null,
+    atlasMat: null,
+    upperSlabMat: null,
+    whiteTrainCabMat: null,
+    whiteTrainMidMat: null,
+    glassMat: null,
+    psdGlassMat: null,
+    psdFrameMat: null,
+    psdHeaderMat: null,
+    psdWarnMat: null,
+    platConcreteMat: null,
+    purpleZoneMat: null,
+    artZoneMat: null,
+    greenExitMat: null,
+    darkMetalMat: null,
+    bogieMat: null,
+    labelAnchors: [],
+    animId: null,
+    orbit: { theta: -0.68, phi: 0.96, radius: 135, tx: 0, ty: 10, tz: 0 },
+    targetOrbit: { theta: -0.68, phi: 0.96, radius: 135, tx: 0, ty: 10, tz: 0 },
+    dragMode: null,
+    lastPtr: { x: 0, y: 0 },
+    eventsBoundOnEl: null
+  };
+
+  function ensureThreeSetup() {
+    if (typeof THREE === "undefined") return false;
+    if (threeState.initialized) return true;
+    try {
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0xe5e7eb, 1);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      const atlasCanvas = generateStationAtlasCanvas();
+      const atlasTexture = new THREE.CanvasTexture(atlasCanvas);
+      atlasTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy() || 1);
+      atlasTexture.needsUpdate = true;
+
+      const trainCabTex = new THREE.CanvasTexture(generateWhiteTrainUVCanvas(true));
+      trainCabTex.anisotropy = 4;
+      const trainMidTex = new THREE.CanvasTexture(generateWhiteTrainUVCanvas(false));
+      trainMidTex.anisotropy = 4;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xe5e7eb);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 0.88);
+      hemi.position.set(0, 80, 0);
+      scene.add(hemi);
+
+      const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.72);
+      dirLight.position.set(-45, 78, 55);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 10;
+      dirLight.shadow.camera.far = 260;
+      const d = 95;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
+      dirLight.shadow.bias = -0.0005;
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.35);
+      fillLight.position.set(55, 45, -55);
+      scene.add(fillLight);
+
+      const stationRoot = new THREE.Group();
+      scene.add(stationRoot);
+
+      const camera = new THREE.PerspectiveCamera(35, 900 / 580, 0.8, 600);
+
+      threeState.renderer = renderer;
+      threeState.scene = scene;
+      threeState.camera = camera;
+      threeState.stationRoot = stationRoot;
+      threeState.atlasCanvas = atlasCanvas;
+      threeState.atlasMat = new THREE.MeshStandardMaterial({ map: atlasTexture, roughness: 0.72, metalness: 0.08 });
+      threeState.upperSlabMat = new THREE.MeshStandardMaterial({
+        map: atlasTexture,
+        transparent: true,
+        opacity: 0.72,
+        roughness: 0.68,
+        metalness: 0.05
+      });
+      threeState.whiteTrainCabMat = new THREE.MeshStandardMaterial({ map: trainCabTex, roughness: 0.25, metalness: 0.15 });
+      threeState.whiteTrainMidMat = new THREE.MeshStandardMaterial({ map: trainMidTex, roughness: 0.25, metalness: 0.15 });
+      threeState.glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.36, roughness: 0.15, metalness: 0.25 });
+      threeState.psdGlassMat = new THREE.MeshLambertMaterial({ color: 0x81d4fa, transparent: true, opacity: 0.50, depthWrite: false, side: THREE.DoubleSide });
+      threeState.psdFrameMat = new THREE.MeshLambertMaterial({ color: 0x2b2b2b });
+      threeState.psdHeaderMat = new THREE.MeshLambertMaterial({ color: 0x0088cc });
+      threeState.psdWarnMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+      threeState.platConcreteMat = new THREE.MeshLambertMaterial({ color: 0x828282 });
+      threeState.purpleZoneMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, transparent: true, opacity: 0.32 });
+      threeState.artZoneMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.34 });
+      threeState.greenExitMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.45 });
+      threeState.darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.5 });
+      threeState.bogieMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.5 });
+      threeState.initialized = true;
+
+      window.addEventListener("resize", resize3DViewer);
+      start3DLoop();
+      return true;
+    } catch (err) {
+      console.error("WebGL Init Error:", err);
+      return false;
+    }
+  }
+
+  function resize3DViewer() {
+    if (!threeState.initialized || !threeState.renderer) return;
+    const stage = document.getElementById("viewer3DStage");
+    if (!stage || stage.clientWidth === 0 || stage.clientHeight === 0) return;
+    threeState.renderer.setSize(stage.clientWidth, stage.clientHeight);
+    threeState.camera.aspect = stage.clientWidth / stage.clientHeight;
+    threeState.camera.updateProjectionMatrix();
+  }
+
+  function bind3DControls(domEl) {
+    if (threeState.eventsBoundOnEl === domEl) return;
+    threeState.eventsBoundOnEl = domEl;
+
+    domEl.addEventListener("contextmenu", e => e.preventDefault());
+    domEl.addEventListener("mousedown", e => {
+      threeState.dragMode = e.button === 2 || e.shiftKey ? "pan" : "orbit";
+      threeState.lastPtr = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener("mousemove", e => {
+      if (!threeState.dragMode) return;
+      const dx = e.clientX - threeState.lastPtr.x;
+      const dy = e.clientY - threeState.lastPtr.y;
+      threeState.lastPtr = { x: e.clientX, y: e.clientY };
+      const t = threeState.targetOrbit;
+      if (threeState.dragMode === "orbit") {
+        t.theta -= dx * 0.008;
+        t.phi = Math.max(0.14, Math.min(Math.PI * 0.46, t.phi - dy * 0.007));
+      } else {
+        const panSpeed = t.radius * 0.0014;
+        const cosT = Math.cos(t.theta), sinT = Math.sin(t.theta);
+        t.tx -= (dx * cosT + dy * sinT) * panSpeed;
+        t.tz -= (-dx * sinT + dy * cosT) * panSpeed;
+      }
+    });
+    window.addEventListener("mouseup", () => { threeState.dragMode = null; });
+    domEl.addEventListener("wheel", e => {
+      e.preventDefault();
+      threeState.targetOrbit.radius = Math.max(26, Math.min(260, threeState.targetOrbit.radius + e.deltaY * 0.08));
+    }, { passive: false });
+    domEl.addEventListener("dblclick", () => reset3DCamera());
+
+    let lastTouchDist = 0;
+    domEl.addEventListener("touchstart", e => {
+      if (e.touches.length === 1) {
+        threeState.dragMode = "orbit";
+        threeState.lastPtr = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e.touches.length === 2) {
+        threeState.dragMode = "pinch";
+        lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      }
+    }, { passive: true });
+    domEl.addEventListener("touchmove", e => {
+      if (e.touches.length === 1 && threeState.dragMode === "orbit") {
+        const dx = e.touches[0].clientX - threeState.lastPtr.x;
+        const dy = e.touches[0].clientY - threeState.lastPtr.y;
+        threeState.lastPtr = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        threeState.targetOrbit.theta -= dx * 0.009;
+        threeState.targetOrbit.phi = Math.max(0.14, Math.min(Math.PI * 0.46, threeState.targetOrbit.phi - dy * 0.008));
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        threeState.targetOrbit.radius = Math.max(26, Math.min(260, threeState.targetOrbit.radius - (dist - lastTouchDist) * 0.25));
+        lastTouchDist = dist;
+      }
+    }, { passive: true });
+    domEl.addEventListener("touchend", () => { threeState.dragMode = null; });
+  }
+
+  function start3DLoop() {
+    if (threeState.animId) cancelAnimationFrame(threeState.animId);
+    const loop = () => {
+      threeState.animId = requestAnimationFrame(loop);
+      if (!threeState.renderer || viewMode === "2d") return;
+
+      const o = threeState.orbit;
+      const t = threeState.targetOrbit;
+      const k = 0.16;
+      o.theta += (t.theta - o.theta) * k;
+      o.phi += (t.phi - o.phi) * k;
+      o.radius += (t.radius - o.radius) * k;
+      o.tx += (t.tx - o.tx) * k;
+      o.ty += (t.ty - o.ty) * k;
+      o.tz += (t.tz - o.tz) * k;
+
+      const cam = threeState.camera;
+      cam.position.set(
+        o.tx + o.radius * Math.sin(o.phi) * Math.sin(o.theta),
+        o.ty + o.radius * Math.cos(o.phi),
+        o.tz + o.radius * Math.sin(o.phi) * Math.cos(o.theta)
+      );
+      cam.lookAt(o.tx, o.ty, o.tz);
+
+      threeState.renderer.render(threeState.scene, cam);
+      updateProjected3DLabels();
+    };
+    loop();
+  }
+
+  function updateProjected3DLabels() {
+    const layer = document.getElementById("labels3DLayer");
+    if (!layer || !show3DLabels || viewMode === "2d") return;
+    const stage = document.getElementById("viewer3DStage");
+    if (!stage) return;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const tmp = new THREE.Vector3();
+
+    for (let i = 0; i < threeState.labelAnchors.length; i++) {
+      const a = threeState.labelAnchors[i];
+      if (!a.el) continue;
+      tmp.copy(a.worldPos).project(threeState.camera);
+      if (tmp.z > 1) {
+        a.el.style.display = "none";
+        continue;
+      }
+      const sx = (tmp.x * 0.5 + 0.5) * w;
+      const sy = (-tmp.y * 0.5 + 0.5) * h;
+      if (sx < -40 || sx > w + 40 || sy < -20 || sy > h + 20) {
+        a.el.style.display = "none";
+      } else {
+        a.el.style.display = "block";
+        a.el.style.left = `${sx}px`;
+        a.el.style.top = `${sy}px`;
+      }
+    }
+  }
+
+  function toggle3DLabels() {
+    show3DLabels = !show3DLabels;
+    const layer = document.getElementById("labels3DLayer");
+    const btn = document.getElementById("btnToggleLabels");
+    if (layer) layer.style.display = show3DLabels ? "block" : "none";
+    if (btn) btn.classList.toggle("active", show3DLabels);
+  }
+
+  function addLabelAnchor(x, y, z, text, cls = "") {
+    const layer = document.getElementById("labels3DLayer");
+    const el = document.createElement("div");
+    el.className = `label-3d-tag ${cls}`;
+    el.innerText = text;
+    if (layer) layer.appendChild(el);
+    threeState.labelAnchors.push({ worldPos: new THREE.Vector3(x, y, z), el });
+  }
+
+  function addBox(parent, w, h, d, x, y, z, regions, mat = threeState.atlasMat, castShadow = true) {
+    const geo = applyBoxRegionUVs(new THREE.BoxGeometry(w, h, d), regions);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 樓梯 & 電扶梯真實上下樓銜接構件（嚴格由 yBot 升至 yTop，頂層僅設開口護欄，絕不往天空突出）
+  // ---------------------------------------------------------------------------
+  function addStairEscalatorSpan(parent, xCenter, yBot, yTop, zCenter, opts = {}) {
+    const { dirSign = 1, escOnly = false, isMetro = false, label = "", labelAtTop = false } = opts;
+    const dy = yTop - yBot;
+    if (dy <= 0.1) return;
+
+    const run = 13.5; // 水平跨距
+    const rampLen = Math.hypot(run, dy);
+    const slopeAngle = Math.atan2(dy, run) * dirSign;
+
+    if (isMetro) {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(run + 3, 0.12, 4.4), threeState.purpleZoneMat);
+      pad.position.set(xCenter, yTop + 0.06, zCenter);
+      parent.add(pad);
+    }
+
+    // 1. 斜坡電扶梯 (1 電扶梯)
+    const escZ = zCenter - (escOnly ? 0 : 0.9);
+    const escGroup = new THREE.Group();
+    escGroup.position.set(xCenter, (yBot + yTop) / 2, escZ);
+    escGroup.rotation.z = slopeAngle;
+
+    addBox(escGroup, rampLen, 0.42, 1.35, 0, 0, 0, {
+      py: UV_REGIONS.escalator_steps,
+      default: UV_REGIONS.concrete_white
+    });
+    const gL = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.9, 0.06), threeState.glassMat);
+    gL.position.set(0, 0.65, 0.68);
+    escGroup.add(gL);
+    const gR = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.9, 0.06), threeState.glassMat);
+    gR.position.set(0, 0.65, -0.68);
+    escGroup.add(gR);
+    const rL = new THREE.Mesh(new THREE.BoxGeometry(rampLen + 0.3, 0.12, 0.12), threeState.darkMetalMat);
+    rL.position.set(0, 1.12, 0.68);
+    escGroup.add(rL);
+    const rR = new THREE.Mesh(new THREE.BoxGeometry(rampLen + 0.3, 0.12, 0.12), threeState.darkMetalMat);
+    rR.position.set(0, 1.12, -0.68);
+    escGroup.add(rR);
+    parent.add(escGroup);
+
+    // 2. 階梯式樓梯 (3 樓梯)：嚴格從 (xCenter - dirSign*run/2, yBot) 升至 (xCenter + dirSign*run/2, yTop)
+    if (!escOnly) {
+      const steps = 16;
+      const stepDx = run / steps;
+      const stepDy = dy / steps;
+      const stairZ = zCenter + 1.05;
+      for (let i = 0; i < steps; i++) {
+        const sx = xCenter + dirSign * (-run / 2 + (i + 0.5) * stepDx);
+        const sy = yBot + (i + 0.5) * stepDy;
+        addBox(parent, stepDx + 0.08, stepDy + 0.12, 1.55, sx, sy, stairZ, UV_REGIONS.concrete_white);
+      }
+      // 樓梯斜向扶手
+      const hand = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.12, 0.12), threeState.darkMetalMat);
+      hand.position.set(xCenter, (yBot + yTop) / 2 + 1.05, stairZ + 0.8);
+      hand.rotation.z = slopeAngle;
+      parent.add(hand);
+    }
+
+    // 3. 上層抵達處之樓梯開口護欄（防止人員墜落，不往上方空中突出）
+    addFloorOpeningGuard3D(parent, xCenter, yTop, zCenter, run, escOnly ? 2.2 : 4.2, dirSign);
+
+    if (label) {
+      addLabelAnchor(xCenter, (labelAtTop ? yTop : yBot) + 2.6, zCenter, label, isMetro ? "metro" : "");
+    }
+  }
+
+  function addFloorOpeningGuard3D(parent, xCenter, yFloor, zCenter, run = 13.5, width = 4.2, openDirSign = 1) {
+    // 樓地板洞口警示暗框 + 玻璃安全圍欄（留下樓入口端開放，其餘三側圍護）
+    const holeVoid = new THREE.Mesh(new THREE.BoxGeometry(run, 0.08, width), threeState.darkMetalMat);
+    holeVoid.position.set(xCenter, yFloor + 0.02, zCenter);
+    parent.add(holeVoid);
+
+    const railH = 1.05;
+    // 兩長側玻璃護欄
+    [-width / 2, width / 2].forEach(dz => {
+      const gSide = new THREE.Mesh(new THREE.BoxGeometry(run, railH, 0.06), threeState.glassMat);
+      gSide.position.set(xCenter, yFloor + railH / 2, zCenter + dz);
+      parent.add(gSide);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(run, 0.1, 0.1), threeState.darkMetalMat);
+      cap.position.set(xCenter, yFloor + railH + 0.05, zCenter + dz);
+      parent.add(cap);
+    });
+    // 封閉端（低側上方的樓板端）玻璃護欄
+    const endX = xCenter - openDirSign * (run / 2);
+    const gEnd = new THREE.Mesh(new THREE.BoxGeometry(0.06, railH, width), threeState.glassMat);
+    gEnd.position.set(endX, yFloor + railH / 2, zCenter);
+    parent.add(gEnd);
+    const capEnd = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, width), threeState.darkMetalMat);
+    capEnd.position.set(endX, yFloor + railH + 0.05, zCenter);
+    parent.add(capEnd);
+  }
+
+  // 連續貫通多樓層之電梯塔 (2 電梯)
+  function addContinuousElevator3D(parent, x, yBot, yTop, z, doorYs = []) {
+    const shaftTop = yTop + 3.1; // 頂層止於 3.1m 高電梯出入口門廳，不突出高塔
+    const totalH = shaftTop - yBot;
+    // 主透明玻璃井道框架 + 四角白柱
+    const coreGlass = new THREE.Mesh(new THREE.BoxGeometry(2.3, totalH, 2.3), threeState.glassMat);
+    coreGlass.position.set(x, yBot + totalH / 2, z);
+    parent.add(coreGlass);
+    [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]].forEach(([dx, dz]) => {
+      addBox(parent, 0.25, totalH, 0.25, x + dx, yBot + totalH / 2, z + dz, UV_REGIONS.concrete_white);
+    });
+    // 頂蓋
+    addBox(parent, 2.5, 0.3, 2.5, x, shaftTop + 0.15, z, UV_REGIONS.concrete_white);
+
+    // 各停靠樓層之電梯門框
+    doorYs.forEach(dy => {
+      addBox(parent, 2.2, 2.8, 2.2, x, dy + 1.4, z, {
+        pz: UV_REGIONS.elevator_door,
+        nz: UV_REGIONS.elevator_door,
+        default: UV_REGIONS.concrete_white
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // GAME 規格月台門 (地下全罩式 / 高架地面半高式) 與頭尾水泥擋板
+  // ---------------------------------------------------------------------------
+  function addGamePlatformScreenDoors3D(parent, zEdge, baseY, psdLen, isUnderground) {
+    if (isUnderground) {
+      // 全罩式月台門 (對照 game.html createPlatformScreenDoors)
+      const baseM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 0.19, 0.18), threeState.psdFrameMat);
+      baseM.position.set(0, baseY + 0.105, zEdge);
+      parent.add(baseM);
+
+      const glassM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 2.43, 0.06), threeState.psdGlassMat);
+      glassM.position.set(0, baseY + 1.425, zEdge);
+      parent.add(glassM);
+
+      const hdrM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 0.15, 0.20), threeState.psdHeaderMat);
+      hdrM.position.set(0, baseY + 2.725, zEdge);
+      parent.add(hdrM);
+
+      const poleGeo = new THREE.BoxGeometry(0.16, 2.43, 0.16);
+      for (let x = -psdLen / 2 + 2; x <= psdLen / 2 - 2; x += 5) {
+        const isWarn = Math.abs(Math.round(x / 5)) % 2 === 0;
+        const p = new THREE.Mesh(poleGeo, isWarn ? threeState.psdWarnMat : threeState.psdFrameMat);
+        p.position.set(x, baseY + 1.425, zEdge);
+        parent.add(p);
+      }
+    } else {
+      // 半高式月台門 (底座 0.19, 玻璃 0.57, 藍上框 0.12)
+      const baseM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 0.19, 0.16), threeState.psdFrameMat);
+      baseM.position.set(0, baseY + 0.105, zEdge);
+      parent.add(baseM);
+
+      const glassM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 0.57, 0.06), threeState.psdGlassMat);
+      glassM.position.set(0, baseY + 0.495, zEdge);
+      parent.add(glassM);
+
+      const hdrM = new THREE.Mesh(new THREE.BoxGeometry(psdLen, 0.12, 0.16), threeState.psdHeaderMat);
+      hdrM.position.set(0, baseY + 0.85, zEdge);
+      parent.add(hdrM);
+
+      const poleGeo = new THREE.BoxGeometry(0.12, 0.57, 0.12);
+      for (let x = -psdLen / 2 + 2; x <= psdLen / 2 - 2; x += 4) {
+        const isWarn = Math.abs(Math.round(x / 4)) % 2 === 0;
+        const p = new THREE.Mesh(poleGeo, isWarn ? threeState.psdWarnMat : threeState.psdFrameMat);
+        p.position.set(x, baseY + 0.495, zEdge);
+        parent.add(p);
+      }
+    }
+  }
+
+  function addGamePlatformEndWalls3D(parent, zCenter, platW, halfLen, baseY, isUnderground) {
+    const wallH = isUnderground ? 4.4 : 0.90;
+    const cy = baseY + wallH / 2;
+    addBox(parent, 0.35, wallH, platW - 0.1, halfLen - 0.18, cy, zCenter, UV_REGIONS.psd_upper_wall);
+    addBox(parent, 0.35, wallH, platW - 0.1, -halfLen + 0.18, cy, zCenter, UV_REGIONS.psd_upper_wall);
+  }
+
+  function addGameStopSign3D(parent, x, trackY, trackZ, isForwardDir, signKind = "4") {
+    const zSign = isForwardDir ? trackZ - 1.32 : trackZ + 1.32;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), threeState.darkMetalMat);
+    pole.position.set(x, trackY + 1.1, zSign);
+    parent.add(pole);
+
+    const reg = signKind === "6" ? UV_REGIONS.stop_sign_6 : (signKind === "full" ? UV_REGIONS.stop_sign_full : UV_REGIONS.stop_sign_4);
+    addBox(parent, 0.12, 0.95, 0.95, x, trackY + 1.95, zSign, {
+      px: reg, nx: reg, default: UV_REGIONS.concrete_white
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // GAME 流線型純白色車輛建模 (對照 e300CreateCenteredCarGeo + 轉向架 + 車輪 + 貫通道)
+  // ---------------------------------------------------------------------------
+  function buildWhiteStreamlinedCarGeo(hasFrontCab, hasRearCab, len) {
+    const iSteps = 32, jSteps = 20;
+    const frontOH = hasFrontCab ? 1.65 : 0;
+    const rearOH = hasRearCab ? 1.65 : 0;
+    const bodyLen = len - frontOH - rearOH;
+    const halfL = bodyLen / 2;
+    const shiftX = (frontOH - rearOH) * 0.5;
+    const halfW = 1.54, baseH = 0.62, roofH = 3.88, hSpan = roofH - baseH;
+    const positions = [], uvs = [], indices = [];
+
+    function evalProf(v) {
+      let y = baseH + v * hSpan, zOut = halfW;
+      if (v < 0.06) { zOut = halfW * (0.45 + 0.35 * (v / 0.06)); y = baseH; }
+      else if (v < 0.18) { zOut = halfW * (0.80 + 0.20 * Math.sin(((v - 0.06) / 0.12) * Math.PI * 0.5)); }
+      else if (v < 0.78) { zOut = halfW - Math.pow((v - 0.18) / 0.60, 2.2) * 0.06; }
+      else if (v < 0.92) { zOut = (halfW - 0.06) - (1 - Math.cos(((v - 0.78) / 0.14) * Math.PI * 0.5)) * 0.38; }
+      else { zOut = (halfW - 0.44) * (1 - (v - 0.92) / 0.08); }
+
+      let frontP = 0;
+      if (v < 0.20) frontP = 1.15 + Math.sin((v / 0.20) * Math.PI * 0.5) * 0.18;
+      else if (v < 0.84) frontP = 1.33 - ((v - 0.20) / 0.64) * 0.96;
+      else frontP = 0.37 * (1 - Math.pow((v - 0.84) / 0.16, 1.5));
+      return { y, zOut, frontP };
+    }
+
+    const totalP = iSteps * 2;
+    for (let k = 0; k <= totalP; k++) {
+      const isRight = k <= iSteps;
+      const sideSign = isRight ? 1 : -1;
+      const uParam = isRight ? (k / iSteps) : ((totalP - k) / iSteps);
+
+      for (let j = 0; j <= jSteps; j++) {
+        const v = j / jSteps;
+        const prof = evalProf(v);
+        let px = 0, py = prof.y, pz = 0, uTex = uParam;
+        const fZone = hasFrontCab ? 0.35 : 0.05;
+        const rZone = hasRearCab ? 0.35 : 0.05;
+
+        if (uParam < fZone) {
+          const w = uParam / fZone;
+          if (hasFrontCab) {
+            const ang = w * Math.PI * 0.5;
+            const zFrac = Math.sin(ang);
+            const xCurve = Math.pow(1 - Math.cos(ang), 1.35);
+            pz = sideSign * prof.zOut * zFrac;
+            const cBoost = Math.cos(ang) * 0.32;
+            px = -halfL - (prof.frontP + cBoost) * (1 - xCurve) + 0.65 * xCurve;
+            uTex = 0.175 + sideSign * (w * 0.175);
+          } else {
+            pz = sideSign * prof.zOut * w; px = -halfL; uTex = w * 0.025;
+          }
+        } else if (uParam > 1.0 - rZone) {
+          const w = (1.0 - uParam) / rZone;
+          if (hasRearCab) {
+            const ang = w * Math.PI * 0.5;
+            const zFrac = Math.sin(ang);
+            const xCurve = Math.pow(1 - Math.cos(ang), 1.35);
+            pz = sideSign * prof.zOut * zFrac;
+            const cBoost = Math.cos(ang) * 0.32;
+            px = halfL + (prof.frontP + cBoost) * (1 - xCurve) - 0.65 * xCurve;
+            uTex = 0.175 - sideSign * (w * 0.175);
+          } else {
+            pz = sideSign * prof.zOut * w; px = halfL; uTex = 0.975 + (1 - w) * 0.022;
+          }
+        } else {
+          const frac = (uParam - fZone) / (1.0 - fZone - rZone);
+          const sx = hasFrontCab ? (-halfL + 0.65) : -halfL;
+          const ex = hasRearCab ? (halfL - 0.65) : halfL;
+          px = sx + frac * (ex - sx);
+          pz = sideSign * prof.zOut;
+          if (hasFrontCab) uTex = 0.35 + frac * 0.645;
+          else if (hasRearCab) uTex = 0.35 + (1.0 - frac) * 0.645;
+          else uTex = isRight ? (0.025 + frac * 0.95) : (0.025 + (1.0 - frac) * 0.95);
+        }
+
+        positions.push(px + shiftX, py, pz);
+        uvs.push(Math.max(0.002, Math.min(0.998, uTex)), Math.max(0.002, Math.min(0.998, v)));
+      }
+    }
+
+    const stride = jSteps + 1;
+    for (let k = 0; k < totalP; k++) {
+      for (let j = 0; j < jSteps; j++) {
+        const a = k * stride + j, b = (k + 1) * stride + j, c = (k + 1) * stride + (j + 1), d = k * stride + (j + 1);
+        indices.push(a, b, d, b, c, d);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(indices);
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  function addWhiteTrain3D(parent, trackY, trackZ, isExpStation, reverseDir = false) {
+    const trainGroup = new THREE.Group();
+    const carCount = isExpStation ? 6 : 4;
+    const pitch = isExpStation ? 21.6 : 21.25;
+    const gap = 0.60;
+    const totalLen = carCount * pitch;
+    const startX = -totalLen / 2 + pitch / 2;
+
+    const bogieGeo = new THREE.BoxGeometry(2.5, 0.28, 2.15);
+    const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.14, 12);
+    const gangwayGeo = new THREE.BoxGeometry(0.75, 2.85, 2.46);
+
+    for (let i = 0; i < carCount; i++) {
+      const lead = i === 0;
+      const tail = i === carCount - 1;
+      const shellLen = pitch - ((lead || tail) ? gap * 0.5 : gap);
+      const cx = startX + i * pitch;
+
+      const carMat = (lead || tail) ? threeState.whiteTrainCabMat : threeState.whiteTrainMidMat;
+      const carGeo = buildWhiteStreamlinedCarGeo(lead, tail, shellLen);
+      const bodyMesh = new THREE.Mesh(carGeo, carMat);
+      bodyMesh.position.set(cx, trackY, 0);
+      bodyMesh.castShadow = true;
+      trainGroup.add(bodyMesh);
+
+      // 轉向架與車輪
+      const bOff = shellLen * 0.33;
+      [cx - bOff, cx + bOff].forEach(bx => {
+        const frame = new THREE.Mesh(bogieGeo, threeState.bogieMat);
+        frame.position.set(bx, trackY + 0.50, 0);
+        trainGroup.add(frame);
+        [-0.82, 0.82].forEach(ax => {
+          [-1.05, 1.05].forEach(zw => {
+            const wh = new THREE.Mesh(wheelGeo, threeState.darkMetalMat);
+            wh.rotation.x = Math.PI / 2;
+            wh.position.set(bx + ax, trackY + 0.42, zw);
+            trainGroup.add(wh);
+          });
+        });
+      });
+
+      if (i < carCount - 1) {
+        const gw = new THREE.Mesh(gangwayGeo, threeState.bogieMat);
+        gw.position.set(cx + pitch / 2, trackY + 2.05, 0);
+        trainGroup.add(gw);
+      }
+    }
+
+    if (reverseDir) trainGroup.rotation.y = Math.PI;
+    trainGroup.position.set(0, 0, trackZ);
+    parent.add(trainGroup);
+  }
+
+  // 純白色 ART 電動快捷接駁車 (FR21 外側轉乘區)
+  function addWhiteARTBus3D(parent, x, y, z) {
+    for (let s = -1; s <= 1; s++) {
+      const bus = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.3, 2.2), threeState.whiteTrainMidMat);
+      bus.position.set(x + s * 5.6, y + 1.25, z);
+      bus.castShadow = true;
+      parent.add(bus);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 完整車站 3D 垂直疊層組裝 (依據 game.html 尺寸與 stations.html 各站結構)
+  // ---------------------------------------------------------------------------
+  function buildStationStacked3D(s) {
+    const root = threeState.stationRoot;
+    const meta = STATION_SIM_META[currentStationId] || { exp: false, scale: 3 };
+    const isExp = meta.exp;
+    const platLen = isExp ? 135 : 85;
+    const halfLen = platLen / 2;
+    const psdLen = platLen - 2;
+    const isUnderground = s.group === "underground";
+
+    // 各樓層真實高程
+    const platBaseY = s.group === "elevated" ? 20.0 : 0.0;
+    const platTopY = platBaseY + 0.6;
+    const concourseY = 10.0;
+    const groundY = s.group === "elevated" ? 0.0 : (s.group === "underground" ? 20.0 : 0.0);
+
+    // -------------------------------------------------------------------------
+    // 1. 月台層與軌道結構 (參照 game.html buildStationsAndProps)
+    // -------------------------------------------------------------------------
+    let totalTrackDepth = 18;
+    if (s.plat_config === "二島四面") totalTrackDepth = 44;
+    else if (s.plat_config === "二側四面") totalTrackDepth = 32;
+    else if (s.plat_config === "二側一島四面") totalTrackDepth = 58;
+    else if (s.plat_config === "一島二面") totalTrackDepth = 24;
+    else totalTrackDepth = 24;
+
+    // 軌道道床大底板
+    addBox(root, platLen + 12, 0.5, totalTrackDepth, 0, platBaseY - 0.35, 0, UV_REGIONS.concrete_white);
+
+    const addTrackSlab = (z) => {
+      addBox(root, platLen + 12, 0.22, 2.5, 0, platBaseY + 0.01, z, {
+        py: UV_REGIONS.slab_trackbed,
+        default: UV_REGIONS.concrete_white
+      }, threeState.atlasMat, false);
+    };
+
+    const addPlatBody = (z, width, psdTop, psdBot) => {
+      const m = addBox(root, platLen, 1.2, width, 0, platBaseY, z, {
+        py: UV_REGIONS.platform_floor,
+        default: UV_REGIONS.concrete_white
+      });
+      if (psdTop) addGamePlatformScreenDoors3D(root, z - width / 2 + 0.14, platTopY, psdLen, isUnderground);
+      if (psdBot) addGamePlatformScreenDoors3D(root, z + width / 2 - 0.14, platTopY, psdLen, isUnderground);
+      addGamePlatformEndWalls3D(root, z, width, halfLen, platTopY, isUnderground);
+      return m;
+    };
+
+    const addSignsForTrack = (z, isForward) => {
+      addGameStopSign3D(root, isForward ? 42.5 : -42.5, platBaseY + 0.12, z, isForward, "4");
+      if (isExp) {
+        addGameStopSign3D(root, isForward ? 65.0 : -65.0, platBaseY + 0.12, z, isForward, "6");
+      }
+    };
+
+    let topPlatZ = -7.5, botPlatZ = 7.5;
+
+    if (s.plat_config === "二側二面" || s.plat_config === "二島二面") {
+      addTrackSlab(-2.0);
+      addTrackSlab(2.0);
+      addPlatBody(-7.5, 8.0, false, true);
+      addPlatBody(7.5, 8.0, true, false);
+      addSignsForTrack(-2.0, false);
+      addSignsForTrack(2.0, true);
+      addWhiteTrain3D(root, platBaseY + 0.12, 2.0, isExp, false);
+      topPlatZ = -7.5; botPlatZ = 7.5;
+    } else if (s.plat_config === "二側四面") {
+      addTrackSlab(-6.0);
+      addTrackSlab(-2.0);
+      addTrackSlab(2.0);
+      addTrackSlab(6.0);
+      addPlatBody(-11.5, 8.0, false, true);
+      addPlatBody(11.5, 8.0, true, false);
+      addSignsForTrack(-6.0, false);
+      addSignsForTrack(6.0, true);
+      addWhiteTrain3D(root, platBaseY + 0.12, 6.0, isExp, false);
+      addWhiteTrain3D(root, platBaseY + 0.12, -2.0, isExp, true);
+      topPlatZ = -11.5; botPlatZ = 11.5;
+    } else if (s.plat_config === "一島二面") {
+      addTrackSlab(-9.0);
+      addTrackSlab(9.0);
+      addPlatBody(0, 15.0, true, true);
+      addSignsForTrack(-9.0, false);
+      addSignsForTrack(9.0, true);
+      addWhiteTrain3D(root, platBaseY + 0.12, 9.0, isExp, false);
+      topPlatZ = 0; botPlatZ = 0;
+    } else if (s.plat_config === "二島四面") {
+      const inT = 2.0;
+      const px = 11.0;
+      const outT = 20.0;
+      addTrackSlab(-outT);
+      addTrackSlab(-inT);
+      addTrackSlab(inT);
+      addTrackSlab(outT);
+      addPlatBody(-px, 15.0, true, true);
+      addPlatBody(px, 15.0, true, true);
+      addSignsForTrack(-outT, false);
+      addSignsForTrack(-inT, false);
+      addSignsForTrack(inT, true);
+      addSignsForTrack(outT, true);
+      addWhiteTrain3D(root, platBaseY + 0.12, outT, isExp, false);
+      addWhiteTrain3D(root, platBaseY + 0.12, -inT, isExp, true);
+      topPlatZ = -px; botPlatZ = px;
+    } else if (s.plat_config === "二側一島四面") {
+      // FR21 綾路北站：兩側 ART + 側式1/4 + 中央島式2/3
+      const artTop = new THREE.Mesh(new THREE.BoxGeometry(platLen, 0.25, 6.0), threeState.artZoneMat);
+      artTop.position.set(0, platBaseY + 0.12, -26.8);
+      root.add(artTop);
+      addWhiteARTBus3D(root, -16, platBaseY + 0.12, -26.8);
+      addWhiteARTBus3D(root, 20, platBaseY + 0.12, -26.8);
+      addLabelAnchor(-16, platTopY + 3.2, -26.8, "🚌 北側 ART 同台轉乘區", "exit");
+
+      addPlatBody(-19.5, 8.0, false, true);
+      addTrackSlab(-14.0);
+      addTrackSlab(-10.0);
+      addPlatBody(0, 15.0, true, true);
+      addTrackSlab(10.0);
+      addTrackSlab(14.0);
+      addPlatBody(19.5, 8.0, true, false);
+
+      const artBot = new THREE.Mesh(new THREE.BoxGeometry(platLen, 0.25, 6.0), threeState.artZoneMat);
+      artBot.position.set(0, platBaseY + 0.12, 26.8);
+      root.add(artBot);
+      addWhiteARTBus3D(root, 12, platBaseY + 0.12, 26.8);
+      addLabelAnchor(12, platTopY + 3.2, 26.8, "🚌 南側 ART 同台轉乘區", "exit");
+
+      addSignsForTrack(-14.0, false);
+      addSignsForTrack(-10.0, false);
+      addSignsForTrack(10.0, true);
+      addSignsForTrack(14.0, true);
+      addWhiteTrain3D(root, platBaseY + 0.12, 10.0, isExp, false);
+      addWhiteTrain3D(root, platBaseY + 0.12, -14.0, isExp, true);
+    }
+
+    // GAME 規格行李處理區方型盒子 (st.dist + 20M ~ +45M -> centerX = +32.5M, 25M長 × 7M寬 × 2.78M高)
+    // 2月台正線側位於 島式月台 A (topPlatZ = -11.0) 之內軌側 (z = -7.15)；3月台正線側位於 島式月台 B (botPlatZ = +11.0) 之內軌側 (z = +7.15)
+    // FR21 第3月台快速側位於中央島式月台 (z = 0) 南側 (+10m 軌側, z = +3.8)
+    const baggagePlats = s.layout && s.layout.baggage_platforms;
+    const hasBaggage = Array.isArray(baggagePlats) && baggagePlats.length > 0;
+    if (hasBaggage) {
+      if (s.plat_config === "二島四面") {
+        if (baggagePlats.includes(2)) {
+          addBox(root, 25.0, 2.78, 6.6, 32.5, platTopY + 1.39, -7.55, UV_REGIONS.baggage_box);
+          addLabelAnchor(32.5, platTopY + 3.4, -7.55, "🧳 行李處理區 (2月台正線側)", "baggage");
+        }
+        if (baggagePlats.includes(3)) {
+          addBox(root, 25.0, 2.78, 6.6, 32.5, platTopY + 1.39, 7.55, UV_REGIONS.baggage_box);
+          addLabelAnchor(32.5, platTopY + 3.4, 7.55, "🧳 行李處理區 (3月台正線側)", "baggage");
+        }
+      } else if (s.plat_config === "二側一島四面" && baggagePlats.includes(3)) {
+        addBox(root, 25.0, 2.78, 6.6, 32.5, platTopY + 1.39, 3.6, UV_REGIONS.baggage_box);
+        addLabelAnchor(32.5, platTopY + 3.4, 3.6, "🧳 行李處理區 (3月台快速側)", "baggage");
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. 大廳層 / 2F 連通道層（立體建築樓板 + 完整大廳設施）
+    // -------------------------------------------------------------------------
+    const concW = s.plat_config === "二側一島四面" ? 46 : (s.plat_config === "二島四面" ? 36 : 26);
+    const hasBaggageUg = isUnderground && hasBaggage;
+    let concL = hasBaggageUg ? 112 : Math.min(platLen - 8, 76);
+    let railHalfZ = 12.8;
+    let exitZ = 19.0;
+    let paidConcW = concW;
+    let freeConcL = 24;
+    let freeCenterX = -28;
+    let paidConcL = 50;
+    let paidCenterX = 9;
+    let gateX = hasBaggageUg ? -24 : -6;
+
+    if (s.group === "surface") {
+      // 嚴格計算 1F 鐵路與月台管制區半寬，確保出口位於 ±railHalfZ 之外
+      if (s.plat_config === "二側一島四面") railHalfZ = 31.0;
+      else if (s.plat_config === "二島四面") railHalfZ = 23.0;
+      else if (s.plat_config === "二島二面" || s.plat_config === "二側二面") railHalfZ = 12.8;
+      else railHalfZ = 12.2;
+
+      exitZ = railHalfZ + 6.2;
+      paidConcW = (railHalfZ - 0.8) * 2;
+      const isLongSurf = platLen >= 130;
+      freeConcL = isLongSurf ? 26 : 24;
+      freeCenterX = isLongSurf ? -37 : -28;
+      gateX = isLongSurf ? -24 : -16;
+      paidConcL = isLongSurf ? 72 : 50; // 長站覆蓋 X ∈ [-24, +48]；短站覆蓋 X ∈ [-16, +34]
+      paidCenterX = gateX + paidConcL / 2;
+      concL = freeConcL + paidConcL;
+
+      const freeFullW = (exitZ + 4.5) * 2;
+      // 2F 非付費跨線連通道橋體（橫跨南北出口廣場，與月台隔離）
+      addBox(root, freeConcL, 0.5, freeFullW, freeCenterX, concourseY - 0.25, 0, {
+        py: UV_REGIONS.concourse_floor,
+        default: UV_REGIONS.concrete_white
+      }, threeState.upperSlabMat, false);
+      // 非付費橋兩側玻璃安全護欄
+      [-freeFullW / 2 + 0.1, freeFullW / 2 - 0.1].forEach(zSide => {
+        const gRail = new THREE.Mesh(new THREE.BoxGeometry(freeConcL, 1.2, 0.1), threeState.glassMat);
+        gRail.position.set(freeCenterX, concourseY + 0.6, zSide);
+        root.add(gRail);
+      });
+
+      // 2F 付費跨站大廳連通道（位於驗票閘門以東、軌道月台管制區正上方）
+      addBox(root, paidConcL, 0.5, paidConcW, paidCenterX, concourseY - 0.25, 0, {
+        py: UV_REGIONS.concourse_floor,
+        default: UV_REGIONS.concrete_white
+      }, threeState.upperSlabMat, false);
+      addBox(root, paidConcL, 3.4, 0.35, paidCenterX, concourseY + 1.7, -paidConcW / 2 + 0.18, {
+        pz: UV_REGIONS.wall_clean,
+        default: UV_REGIONS.concrete_white
+      });
+      for (let cx = gateX + 8; cx <= paidCenterX + paidConcL / 2 - 6; cx += 18) {
+        addBox(root, 0.7, 3.4, 0.7, cx, concourseY + 1.7, -paidConcW / 2 + 1.4, UV_REGIONS.concrete_white);
+        addBox(root, 0.7, 3.4, 0.7, cx, concourseY + 1.7, paidConcW / 2 - 1.4, UV_REGIONS.concrete_white);
+      }
+    } else {
+      addBox(root, concL, 0.5, concW, 0, concourseY - 0.25, 0, {
+        py: UV_REGIONS.concourse_floor,
+        default: UV_REGIONS.concrete_white
+      }, threeState.upperSlabMat, false);
+
+      // 後側立牆與端牆（保留前側透明剖面以便觀看內部）
+      addBox(root, concL, 3.8, 0.4, 0, concourseY + 1.9, -concW / 2 + 0.2, {
+        pz: UV_REGIONS.wall_clean,
+        default: UV_REGIONS.concrete_white
+      });
+      // 大廳立柱（靠南北外緣配置，絕不穿入樓梯或行李區）
+      const colStepX = hasBaggageUg ? 20 : 14;
+      const colSpanZ = hasBaggageUg ? concW / 2 - 1.5 : concW / 2 - 2.6;
+      for (let cx = -concL / 2 + 8; cx <= concL / 2 - 8; cx += colStepX) {
+        addBox(root, 0.75, 3.8, 0.75, cx, concourseY + 1.9, -colSpanZ, UV_REGIONS.concrete_white);
+        addBox(root, 0.75, 3.8, 0.75, cx, concourseY + 1.9, colSpanZ, UV_REGIONS.concrete_white);
+      }
+    }
+
+    // 驗票閘門 (6) 與雙向服務台 (8)
+    const gateSpanW = s.group === "surface" ? paidConcW : concW;
+    for (let gz = -gateSpanW / 2 + 2.6; gz <= gateSpanW / 2 - 2.6; gz += 2.2) {
+      if (Math.abs(gz) < 2.2) continue;
+      addBox(root, 1.4, 1.15, 0.4, gateX, concourseY + 0.58, gz, UV_REGIONS.ticket_gate);
+    }
+    addLabelAnchor(gateX, concourseY + 2.2, -gateSpanW / 2 + 3.2, "6 驗票閘門", "");
+
+    addBox(root, 3.6, 2.5, 3.0, gateX, concourseY + 1.25, 0, UV_REGIONS.service_booth);
+    addLabelAnchor(gateX, concourseY + 3.2, 0, "8 服務台", "");
+
+    if (s.group !== "surface") {
+      // 廁所 + 無障礙廁所 (5)
+      const toiletX = hasBaggageUg ? -35 : -concL / 2 + 12;
+      const toiletZ = hasBaggageUg ? concW / 2 - 2.8 : concW / 2 - 3.2;
+      addBox(root, 8.0, 2.8, 3.2, toiletX, concourseY + 1.4, toiletZ, UV_REGIONS.toilet_wall);
+      addLabelAnchor(toiletX, concourseY + 3.5, toiletZ, "5 廁所+無障礙廁所", "");
+    }
+
+    // 大廳層／2F 連通道層行李處理區（與月台層行李盒垂直對齊於 X = 32.5, Z 對應各月台側）
+    if (hasBaggage) {
+      if (s.plat_config === "二島四面") {
+        if (baggagePlats.includes(2)) {
+          addBox(root, 20.0, 2.0, 4.4, 32.5, concourseY + 1.0, -7.55, UV_REGIONS.baggage_box);
+          addLabelAnchor(32.5, concourseY + 2.6, -7.55, "🧳 大廳行李處理區 (2月台上)", "baggage");
+        }
+        if (baggagePlats.includes(3)) {
+          addBox(root, 20.0, 2.0, 4.4, 32.5, concourseY + 1.0, 7.55, UV_REGIONS.baggage_box);
+          addLabelAnchor(32.5, concourseY + 2.6, 7.55, "🧳 大廳行李處理區 (3月台上)", "baggage");
+        }
+      } else if (s.plat_config === "二側一島四面" && baggagePlats.includes(3)) {
+        addBox(root, 20.0, 2.0, 4.4, 32.5, concourseY + 1.0, 3.6, UV_REGIONS.baggage_box);
+        addLabelAnchor(32.5, concourseY + 2.6, 3.6, "🧳 2F行李處理區 (3月台上)", "baggage");
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. 地面層 / 出口層 + 上下樓梯與電扶梯精準跨層連結（避開行李處理區 & 隔離平面出口）
+    // -------------------------------------------------------------------------
+    if (s.group === "elevated") {
+      // 地面層實體地坪 (Y=0)
+      addBox(root, 64, 0.5, concW, -4, -0.25, 0, {
+        py: UV_REGIONS.concourse_floor,
+        default: UV_REGIONS.concrete_white
+      });
+      // 出口 1 & 2
+      addBox(root, 2.6, 2.6, 2.4, -33, 1.3, -concW / 2 + 3.5, UV_REGIONS.concrete_white, threeState.greenExitMat);
+      addLabelAnchor(-33, 3.3, -concW / 2 + 3.5, "🚪 出口 1", "exit");
+      addBox(root, 2.6, 2.6, 2.4, -33, 1.3, concW / 2 - 3.5, UV_REGIONS.concrete_white, threeState.greenExitMat);
+      addLabelAnchor(-33, 3.3, concW / 2 - 3.5, "🚪 出口 2", "exit");
+
+      if (s.layout.has_store) {
+        addBox(root, 9.0, 3.0, 4.8, 2, 1.5, -concW / 2 + 4.5, UV_REGIONS.store_front);
+        addLabelAnchor(2, 3.8, -concW / 2 + 4.5, "🏪 9. 車站超商 * 1", "");
+      }
+
+      // 地面層 (Y=0) 向上連接至 2F大廳層 (Y=10)
+      if (s.layout.ground_main_sets === 1) {
+        addStairEscalatorSpan(root, -20, 0, concourseY, -4, { dirSign: 1, label: "1/3 往2F大廳 (向上)" });
+        addContinuousElevator3D(root, -28, 0, concourseY, -4, [0, concourseY]);
+        addLabelAnchor(-28, 12.2, -4, "2 電梯 (1F↔2F)", "");
+      } else {
+        addStairEscalatorSpan(root, -20, 0, concourseY, -6, { dirSign: 1, label: "出口1 往2F (向上)" });
+        addStairEscalatorSpan(root, -20, 0, concourseY, 6, { dirSign: 1, label: "出口2 往2F (向上)" });
+        addContinuousElevator3D(root, -28, 0, concourseY, -6, [0, concourseY]);
+        addContinuousElevator3D(root, -28, 0, concourseY, 6, [0, concourseY]);
+      }
+
+      // 地面層 (Y=0) 向下連接至地下地鐵站 (Y=-6.5)
+      if (s.layout.ground_metro_sets === 1) {
+        addStairEscalatorSpan(root, 14, -6.5, 0, 5, { dirSign: -1, isMetro: true, labelAtTop: true, label: "🚇 往地鐵站 (向下)" });
+        addContinuousElevator3D(root, 22, -6.5, 0, 5, [-6.5, 0]);
+      }
+
+      // 2F大廳層 (Y=10) 付費區向上連接至 3F月台層 (Y=20.6)
+      const xA = 10, xB = 26;
+      if (s.layout.plat_sets_mode === "2+2") {
+        addStairEscalatorSpan(root, xA, concourseY, platTopY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "月台 A1 (2F↗3F)" });
+        addStairEscalatorSpan(root, xB, concourseY, platTopY, topPlatZ, { dirSign: -1 });
+        addStairEscalatorSpan(root, xA, concourseY, platTopY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "月台 B1 (2F↗3F)" });
+        addStairEscalatorSpan(root, xB, concourseY, platTopY, botPlatZ, { dirSign: -1 });
+        addContinuousElevator3D(root, xA - 8, concourseY, platTopY, topPlatZ, [concourseY, platTopY]);
+        addContinuousElevator3D(root, xB + 8, concourseY, platTopY, topPlatZ, [concourseY, platTopY]);
+        addContinuousElevator3D(root, xA - 8, concourseY, platTopY, botPlatZ, [concourseY, platTopY]);
+        addContinuousElevator3D(root, xB + 8, concourseY, platTopY, botPlatZ, [concourseY, platTopY]);
+      } else if (s.layout.plat_sets_mode === "1+1") {
+        addStairEscalatorSpan(root, 12, concourseY, platTopY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "月台 A (2F↗3F)" });
+        addStairEscalatorSpan(root, 12, concourseY, platTopY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "月台 B (2F↗3F)" });
+        addContinuousElevator3D(root, 4, concourseY, platTopY, topPlatZ, [concourseY, platTopY]);
+        addContinuousElevator3D(root, 4, concourseY, platTopY, botPlatZ, [concourseY, platTopY]);
+        // FR18 3F月台層往地鐵電扶梯+電梯 (向下)
+        if (s.layout.plat_metro_sets === "1+1") {
+          const escOnly = !!s.layout.plat_metro_esc_only;
+          addStairEscalatorSpan(root, 26, 0, platTopY, topPlatZ, { dirSign: -1, escOnly, isMetro: true, labelAtTop: true, label: "🚇 3F直下地鐵 A" });
+          addStairEscalatorSpan(root, 26, 0, platTopY, botPlatZ, { dirSign: -1, escOnly, isMetro: true, labelAtTop: true, label: "🚇 3F直下地鐵 B" });
+          addContinuousElevator3D(root, 34, 0, platTopY, topPlatZ, [0, platTopY]);
+          addContinuousElevator3D(root, 34, 0, platTopY, botPlatZ, [0, platTopY]);
+        }
+      }
+    } else if (s.group === "underground") {
+      // 地下車站地面出口層 (Y=20)：含行李站集中於非付費區 X ∈ [-56, -20] 上方，確保不擋下方行李區
+      const ugGroundLen = hasBaggageUg ? 36 : 64;
+      const ugGroundX = hasBaggageUg ? -38 : -4;
+      addBox(root, ugGroundLen, 0.45, concW, ugGroundX, groundY - 0.22, 0, {
+        py: UV_REGIONS.concourse_floor,
+        default: UV_REGIONS.concrete_white
+      }, threeState.upperSlabMat, false);
+
+      if (s.layout.airport_exit) {
+        // FR16 飛灣機場：出口1門廳、往機場樓梯+電扶梯*2 (x=-33, z=±8)、大型行李電梯*3 (x=-45.5, z=-8/0/+8 互不重疊) + B1輔助電梯
+        addBox(root, 4.0, 3.2, 20.0, -52, groundY + 1.6, 0, UV_REGIONS.concrete_white, threeState.greenExitMat);
+        addLabelAnchor(-52, groundY + 3.8, 0, "✈️ 出口 1（往機場航廈連通大廳）", "exit");
+
+        addStairEscalatorSpan(root, -33, concourseY, groundY, -8.0, { dirSign: -1, labelAtTop: true, label: "往機場出口 #1 (B1↗1F)" });
+        addStairEscalatorSpan(root, -33, concourseY, groundY, 8.0, { dirSign: -1, labelAtTop: true, label: "往機場出口 #2 (B1↗1F)" });
+
+        [-8.0, 0.0, 8.0].forEach((ez, idx) => {
+          addContinuousElevator3D(root, -45.5, concourseY, groundY, ez, [concourseY, groundY]);
+          addLabelAnchor(-45.5, groundY + 3.6, ez, `2 往機場電梯 #${idx + 1}`, "");
+        });
+        // 第 4 部 B1 大廳站務/無障礙輔助電梯（間距 6m，不重疊）
+        addContinuousElevator3D(root, -45.5, concourseY, groundY, -14.0, [concourseY, groundY]);
+      } else {
+        const ugExSignX = hasBaggageUg ? -51 : -32;
+        const ugExStairX = hasBaggageUg ? -35 : -20;
+        const ugExElevX = hasBaggageUg ? -45.5 : -29;
+        const ugExZ = hasBaggageUg ? 8.0 : 6.0;
+
+        addBox(root, 2.6, 2.4, 2.2, ugExSignX, groundY + 1.2, -ugExZ, UV_REGIONS.concrete_white, threeState.greenExitMat);
+        addLabelAnchor(ugExSignX, groundY + 3.2, -ugExZ, "🚪 出口 1", "exit");
+        addBox(root, 2.6, 2.4, 2.2, ugExSignX, groundY + 1.2, ugExZ, UV_REGIONS.concrete_white, threeState.greenExitMat);
+        addLabelAnchor(ugExSignX, groundY + 3.2, ugExZ, "🚪 出口 2", "exit");
+
+        addStairEscalatorSpan(root, ugExStairX, concourseY, groundY, -ugExZ, { dirSign: -1, labelAtTop: true, label: "出口 1 (B1↗地面)" });
+        addStairEscalatorSpan(root, ugExStairX, concourseY, groundY, ugExZ, { dirSign: -1, labelAtTop: true, label: "出口 2 (B1↗地面)" });
+        addContinuousElevator3D(root, ugExElevX, concourseY, groundY, -ugExZ, [concourseY, groundY]);
+        addContinuousElevator3D(root, ugExElevX, concourseY, groundY, ugExZ, [concourseY, groundY]);
+
+        if (s.layout.port_walkway) {
+          addBox(root, 26, 0.4, 6.0, -7, groundY + 0.2, 0, { py: UV_REGIONS.concourse_floor, default: UV_REGIONS.concrete_white });
+          const gwA = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 0.14), threeState.glassMat);
+          gwA.position.set(-7, groundY + 1.5, -2.9);
+          root.add(gwA);
+          const gwB = new THREE.Mesh(new THREE.BoxGeometry(26, 2.6, 0.14), threeState.glassMat);
+          gwB.position.set(-7, groundY + 1.5, 2.9);
+          root.add(gwB);
+          addBox(root, 2.4, 2.4, 3.8, 6.8, groundY + 1.2, 0, UV_REGIONS.concrete_white, threeState.greenExitMat);
+          addLabelAnchor(-2, groundY + 3.3, 0, "🛳️ 往港口步行連通道（出口 3）", "exit");
+        }
+      }
+
+      // B2月台層 (Y=0.6) 向上連接至 B1大廳層 (Y=10) —— 若有行李區，全部向西推移至 X <= 15.25 (距離 X=20 行李區至少 4.75m)
+      if (s.layout.plat_sets_mode === "2+2") {
+        const st1X = hasBaggage ? -10.5 : 10;
+        const el1X = hasBaggage ? -19.5 : 2;
+        const st2X = hasBaggage ? 8.5 : 26;
+        const el2X = hasBaggage ? -1.0 : 34;
+
+        addStairEscalatorSpan(root, st1X, platTopY, concourseY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "B2↗B1 A1" });
+        addStairEscalatorSpan(root, st2X, platTopY, concourseY, topPlatZ, { dirSign: 1 });
+        addStairEscalatorSpan(root, st1X, platTopY, concourseY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "B2↗B1 B1" });
+        addStairEscalatorSpan(root, st2X, platTopY, concourseY, botPlatZ, { dirSign: 1 });
+        addContinuousElevator3D(root, el1X, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, el2X, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, el1X, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, el2X, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+      } else if (s.layout.plat_sets_mode === "1+1") {
+        const st1X = hasBaggage ? -10.5 : 10;
+        const el1X = hasBaggage ? -19.5 : 2;
+        const stMX = hasBaggage ? 8.5 : 26;
+        const elMX = hasBaggage ? -1.0 : 34;
+
+        addStairEscalatorSpan(root, st1X, platTopY, concourseY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "B2↗B1 A" });
+        addStairEscalatorSpan(root, st1X, platTopY, concourseY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "B2↗B1 B" });
+        addContinuousElevator3D(root, el1X, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, el1X, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+        if (s.layout.plat_metro_sets === "1+1") {
+          addStairEscalatorSpan(root, stMX, -6.5, platTopY, topPlatZ, { dirSign: -1, isMetro: true, labelAtTop: true, label: "🚇 往地鐵站 A (向下)" });
+          addStairEscalatorSpan(root, stMX, -6.5, platTopY, botPlatZ, { dirSign: -1, isMetro: true, labelAtTop: true, label: "🚇 往地鐵站 B (向下)" });
+          addContinuousElevator3D(root, elMX, -6.5, platTopY, topPlatZ, [-6.5, platTopY]);
+          addContinuousElevator3D(root, elMX, -6.5, platTopY, botPlatZ, [-6.5, platTopY]);
+        }
+      } else if (s.layout.plat_sets_mode === "2") {
+        addStairEscalatorSpan(root, 10, platTopY, concourseY, 0, { dirSign: 1, labelAtTop: true, label: "B2↗B1 #1" });
+        addStairEscalatorSpan(root, 26, platTopY, concourseY, 0, { dirSign: -1, labelAtTop: true, label: "B2↗B1 #2" });
+        addContinuousElevator3D(root, 2, platTopY, concourseY, 0, [platTopY, concourseY]);
+        addContinuousElevator3D(root, 34, platTopY, concourseY, 0, [platTopY, concourseY]);
+      }
+    } else if (s.group === "surface") {
+      // 1F 南北站區隔離圍牆：完全封閉鐵路與月台管制區，防止地面出口直通月台
+      [-railHalfZ, railHalfZ].forEach(wz => {
+        addBox(root, platLen + 12, 0.9, 0.35, 0, platTopY + 0.45, wz, UV_REGIONS.psd_upper_wall);
+        const fGlass = new THREE.Mesh(new THREE.BoxGeometry(platLen + 12, 1.35, 0.10), threeState.glassMat);
+        fGlass.position.set(0, platTopY + 1.55, wz);
+        root.add(fGlass);
+        const fCap = new THREE.Mesh(new THREE.BoxGeometry(platLen + 12, 0.14, 0.22), threeState.darkMetalMat);
+        fCap.position.set(0, platTopY + 2.26, wz);
+        root.add(fCap);
+      });
+
+      // 南北兩側獨立站外地面出口廣場（完全位於 |Z| > railHalfZ 外側，只向上連接 2F 連通道）
+      const isLongSurf = platLen >= 130;
+      const plazaX = isLongSurf ? -40 : -30;
+      const exStairX = isLongSurf ? -35 : -25.5;
+      const exElevX = isLongSurf ? -45.5 : -35.5;
+      const exSignX = isLongSurf ? -49 : -39;
+
+      [-exitZ, exitZ].forEach((ez, idx) => {
+        // 站外地面廣場板塊 (寬 24m × 深 9m，位於隔離牆外)
+        addBox(root, 24, 1.2, 9.0, plazaX, platBaseY, ez, {
+          py: UV_REGIONS.concourse_floor,
+          default: UV_REGIONS.concrete_white
+        });
+        addBox(root, 2.8, 2.4, 2.4, exSignX, platTopY + 1.2, ez, UV_REGIONS.concrete_white, threeState.greenExitMat);
+        addLabelAnchor(exSignX, platTopY + 3.4, ez, `🚪 出口 ${idx + 1} (站外廣場↗2F)`, "exit");
+
+        addStairEscalatorSpan(root, exStairX, platTopY, concourseY, ez, {
+          dirSign: 1,
+          labelAtTop: true,
+          label: `出口${idx + 1} (1F↗2F)`
+        });
+        addContinuousElevator3D(root, exElevX, platTopY, concourseY, ez, [platTopY, concourseY]);
+      });
+
+      // 地面月台 (Y=0.6) 向上連接至 2F 付費連通道層 (Y=10)
+      if (s.layout.plat_sets_mode === "2+2+2") {
+        // FR21 綾路北站：全數推移至 X ∈ [-20.75, +15.25]，距中島3月台行李區 (X ∈ [20, 45]) 保留 4.75m 淨空
+        [-19.5, 0, 19.5].forEach((pz, idx) => {
+          const tag = idx === 0 ? "月台1" : (idx === 1 ? "中島2/3" : "月台4");
+          addStairEscalatorSpan(root, -10.5, platTopY, concourseY, pz, { dirSign: 1, labelAtTop: true, label: `${tag} 往2F #1` });
+          addStairEscalatorSpan(root, 8.5, platTopY, concourseY, pz, { dirSign: 1, labelAtTop: true, label: `${tag} 往2F #2` });
+          addContinuousElevator3D(root, -19.5, platTopY, concourseY, pz, [platTopY, concourseY]);
+          addContinuousElevator3D(root, -1.0, platTopY, concourseY, pz, [platTopY, concourseY]);
+        });
+      } else if (s.layout.plat_sets_mode === "1+1") {
+        // FR12 飛灣公園：2F 付費連通道涵蓋 X ∈ [-24, +48]
+        addStairEscalatorSpan(root, 0, platTopY, concourseY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "月台A 往2F" });
+        addStairEscalatorSpan(root, 0, platTopY, concourseY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "月台B 往2F" });
+        addContinuousElevator3D(root, -10, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, -10, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+        if (s.layout.plat_metro_sets === "1+1") {
+          addStairEscalatorSpan(root, 24, -6.5, platTopY, topPlatZ, { dirSign: -1, isMetro: true, labelAtTop: true, label: "🚇 往地鐵站 A (向下)" });
+          addStairEscalatorSpan(root, 24, -6.5, platTopY, botPlatZ, { dirSign: -1, isMetro: true, labelAtTop: true, label: "🚇 往地鐵站 B (向下)" });
+          addContinuousElevator3D(root, 33, -6.5, platTopY, topPlatZ, [-6.5, platTopY]);
+          addContinuousElevator3D(root, 33, -6.5, platTopY, botPlatZ, [-6.5, platTopY]);
+        }
+      } else if (s.layout.plat_sets_mode === "2+2") {
+        // FR13, FR14, FR19: 2F 付費連通道涵蓋 X ∈ [-16, +34]
+        addStairEscalatorSpan(root, -3, platTopY, concourseY, topPlatZ, { dirSign: 1, labelAtTop: true, label: "月台A 往2F #1" });
+        addStairEscalatorSpan(root, 16, platTopY, concourseY, topPlatZ, { dirSign: -1 });
+        addStairEscalatorSpan(root, -3, platTopY, concourseY, botPlatZ, { dirSign: 1, labelAtTop: true, label: "月台B 往2F #1" });
+        addStairEscalatorSpan(root, 16, platTopY, concourseY, botPlatZ, { dirSign: -1 });
+        addContinuousElevator3D(root, -11.5, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, 25, platTopY, concourseY, topPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, -11.5, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+        addContinuousElevator3D(root, 25, platTopY, concourseY, botPlatZ, [platTopY, concourseY]);
+      } else if (s.layout.plat_sets_mode === "2") {
+        // FR20, FR22: 2F 付費連通道涵蓋 X ∈ [-16, +34]
+        addStairEscalatorSpan(root, -3, platTopY, concourseY, 0, { dirSign: 1, labelAtTop: true, label: "月台 往2F #1" });
+        addStairEscalatorSpan(root, 16, platTopY, concourseY, 0, { dirSign: -1, labelAtTop: true, label: "月台 往2F #2" });
+        addContinuousElevator3D(root, -11.5, platTopY, concourseY, 0, [platTopY, concourseY]);
+        addContinuousElevator3D(root, 25, platTopY, concourseY, 0, [platTopY, concourseY]);
+      }
+    }
+  }
+
+  function reset3DCamera() {
+    const s = frStations[currentStationId];
+    const meta = STATION_SIM_META[currentStationId] || { exp: false };
+    const isSurface = s && s.group === "surface";
+    threeState.targetOrbit = {
+      theta: -0.68,
+      phi: 0.96,
+      radius: meta.exp ? (isSurface ? 155 : 148) : (isSurface ? 112 : 118),
+      tx: 0,
+      ty: isSurface ? 5.5 : 10.5,
+      tz: 0
+    };
+  }
+
+  function clearStation3D() {
+    threeState.builtStationId = null;
+    if (!threeState.stationRoot) return;
+    threeState.stationRoot.traverse(obj => {
+      if (obj.isMesh && obj.geometry) obj.geometry.dispose();
+    });
+    while (threeState.stationRoot.children.length > 0) {
+      threeState.stationRoot.remove(threeState.stationRoot.children[0]);
+    }
+    const layer = document.getElementById("labels3DLayer");
+    if (layer) layer.innerHTML = "";
+    threeState.labelAnchors = [];
+  }
+
+  function render3DStation(s) {
+    if (!ensureThreeSetup()) {
+      const fb = document.getElementById("webglFallbackBanner");
+      if (fb) fb.style.display = "block";
+      viewMode = "2d";
+      switchFloorOrViewMode("2d", s.levels[0]);
+      return;
+    }
+
+    const stage = document.getElementById("viewer3DStage");
+    if (stage) {
+      stage.innerHTML = "";
+      stage.appendChild(threeState.renderer.domElement);
+      bind3DControls(threeState.renderer.domElement);
+      resize3DViewer();
+      requestAnimationFrame(() => resize3DViewer());
+    }
+
+    clearStation3D();
+    buildStationStacked3D(s);
+    threeState.builtStationId = currentStationId;
+    reset3DCamera();
+  }
+
   window.onload = () => {
-    loadStationData("FR01");
+    loadStationData('FR01');
   };
 </script>
 </body>

@@ -2282,6 +2282,76 @@
 
         }
 
+        /* 手機版左右細桿操縱桿 (參考 game_normal) */
+        .mobile-lever-wrap {
+            display: none;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            flex-direction: column;
+            align-items: center;
+            z-index: 140;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body.is-mobile .mobile-lever-wrap {
+            display: flex;
+        }
+
+        #mobile-lever-brk-wrap {
+            left: 8px;
+        }
+
+        #mobile-lever-pwr-wrap {
+            right: 8px;
+        }
+
+        .mobile-lever-track {
+            position: relative;
+            width: 20px;
+            height: min(260px, 55vh);
+            background: rgba(17, 17, 17, 0.78);
+            border: 1px solid #555;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            touch-action: none;
+        }
+
+        .mobile-lever-handle {
+            position: absolute;
+            left: 1px;
+            width: 16px;
+            height: 18px;
+            border-radius: 5px;
+            transition: top 0.1s;
+            box-shadow: 0 2px 5px #000;
+            z-index: 10;
+            cursor: grab;
+        }
+
+        #mobile-handle-pwr {
+            background: #00cc00;
+            top: 90%;
+        }
+
+        #mobile-handle-brk {
+            background: #ff3333;
+            top: 50%;
+        }
+
+        .mobile-lever-label {
+            text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 4px;
+            color: #ddd;
+            text-shadow: 0 1px 2px #000;
+            pointer-events: none;
+        }
+
 
 
         @keyframes blink {
@@ -2544,6 +2614,16 @@
 
                             style="flex:1; padding:9px 12px; background:#070b16; color:#00ffff; border:1px solid #00ffff; border-radius:6px; font-size:16px; font-family:monospace; font-weight:bold; outline:none;" />
 
+                        <button type="button" id="story-train-dice-btn" onclick="rollRandomTrainNumber('story')"
+
+                            title="隨機抽取可用班次"
+
+                            style="width:auto; margin-top:0; padding:9px 14px; font-size:14px; background:#1e293b; color:#38bdf8; border:1px solid #38bdf8; font-weight:bold; border-radius:6px; cursor:pointer; transition:all 0.2s; white-space:nowrap;">
+
+                            🎲 隨機車次
+
+                        </button>
+
                         <button id="story-train-confirm-btn" onclick="confirmStoryTrainNumber()"
 
                             style="width:auto; margin-top:0; padding:9px 18px; font-size:14px; background:#00ffff; color:#000; font-weight:bold; border-radius:6px; cursor:pointer; border:none; transition:all 0.2s; white-space:nowrap;">
@@ -2787,6 +2867,12 @@
 
                         onkeypress="if(event.key==='Enter') searchTrainNumber()" />
 
+                    <button type="button" id="setup-train-dice-btn" onclick="rollRandomTrainNumber('setup')"
+
+                        title="隨機抽取可用班次"
+
+                        style="width: auto; margin-top: 0; padding: 10px 14px; font-size:16px; background:#1e293b; color:var(--color-ato); border:1px solid var(--color-ato); font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;">🎲</button>
+
                     <button onclick="searchTrainNumber()"
 
                         style="width: auto; margin-top: 0; padding: 10px 18px; font-size:16px; background:var(--color-ato); color:#000; font-weight:bold; border-radius:4px; cursor:pointer;">讀取車次</button>
@@ -2891,6 +2977,21 @@
 
             </button>
 
+        </div>
+
+        <!-- 手機版最左邊(煞車)與最右邊(電門)細桿 -->
+        <div id="mobile-lever-brk-wrap" class="mobile-lever-wrap" onpointerdown="event.stopPropagation()">
+            <div class="mobile-lever-track">
+                <div class="mobile-lever-handle" id="mobile-handle-brk"></div>
+            </div>
+            <div class="mobile-lever-label">煞車<br>BRK</div>
+        </div>
+
+        <div id="mobile-lever-pwr-wrap" class="mobile-lever-wrap" onpointerdown="event.stopPropagation()">
+            <div class="mobile-lever-track">
+                <div class="mobile-lever-handle" id="mobile-handle-pwr"></div>
+            </div>
+            <div class="mobile-lever-label">電門<br>PWR</div>
         </div>
 
     </div>
@@ -3894,6 +3995,8 @@
 
             hPwr: document.getElementById('handle-pwr'), hBrk: document.getElementById('handle-brk'),
 
+            mPwr: document.getElementById('mobile-handle-pwr'), mBrk: document.getElementById('mobile-handle-brk'),
+
             sign: document.getElementById('station-sign'), msg: document.getElementById('msg-center'),
 
             door: document.getElementById('ui-door'), curr: document.getElementById('ui-curr'), next: document.getElementById('ui-next'),
@@ -4773,6 +4876,63 @@
         }
 
 
+
+        function getAvailableTrainsForSchedule(schedType) {
+            const upTrains = getMergedTrainsForSchedule(schedType, 'up') || [];
+            const downTrains = getMergedTrainsForSchedule(schedType, 'down') || [];
+            return [...downTrains, ...upTrains].filter(t => {
+                if (!t || !t.num || String(t.num).trim() === '') return false;
+                if (t.type && t.type.includes('試運轉')) return false;
+                return true;
+            });
+        }
+
+        function rollRandomTrainNumber(target) {
+            const isStory = (target === 'story');
+            if (isStory) {
+                const yearEl = document.getElementById('story-flywan-year');
+                const monthEl = document.getElementById('story-flywan-month');
+                const dayEl = document.getElementById('story-flywan-day');
+                const calInfo = getFlywanCalendarInfo(
+                    yearEl ? yearEl.value : 2026,
+                    monthEl ? monthEl.value : 1,
+                    dayEl ? dayEl.value : 1
+                );
+                setActiveScheduleType(calInfo.scheduleType);
+            }
+
+            const pool = getAvailableTrainsForSchedule(currentScheduleType);
+            const inputEl = isStory
+                ? document.getElementById('story-train-input')
+                : (ui.trainNumInput || document.getElementById('train-num-input'));
+            const msgEl = isStory
+                ? document.getElementById('story-train-msg')
+                : ui.trainSearchMsg;
+
+            if (!pool.length) {
+                if (msgEl) {
+                    msgEl.innerHTML = `<span style="color:var(--color-err)">❌ 目前時刻表沒有可用的營運班次！</span>`;
+                }
+                return;
+            }
+
+            const currentVal = inputEl ? inputEl.value.trim() : '';
+            const candidates = pool.length > 1
+                ? pool.filter(t => t.num !== currentVal)
+                : pool;
+            const picked = candidates[Math.floor(Math.random() * candidates.length)];
+
+            if (inputEl) inputEl.value = picked.num;
+
+            if (isStory) {
+                onDutyFormInputChanged();
+                if (msgEl) {
+                    msgEl.innerHTML = `<span style="color:#38bdf8;">🎲 已隨機抽取可用班次：<b>${picked.num} 次</b> (${picked.type || '列車'}・${picked.origin} ➔ ${picked.dest})，請點擊「確認核對車次及時刻」</span>`;
+                }
+            } else {
+                searchTrainNumber();
+            }
+        }
 
         function confirmStoryTrainNumber() {
 
@@ -10110,6 +10270,11 @@
 
                     }
 
+                    if (state.doorClosing) {
+                        const doorText = (state.doorTimer <= 4.0) ? `⚠️ 車門關閉中 (${Math.ceil(state.doorTimer)}s)` : `⚠️ 月台發車鈴聲中 (${Math.ceil(state.doorTimer - 4.0)}s)`;
+                        occMsg += `\n${doorText}`;
+                    }
+
                 } else if (state.radioEmer && state.radioEmer.triggered && !state.radioEmer.cleared) {
 
                     occMsg = "⚠️ 防護無線動作中！全線列車緊急停車！\n立即施行 EB 緊急煞車停妥後按 T 聯繫行控！";
@@ -10723,9 +10888,9 @@
 
                 if (e.button !== 0) return;
 
-                // 排除 UI 按鈕（如左上角保存進度按鈕），避免觸發視角移動
+                // 排除 UI 按鈕（如左上角保存進度按鈕與手機版細桿），避免觸發視角移動
 
-                if (e.target && (e.target.closest('#save-btn-container') || e.target.closest('#btn-save-game') || e.target.closest('button'))) {
+                if (e.target && (e.target.closest('#save-btn-container') || e.target.closest('#btn-save-game') || e.target.closest('.mobile-lever-wrap') || e.target.closest('button'))) {
 
                     return;
 
@@ -12078,6 +12243,64 @@
 
             return applySceneryDistanceShader(material, 100, 85, enableWind);
 
+        }
+
+        // 月台新增場景專用 10M 距離著色器：沿視線/軌道縱向距離 <= 10M 內才顯示（含橫向月台寬度補償，超過 10M 自動裁切）
+        function applyScenery10mPlatformShader(material, maxDist = 10.0, fadeStart = 7.5) {
+            window._sceneryMatCounter = (window._sceneryMatCounter || 0) + 1;
+            const matCacheId = window._sceneryMatCounter;
+            const isTrans = !!material.transparent;
+
+            material.customProgramCacheKey = function () {
+                return 'scenery_plat10m_' + matCacheId + '_' + maxDist + '_' + fadeStart;
+            };
+
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.uCamPos = { value: new THREE.Vector3() };
+                shader.uniforms.uCamFwd = { value: new THREE.Vector2(0, 1) };
+                shader.uniforms.uMaxDist = { value: maxDist };
+                shader.uniforms.uFadeStart = { value: fadeStart };
+
+                shader.vertexShader = `
+                    varying vec3 vWorldPosition;
+                    ${shader.vertexShader}
+                `.replace(
+                    `#include <worldpos_vertex>`,
+                    `#include <worldpos_vertex>
+                    vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+                );
+
+                const fadeFrag = isTrans ? `
+                    if (dToCam > uFadeStart) {
+                        gl_FragColor.a *= clamp(1.0 - (dToCam - uFadeStart) / max(0.001, uMaxDist - uFadeStart), 0.0, 1.0);
+                    }` : '';
+
+                shader.fragmentShader = `
+                    uniform vec3 uCamPos;
+                    uniform vec2 uCamFwd;
+                    uniform float uMaxDist;
+                    uniform float uFadeStart;
+                    varying vec3 vWorldPosition;
+                    ${shader.fragmentShader}
+                `.replace(
+                    `#include <dithering_fragment>`,
+                    `#include <dithering_fragment>
+                    vec2 diffXZ = vWorldPosition.xz - uCamPos.xz;
+                    float projLong = dot(diffXZ, uCamFwd);
+                    float dLong = abs(projLong);
+                    float dLat = length(diffXZ - projLong * uCamFwd);
+                    float dToCam = max(dLong, max(0.0, dLat - 28.0));
+                    if (dToCam > uMaxDist) discard;
+                    ${fadeFrag}`
+                );
+
+                material.userData.shader = shader;
+            };
+
+            if (!window.sceneryShaderMats.includes(material)) {
+                window.sceneryShaderMats.push(material);
+            }
+            return material;
         }
 
 
@@ -14751,6 +14974,291 @@
             bCtx.fillText('行李處理區 BAGGAGE HANDLING', 256, 64);
             const baggageBoxMat = applySceneryDistanceShader(new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(baggageCanvas), side: THREE.DoubleSide }), 1000, 850);
 
+            // =========================================================================
+            // 月台新增場景 (10M 內才顯示；僅建模月台層設施，不建模大廳層與高架／地下出口層)
+            // =========================================================================
+            function makePlatformTex10m(w, h, drawFn) {
+                const c = document.createElement('canvas');
+                c.width = w;
+                c.height = h;
+                drawFn(c.getContext('2d'), w, h);
+                const t = new THREE.CanvasTexture(c);
+                t.needsUpdate = true;
+                return t;
+            }
+
+            const platFloorIsland10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({
+                map: makePlatformTex10m(512, 1024, (ctx, w, h) => {
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 2;
+                    for (let x = 0; x <= w; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+                    for (let y = 0; y <= h; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+                    // 雙側黃色導盲磚
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillRect(24, 0, 22, h);
+                    ctx.fillRect(w - 46, 0, 22, h);
+                }),
+                side: THREE.FrontSide
+            }), 10.0, 7.5);
+
+            const platFloorSide10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({
+                map: makePlatformTex10m(256, 1024, (ctx, w, h) => {
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 2;
+                    for (let x = 0; x <= w; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+                    for (let y = 0; y <= h; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+                    // 單側 (+X 內緣) 黃色導盲磚
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillRect(w - 36, 0, 20, h);
+                }),
+                side: THREE.FrontSide
+            }), 10.0, 7.5);
+
+            const escStep10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({
+                map: makePlatformTex10m(256, 256, (ctx, w, h) => {
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillRect(0, 0, 20, h);
+                    ctx.fillRect(w - 20, 0, 20, h);
+                    for (let y = 0; y < h; y += 16) {
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.fillRect(22, y, w - 44, 10);
+                        ctx.fillStyle = '#1e293b';
+                        ctx.fillRect(22, y + 10, w - 44, 6);
+                    }
+                }),
+                side: THREE.DoubleSide
+            }), 10.0, 7.5);
+
+            const stairStep10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({
+                map: makePlatformTex10m(256, 256, (ctx, w, h) => {
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.fillStyle = '#94a3b8';
+                    for (let y = 0; y < h; y += 24) ctx.fillRect(0, y, w, 5);
+                    ctx.fillStyle = '#64748b';
+                    ctx.fillRect(0, 0, w, 6);
+                }),
+                side: THREE.DoubleSide
+            }), 10.0, 7.5);
+
+            const elevDoor10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({
+                map: makePlatformTex10m(256, 256, (ctx, w, h) => {
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(36, 20, w - 72, 34);
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('2 電梯 ♿', w / 2, 37);
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillRect(36, 62, w - 72, h - 62);
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(36, 62, w - 72, h - 62);
+                    ctx.beginPath(); ctx.moveTo(w / 2, 62); ctx.lineTo(w / 2, h); ctx.stroke();
+                }),
+                side: THREE.DoubleSide
+            }), 10.0, 7.5);
+
+            const concreteWhite10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({ color: 0xf1f5f9, side: THREE.DoubleSide }), 10.0, 7.5);
+            const darkMetal10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({ color: 0x334155, side: THREE.DoubleSide }), 10.0, 7.5);
+            const glass10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.40, depthWrite: false, side: THREE.DoubleSide }), 10.0, 7.5);
+            const metroZone10mMat = applyScenery10mPlatformShader(new THREE.MeshLambertMaterial({ color: 0xa855f7, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }), 10.0, 7.5);
+
+            // FR01~FR22 月台層新增設施配置表 (對照 stations.html 月台層規格；不建置大廳層與高架/地下出口層)
+            const STATION_PLATFORM_SCENERY_CFG = {
+                FR01: { group: 'elevated',    platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR02: { group: 'elevated',    platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR03: { group: 'elevated',    platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR04: { group: 'underground', platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: true  },
+                FR05: { group: 'underground', platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: false },
+                FR06: { group: 'underground', platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: false },
+                FR07: { group: 'underground', platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: false },
+                FR08: { group: 'underground', platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: true  },
+                FR09: { group: 'underground', platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR10: { group: 'underground', platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR11: { group: 'underground', platSets: '2',   metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR12: { group: 'surface',     platSets: '1+1', metroSets: '1+1', metroEscOnly: false, hasBaggage: false },
+                FR13: { group: 'surface',     platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR14: { group: 'surface',     platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR15: { group: 'underground', platSets: '2',   metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR16: { group: 'underground', platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: true  },
+                FR17: { group: 'elevated',    platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR18: { group: 'elevated',    platSets: '1+1', metroSets: '1+1', metroEscOnly: true,  hasBaggage: false },
+                FR19: { group: 'surface',     platSets: '2',   metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR20: { group: 'surface',     platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: false },
+                FR21: { group: 'surface',     platSets: '2+2', metroSets: null,  metroEscOnly: false, hasBaggage: true  },
+                FR22: { group: 'surface',     platSets: '2',   metroSets: null,  metroEscOnly: false, hasBaggage: false }
+            };
+
+            function addPlatformGuardrail10m(parent, xCenter, zCenter, widthX, runZ, openDirSignZ) {
+                const baseY = 0.62;
+                const pitPad = new THREE.Mesh(new THREE.BoxGeometry(widthX, 0.03, runZ), darkMetal10mMat);
+                pitPad.position.set(xCenter, baseY + 0.015, zCenter);
+                parent.add(pitPad);
+
+                const railH = 1.06;
+                [-widthX / 2, widthX / 2].forEach(dx => {
+                    const gSide = new THREE.Mesh(new THREE.BoxGeometry(0.06, railH, runZ), glass10mMat);
+                    gSide.position.set(xCenter + dx, baseY + railH / 2, zCenter);
+                    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, runZ), darkMetal10mMat);
+                    cap.position.set(xCenter + dx, baseY + railH + 0.04, zCenter);
+                    parent.add(gSide, cap);
+                });
+                const closedZ = zCenter - openDirSignZ * (runZ / 2);
+                const gEnd = new THREE.Mesh(new THREE.BoxGeometry(widthX, railH, 0.06), glass10mMat);
+                gEnd.position.set(xCenter, baseY + railH / 2, closedZ);
+                const cEnd = new THREE.Mesh(new THREE.BoxGeometry(widthX, 0.08, 0.10), darkMetal10mMat);
+                cEnd.position.set(xCenter, baseY + railH + 0.04, closedZ);
+                parent.add(gEnd, cEnd);
+            }
+
+            // 建立單組月台樓梯＋電扶梯（僅月台層構造：向上止於天花/頂框；向下設井口護欄與下階梯）
+            function addPlatformStairEsc10m(parent, xCenter, zCenter, opts = {}) {
+                const { isUp = true, dirSign = 1, escOnly = false, isMetro = false } = opts;
+                const yPlat = 0.62;
+                const run = isUp ? 10.5 : 6.2;
+                const yLow = isUp ? yPlat : -1.65;
+                const yHigh = isUp ? 5.36 : yPlat;
+                const dy = yHigh - yLow;
+                const rampLen = Math.hypot(run, dy);
+                // Three.js +X 右手定則：rotX = -atan2(dy, run) * dirSign 時，沿 +dirSign*Z 方向上升至 yHigh
+                const slopeRotX = -Math.atan2(dy, run) * dirSign;
+                const widthX = escOnly ? 1.8 : 3.2;
+
+                if (isMetro) {
+                    const metroPad = new THREE.Mesh(new THREE.BoxGeometry(widthX + 1.0, 0.008, run + 1.8), metroZone10mMat);
+                    metroPad.position.set(xCenter, 0.614, zCenter);
+                    parent.add(metroPad);
+                }
+
+                // 1. 電扶梯主體＋雙側玻璃欄板＋扶手
+                const escX = escOnly ? xCenter : (xCenter - 0.85);
+                const escGroup = new THREE.Group();
+                escGroup.position.set(escX, (yLow + yHigh) / 2, zCenter);
+                escGroup.rotation.x = slopeRotX;
+
+                const escDeck = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.34, rampLen), escStep10mMat);
+                escGroup.add(escDeck);
+                [-0.65, 0.65].forEach(dx => {
+                    const gPane = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.88, rampLen), glass10mMat);
+                    gPane.position.set(dx, 0.61, 0);
+                    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, rampLen + 0.25), darkMetal10mMat);
+                    rail.position.set(dx, 1.06, 0);
+                    escGroup.add(gPane, rail);
+                });
+                parent.add(escGroup);
+
+                // 2. 階梯式樓梯
+                if (!escOnly) {
+                    const stairX = xCenter + 0.82;
+                    const steps = 14;
+                    const stepDz = run / steps;
+                    const stepDy = dy / steps;
+                    for (let i = 0; i < steps; i++) {
+                        const sz = zCenter + dirSign * (-run / 2 + (i + 0.5) * stepDz);
+                        const sy = yLow + (i + 0.5) * stepDy;
+                        const stMesh = new THREE.Mesh(new THREE.BoxGeometry(1.42, stepDy + 0.10, stepDz + 0.06), stairStep10mMat);
+                        stMesh.position.set(stairX, sy, sz);
+                        parent.add(stMesh);
+                    }
+                    const handRail = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, rampLen), darkMetal10mMat);
+                    handRail.position.set(stairX + 0.72, (yLow + yHigh) / 2 + 1.0, zCenter);
+                    handRail.rotation.x = slopeRotX;
+                    parent.add(handRail);
+                }
+
+                // 3. 若由月台層向下 (高架 3F→2F 或 月台→地鐵)，補設月台面開口玻璃防護圍欄
+                if (!isUp) {
+                    addPlatformGuardrail10m(parent, xCenter, zCenter, widthX + 0.3, run, dirSign);
+                }
+            }
+
+            // 建立單座月台電梯門廳（僅月台層高度，不建置大廳或出口樓板）
+            function addPlatformElevator10m(parent, xCenter, zCenter, isUp = true) {
+                const baseY = 0.62;
+                const shaftH = isUp ? (5.36 - baseY) : 3.10;
+                const shaftCore = new THREE.Mesh(new THREE.BoxGeometry(2.2, shaftH, 2.2), glass10mMat);
+                shaftCore.position.set(xCenter, baseY + shaftH / 2, zCenter);
+                parent.add(shaftCore);
+
+                [[-1.08, -1.08], [1.08, -1.08], [-1.08, 1.08], [1.08, 1.08]].forEach(([dx, dz]) => {
+                    const col = new THREE.Mesh(new THREE.BoxGeometry(0.22, shaftH, 0.22), concreteWhite10mMat);
+                    col.position.set(xCenter + dx, baseY + shaftH / 2, zCenter + dz);
+                    parent.add(col);
+                });
+
+                const topCap = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.22, 2.4), concreteWhite10mMat);
+                topCap.position.set(xCenter, baseY + shaftH + 0.11, zCenter);
+                parent.add(topCap);
+
+                const doorBox = new THREE.Mesh(new THREE.BoxGeometry(2.12, 2.65, 2.12), elevDoor10mMat);
+                doorBox.position.set(xCenter, baseY + 1.325, zCenter);
+                parent.add(doorBox);
+            }
+
+            function createPlatformScenery10m(platformGroup, st, platCenters, platWidth, platLen) {
+                const stCodeMatch = String(st.name || '').match(/FR\d{2}/);
+                const stCode = stCodeMatch ? stCodeMatch[0] : '';
+                const cfg = STATION_PLATFORM_SCENERY_CFG[stCode];
+                if (!cfg) return;
+
+                const isUpToConcourse = (cfg.group !== 'elevated');
+                const isSideType = (st.type === 'side' || st.type === 'passing_side');
+
+                // 1. 鋪設月台層石材磁磚與黃色導盲磚鋪面 (10M 內才顯示)
+                const floorW = Math.max(2.0, platWidth - 0.36);
+                const floorL = Math.max(10.0, platLen - 0.8);
+                platCenters.forEach(cx => {
+                    const floorMatCur = isSideType ? platFloorSide10mMat : platFloorIsland10mMat;
+                    const floorOverlay = new THREE.Mesh(new THREE.BoxGeometry(floorW, 0.008, floorL), floorMatCur);
+                    floorOverlay.position.set(cx, 0.605, 0);
+                    if (isSideType && cx > 0) floorOverlay.rotation.y = Math.PI;
+                    platformGroup.add(floorOverlay);
+                });
+
+                // 2. 配置各月台垂直動線組 (閃避行李區 localZ ∈ [-45.0, -20.0]，確保所有設施位於 [-14.5, +21.2])
+                platCenters.forEach(cx => {
+                    const facX = isSideType ? (cx < 0 ? cx - 0.6 : cx + 0.6) : cx;
+
+                    if (cfg.platSets === '1+1') {
+                        // 第 1 組：往大廳／2F連通道
+                        addPlatformElevator10m(platformGroup, facX, 19.5, isUpToConcourse);
+                        addPlatformStairEsc10m(platformGroup, facX, 10.5, { isUp: isUpToConcourse, dirSign: 1 });
+                        // 第 2 組：往地鐵站直達轉乘區 (向下)
+                        if (cfg.metroSets === '1+1') {
+                            addPlatformElevator10m(platformGroup, facX, 1.0, false);
+                            addPlatformStairEsc10m(platformGroup, facX, -8.5, {
+                                isUp: false,
+                                dirSign: -1,
+                                escOnly: cfg.metroEscOnly,
+                                isMetro: true
+                            });
+                        }
+                    } else if (cfg.hasBaggage) {
+                        // 含行李處理區 (FR16, FR21)：兩組皆配置於 localZ ∈ [-14.5, +20.8]，距行李箱 (-20.0) >= 5.5m
+                        addPlatformElevator10m(platformGroup, facX, 19.5, isUpToConcourse);
+                        addPlatformStairEsc10m(platformGroup, facX, 10.5, { isUp: isUpToConcourse, dirSign: 1 });
+                        addPlatformElevator10m(platformGroup, facX, 1.0, isUpToConcourse);
+                        addPlatformStairEsc10m(platformGroup, facX, -8.5, { isUp: isUpToConcourse, dirSign: -1 });
+                    } else {
+                        // 一般雙組對稱配置 (localZ ∈ [-21.2, +21.2])
+                        addPlatformElevator10m(platformGroup, facX, 20.0, isUpToConcourse);
+                        addPlatformStairEsc10m(platformGroup, facX, 11.0, { isUp: isUpToConcourse, dirSign: 1 });
+                        addPlatformStairEsc10m(platformGroup, facX, -11.0, { isUp: isUpToConcourse, dirSign: -1 });
+                        addPlatformElevator10m(platformGroup, facX, -20.0, isUpToConcourse);
+                    }
+                });
+            }
+
             // 輔助函式：於月台沿線靠軌道側生成月台門 (PSD)
             // 地下車站 (isUnderground = true)：改為全罩式月台門，門框高度 2.8M，以上補水泥牆至隧道頂部，確保無重疊
             // 高架與地面車站：維持半高式月台門 (頂端 localY = 1.51)
@@ -14886,6 +15394,7 @@
                     createPlatformScreenDoors(group, 3.55, psdLen, isUnderground);
                     createPlatformEndConcreteWalls(group, -px, 8.0, platLen / 2, isUnderground);
                     createPlatformEndConcreteWalls(group, px, 8.0, platLen / 2, isUnderground);
+                    createPlatformScenery10m(group, st, [-px, px], 8.0, platLen);
                 } else if (st.type === "double_island" || st.type === "double_island_end") {
                     // 雙島式月台：每座島式月台寬 15M (半寬 7.5M)
                     // FR12 正線 ±4.2M -> 內緣 ±5.7M，月台中心 ±13.2M，外緣 ±20.7M，外軌 ±22.2M
@@ -14911,6 +15420,7 @@
                     } else if (st.name.includes("FR21")) {
                         createBaggageHandlingBox(group, -7.15); // 第 3 月台 (快速停靠側 -X)
                     }
+                    createPlatformScenery10m(group, st, [-px, px], 15.0, platLen);
                 } else if (st.type === "island") {
                     // 島式月台寬 15M (半寬 7.5M)，中心 0M，軌道 ±9.0M
                     const p1 = new THREE.Mesh(geoIslandCur, platMat); p1.position.x = 0;
@@ -14918,6 +15428,7 @@
                     createPlatformScreenDoors(group, -7.45, psdLen, isUnderground);
                     createPlatformScreenDoors(group, 7.45, psdLen, isUnderground);
                     createPlatformEndConcreteWalls(group, 0, 15.0, platLen / 2, isUnderground);
+                    createPlatformScenery10m(group, st, [0], 15.0, platLen);
                 } else if (st.type === "passing_side") {
                     // 越行側式月台寬 8M (半寬 4M)，側線軌道 ±6.0M，月台內緣 ±7.5M，中心 ±11.5M
                     const px = 11.5;
@@ -14928,6 +15439,7 @@
                     createPlatformScreenDoors(group, 7.55, psdLen, isUnderground);
                     createPlatformEndConcreteWalls(group, -px, 8.0, platLen / 2, isUnderground);
                     createPlatformEndConcreteWalls(group, px, 8.0, platLen / 2, isUnderground);
+                    createPlatformScenery10m(group, st, [-px, px], 8.0, platLen);
                 }
 
                 scene.add(group);
@@ -22531,6 +23043,7 @@
 
 
             let dynamicLimit = 120;
+            let staticDynamicLimit = 120;
 
             for (let pIdx = 0; pIdx < lookAheadPoints.length; pIdx++) {
 
@@ -22539,6 +23052,7 @@
                 let curveLim = pt.isCbtcBlock ? pt.cbtcLimit : applyBrakingCurve(120, pt.limit, pt.dist);
 
                 if (curveLim < dynamicLimit) dynamicLimit = curveLim;
+                if (!pt.isCbtcBlock && curveLim < staticDynamicLimit) staticDynamicLimit = curveLim;
 
             }
 
@@ -22571,15 +23085,14 @@
             let speedZoneTargetDist = searchDist;
 
             lookAheadPoints.forEach(pt => {
-                if (!pt.isCbtcBlock && pt.limit < currentZoneLimit) {
+                if (pt.isCbtcBlock) return;
+                if (pt.limit < currentZoneLimit) {
                     let ptTargetMs = Math.max(0, pt.limit - (isDownhillEnv ? 2.0 : 1.0)) / 3.6;
                     if (curV > ptTargetMs) {
                         let ptDecel = (curV * curV - ptTargetMs * ptTargetMs) / (2 * Math.max(1.0, pt.dist));
                         if (ptDecel > speedZoneReqDecel) speedZoneReqDecel = ptDecel;
                     }
-                }
-                if (pt.limit < currentZoneLimit) {
-                    let dynamicPtLimit = pt.isCbtcBlock ? pt.cbtcLimit : applyBrakingCurve(currentZoneLimit, pt.limit, pt.dist);
+                    let dynamicPtLimit = applyBrakingCurve(currentZoneLimit, pt.limit, pt.dist);
                     if (dynamicPtLimit < currentZoneLimit - 0.1) {
                         isAtpCurveDropping = true;
                         if (dynamicPtLimit < minDynamicPtLimit || (Math.abs(dynamicPtLimit - minDynamicPtLimit) < 0.1 && pt.dist < targetDist)) {
@@ -22587,23 +23100,18 @@
                             futureTargetLimit = pt.limit;
                             targetDist = Math.max(0.5, pt.dist);
                         }
-                        if (!pt.isCbtcBlock) {
-                            isSpeedLimitDropping = true;
-                            if (pt.limit < speedZoneTargetLimit || (pt.limit === speedZoneTargetLimit && pt.dist < speedZoneTargetDist)) {
-                                speedZoneTargetLimit = pt.limit;
-                                speedZoneTargetDist = Math.max(0.5, pt.dist);
-                            }
+                        isSpeedLimitDropping = true;
+                        if (pt.limit < speedZoneTargetLimit || (pt.limit === speedZoneTargetLimit && pt.dist < speedZoneTargetDist)) {
+                            speedZoneTargetLimit = pt.limit;
+                            speedZoneTargetDist = Math.max(0.5, pt.dist);
                         }
                     }
                 }
             });
 
-            if (dynamicLimit < currentZoneLimit - 0.1) {
+            if (staticDynamicLimit < currentZoneLimit - 0.1) {
                 isAtpCurveDropping = true;
-                if (dynamicLimit < futureTargetLimit) futureTargetLimit = dynamicLimit;
-            }
-            if (isCbtcRestricting) {
-                isAtpCurveDropping = true;
+                if (staticDynamicLimit < futureTargetLimit) futureTargetLimit = staticDynamicLimit;
             }
             if (isSpeedLimitDropping && (speedZoneTargetLimit < futureTargetLimit || speedZoneReqDecel > 0.05)) {
                 isAtpCurveDropping = true;
@@ -22628,7 +23136,7 @@
 
                 st.wasHeldByCbtc = false;
 
-                if (currentKph < 45.0 && st.b > 0 && !st.isStopping) {
+                if (currentKph < 45.0 && st.b > 0 && !st.isStopping && !st.isDownhillBraking && !st.isAtpBraking) {
 
                     st.b = 0;
 
@@ -22771,11 +23279,12 @@
                 ? Math.max(0, cbtc.blockDist - stopTargetBuf)
                 : Infinity;
 
-            let isCbtcActiveMode = (typeof cbtcSpeedLim === 'number' && cbtcSpeedLim < 119.9);
-            let baseStaticEffLimit = Math.min(currentZoneLimit, dynamicLimit);
-            let cbtcLim = isCbtcActiveMode ? Math.min(cbtcSpeedLim, baseStaticEffLimit) : baseStaticEffLimit;
-            if (isNotAtFixedStop && (isStationStopBlock || isStationArea)) {
-                cbtcLim = Math.min(Math.max(cbtcLim, 45), baseStaticEffLimit);
+            let baseStaticEffLimit = Math.min(currentZoneLimit, staticDynamicLimit);
+            let isStationApproachCbtcExempt = !!(isNotAtFixedStop && (isStationStopBlock || isStationArea));
+            let isCbtcActiveMode = (typeof cbtcSpeedLim === 'number' && cbtcSpeedLim < 119.9 && !isStationApproachCbtcExempt);
+            let cbtcLim = isCbtcActiveMode ? cbtcSpeedLim : baseStaticEffLimit;
+            if (isStationApproachCbtcExempt) {
+                cbtcLim = Math.min(Math.max(cbtcSpeedLim, 45), baseStaticEffLimit);
             }
 
             let safetyMarginKph = isDownhill ? 2.5 : 1.5;
@@ -27472,22 +27981,21 @@
             ctx.save();
             ctx.translate(cx, cy);
             ctx.scale(scale, scale);
-            const gradTop = ctx.createLinearGradient(-45, -35, 55, 25);
             if (isCyanScheme) {
+                const gradTop = ctx.createLinearGradient(-45, -35, 55, 25);
                 gradTop.addColorStop(0, '#00e5ff');
                 gradTop.addColorStop(1, '#2dd4bf');
+                ctx.fillStyle = gradTop;
             } else {
-                gradTop.addColorStop(0, '#0284c7');
-                gradTop.addColorStop(1, '#14b8a6');
+                ctx.fillStyle = '#0284c7';
             }
-            ctx.fillStyle = gradTop;
             ctx.beginPath();
             ctx.moveTo(-36, 36); ctx.lineTo(-14, -26);
             ctx.quadraticCurveTo(-6, -42, 14, -42);
             ctx.lineTo(52, -42); ctx.lineTo(42, -18); ctx.lineTo(6, -18); ctx.lineTo(-12, 36);
             ctx.closePath(); ctx.fill();
 
-            ctx.fillStyle = isCyanScheme ? '#67e8f9' : '#2dd4bf';
+            ctx.fillStyle = isCyanScheme ? '#67e8f9' : '#0a9176';
             ctx.beginPath();
             ctx.moveTo(-4, -3); ctx.lineTo(38, -3); ctx.lineTo(28, 17); ctx.lineTo(-12, 17);
             ctx.closePath(); ctx.fill();
@@ -27559,24 +28067,25 @@
             ctx.restore();
         }
 
-        function e300CreateUVCanvas(modelType, carRole, hasCabFront) {
+        function e300CreateUVCanvas(modelType, carRole, hasCabFront, flipSideEmblem = false) {
             const canvas = document.createElement('canvas');
             canvas.width = 2048; canvas.height = 1024;
             const ctx = canvas.getContext('2d');
             const isCyan = (modelType === 'E300E');
 
             const metalGrad = ctx.createLinearGradient(0, 0, 0, 1024);
-            metalGrad.addColorStop(0.00, '#94a3b8'); metalGrad.addColorStop(0.10, '#e2e8f0');
-            metalGrad.addColorStop(0.55, '#cbd5e1'); metalGrad.addColorStop(0.68, '#f8fafc');
+            metalGrad.addColorStop(0.00, '#cbd5e1'); metalGrad.addColorStop(0.10, '#f1f5f9');
+            metalGrad.addColorStop(0.55, '#e2e8f0'); metalGrad.addColorStop(0.68, '#f8fafc');
             metalGrad.addColorStop(0.86, '#94a3b8'); metalGrad.addColorStop(1.00, '#334155');
             ctx.fillStyle = metalGrad; ctx.fillRect(0, 0, 2048, 1024);
 
             const sideStartX = hasCabFront ? 716 : 40;
-            const topStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
+            let topStripeGrad;
             if (isCyan) {
+                topStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
                 topStripeGrad.addColorStop(0, '#00f2fe'); topStripeGrad.addColorStop(0.5, '#06b6d4'); topStripeGrad.addColorStop(1, '#0891b2');
             } else {
-                topStripeGrad.addColorStop(0, '#1d4ed8'); topStripeGrad.addColorStop(0.35, '#0284c7'); topStripeGrad.addColorStop(1, '#0d9488');
+                topStripeGrad = '#0a9176';
             }
             ctx.fillStyle = topStripeGrad; ctx.fillRect(sideStartX, 118, 2048 - sideStartX, 44);
             ctx.fillStyle = '#f8fafc'; ctx.fillRect(sideStartX, 162, 2048 - sideStartX, 12);
@@ -27586,14 +28095,15 @@
             ctx.fillStyle = bandGrad; ctx.fillRect(sideStartX, 174, 2048 - sideStartX, 391);
             ctx.fillStyle = '#f8fafc'; ctx.fillRect(sideStartX, 565, 2048 - sideStartX, 14);
 
-            const midStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
+            let midStripeGrad;
             if (isCyan) {
+                midStripeGrad = ctx.createLinearGradient(sideStartX, 0, 2048, 0);
                 midStripeGrad.addColorStop(0, '#22d3ee'); midStripeGrad.addColorStop(0.5, '#06b6d4'); midStripeGrad.addColorStop(1, '#0e7490');
             } else {
-                midStripeGrad.addColorStop(0, '#0d9488'); midStripeGrad.addColorStop(0.65, '#14b8a6'); midStripeGrad.addColorStop(1, '#1d4ed8');
+                midStripeGrad = '#0a9176';
             }
             ctx.fillStyle = midStripeGrad; ctx.fillRect(sideStartX, 579, 2048 - sideStartX, 58);
-            ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(sideStartX, 637, 2048 - sideStartX, 10);
+            ctx.fillStyle = isCyan ? '#083344' : '#065f46'; ctx.fillRect(sideStartX, 637, 2048 - sideStartX, 8);
 
             if (hasCabFront) {
                 const cx = 358;
@@ -27605,20 +28115,28 @@
                 ctx.fillStyle = bandGrad; ctx.fillRect(0, 174, 716, 391);
                 ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 565, 716, 14);
                 ctx.fillStyle = midStripeGrad; ctx.fillRect(0, 579, 716, 58);
-                ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(0, 637, 716, 10);
+                ctx.fillStyle = isCyan ? '#083344' : '#065f46'; ctx.fillRect(0, 637, 716, 8);
 
-                const cheekGrad = ctx.createLinearGradient(0, 95, 0, 790);
-                if (isCyan) {
-                    cheekGrad.addColorStop(0.00, '#00f2fe'); cheekGrad.addColorStop(0.55, '#06b6d4'); cheekGrad.addColorStop(1.00, '#0891b2');
-                } else {
-                    cheekGrad.addColorStop(0.00, '#1d4ed8'); cheekGrad.addColorStop(0.42, '#0284c7'); cheekGrad.addColorStop(0.75, '#0d9488'); cheekGrad.addColorStop(1.00, '#14b8a6');
-                }
-                ctx.fillStyle = cheekGrad;
                 ctx.beginPath();
                 ctx.moveTo(0, 118); ctx.lineTo(65, 118); ctx.lineTo(155, 76); ctx.lineTo(561, 76);
                 ctx.lineTo(651, 118); ctx.lineTo(716, 118); ctx.lineTo(716, 646); ctx.lineTo(652, 646);
                 ctx.quadraticCurveTo(540, 682, 465, 782); ctx.lineTo(251, 782); ctx.quadraticCurveTo(176, 682, 64, 646);
-                ctx.lineTo(0, 646); ctx.closePath(); ctx.fill();
+                ctx.lineTo(0, 646); ctx.closePath();
+
+                if (isCyan) {
+                    const cheekGrad = ctx.createLinearGradient(0, 95, 0, 790);
+                    cheekGrad.addColorStop(0.00, '#00f2fe'); cheekGrad.addColorStop(0.55, '#06b6d4'); cheekGrad.addColorStop(1.00, '#0891b2');
+                    ctx.fillStyle = cheekGrad;
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#0a9176';
+                    ctx.fill();
+                    ctx.save();
+                    ctx.clip();
+                    ctx.fillStyle = '#1d4ed8';
+                    ctx.fillRect(105, 70, 506, 205);
+                    ctx.restore();
+                }
 
                 ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 10;
                 ctx.beginPath(); ctx.moveTo(154, 82); ctx.quadraticCurveTo(128, 495, 224, 696);
@@ -27698,7 +28216,7 @@
                 ctx.fillStyle = '#cbd5e1'; ctx.fillRect(dx, dy + 387, dw, dh - 387);
                 ctx.fillStyle = '#f8fafc'; ctx.fillRect(dx, 565, dw, 14);
                 ctx.fillStyle = midStripeGrad; ctx.fillRect(dx, 579, dw, 58);
-                ctx.fillStyle = isCyan ? '#083344' : '#1e3a8a'; ctx.fillRect(dx, 637, dw, 10);
+                ctx.fillStyle = isCyan ? '#083344' : '#065f46'; ctx.fillRect(dx, 637, dw, 8);
                 ctx.fillStyle = '#020617'; ctx.fillRect(dc - 2.5, dy, 5, dh);
 
                 const winOffset = dw * 0.23, dww = dw * 0.28, dwh = 285;
@@ -27759,10 +28277,20 @@
             });
 
             const emblemX = bodyStart + sideSpan * 0.355;
-            if (carRole === 'commuter') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.15, false);
-            else if (carRole === 'business') e300DrawBriefcaseIcon(ctx, emblemX, 732, 0.98);
-            else if (carRole === 'luggage') e300DrawLargeLuggageGraphic(ctx, bodyStart + sideSpan * 0.37, 520, 1.15);
-            else if (carRole === 'express_std') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.10, true);
+            if (carRole === 'luggage') {
+                const lx = bodyStart + sideSpan * 0.37;
+                ctx.save();
+                if (flipSideEmblem) { ctx.translate(lx, 0); ctx.scale(-1, 1); ctx.translate(-lx, 0); }
+                e300DrawLargeLuggageGraphic(ctx, lx, 520, 1.15);
+                ctx.restore();
+            } else {
+                ctx.save();
+                if (flipSideEmblem) { ctx.translate(emblemX, 0); ctx.scale(-1, 1); ctx.translate(-emblemX, 0); }
+                if (carRole === 'commuter') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.15, false);
+                else if (carRole === 'business') e300DrawBriefcaseIcon(ctx, emblemX, 732, 0.98);
+                else if (carRole === 'express_std') e300DrawStylizedFLogo(ctx, emblemX, 730, 1.10, true);
+                ctx.restore();
+            }
 
             return canvas;
         }
@@ -27843,7 +28371,7 @@
                         pz = sideSign * prof.zOut;
                         if (hasFrontCab) uTex = 0.35 + bodyFraction * 0.645;
                         else if (hasRearCab) uTex = 0.35 + (1.0 - bodyFraction) * 0.645;
-                        else uTex = 0.025 + bodyFraction * 0.95;
+                        else uTex = isRightSide ? (0.025 + bodyFraction * 0.95) : (0.025 + (1.0 - bodyFraction) * 0.95);
                     }
 
                     positions.push(px + shiftX, py, pz);
@@ -27863,6 +28391,10 @@
             geo.setIndex(indices);
             geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            const sideIndexCount = iSteps * jSteps * 6;
+            geo.clearGroups();
+            geo.addGroup(0, sideIndexCount, 0);
+            geo.addGroup(sideIndexCount, sideIndexCount, 1);
             geo.computeVertexNormals();
             e300AssetCache.geometries[key] = geo;
             return geo;
@@ -27873,15 +28405,18 @@
             e300AssetCache.initialized = true;
 
             const specs = [
-                { key: 'E300C_cab', m: 'E300C', r: 'commuter', cab: true },
-                { key: 'E300C_mid', m: 'E300C', r: 'commuter', cab: false },
-                { key: 'E300E_car1', m: 'E300E', r: 'business', cab: true },
-                { key: 'E300E_car2', m: 'E300E', r: 'luggage', cab: false },
-                { key: 'E300E_mid', m: 'E300E', r: 'express_std', cab: false },
-                { key: 'E300E_tail', m: 'E300E', r: 'express_std', cab: true }
+                { key: 'E300C_cab', m: 'E300C', r: 'commuter', cab: true, flip: false },
+                { key: 'E300C_cab_flip', m: 'E300C', r: 'commuter', cab: true, flip: true },
+                { key: 'E300C_mid', m: 'E300C', r: 'commuter', cab: false, flip: false },
+                { key: 'E300E_car1', m: 'E300E', r: 'business', cab: true, flip: false },
+                { key: 'E300E_car1_flip', m: 'E300E', r: 'business', cab: true, flip: true },
+                { key: 'E300E_car2', m: 'E300E', r: 'luggage', cab: false, flip: false },
+                { key: 'E300E_mid', m: 'E300E', r: 'express_std', cab: false, flip: false },
+                { key: 'E300E_tail', m: 'E300E', r: 'express_std', cab: true, flip: false },
+                { key: 'E300E_tail_flip', m: 'E300E', r: 'express_std', cab: true, flip: true }
             ];
             specs.forEach(s => {
-                const tex = new THREE.CanvasTexture(e300CreateUVCanvas(s.m, s.r, s.cab));
+                const tex = new THREE.CanvasTexture(e300CreateUVCanvas(s.m, s.r, s.cab, s.flip));
                 tex.anisotropy = 4;
                 tex.needsUpdate = true;
                 e300AssetCache.textures[s.key] = tex;
@@ -27946,9 +28481,14 @@
             carDefs.forEach((cd, idx) => {
                 const shellLength = cd.pitch - ((cd.lead || cd.tail) ? gangwayGap * 0.5 : gangwayGap);
                 const carMesh = new THREE.Group();
+                const matNormal = e300AssetCache.materials[cd.matKey];
+                const matFlip = e300AssetCache.materials[cd.matKey + '_flip'] || matNormal;
+                const carMaterials = cd.lead
+                    ? [matNormal, matFlip]
+                    : (cd.tail ? [matFlip, matNormal] : [matNormal, matNormal]);
                 const bodyMesh = new THREE.Mesh(
                     e300CreateCenteredCarGeo(cd.lead, cd.tail, shellLength),
-                    e300AssetCache.materials[cd.matKey]
+                    carMaterials
                 );
                 carMesh.add(bodyMesh);
 
@@ -32019,6 +32559,8 @@
 
 
 
+            let isPlayerStationCbtcExempt45 = false;
+
             if (blockDist < Infinity) {
 
                 state.cbtcBlockDist = blockDist;
@@ -32050,14 +32592,11 @@
                 // 修改ATO邏輯：站內低於45KPH未到達定點可加速至45KPH (到站減速仍優先)
 
                 let isSidingHoldOrLeadFollow = !!(playerBlock.isRule1Controlling || (playerBlock.holdInfo && (playerBlock.holdInfo.isSidingTurnoutHold || playerBlock.holdInfo.isArrivalCrossoverHold)));
+                isPlayerStationCbtcExempt45 = (!isSidingHoldOrLeadFollow && isPlayerNotAtFixedStop && (state.isStationStopBefore5mHold || (state.stationHoldInfo && distToPhysStop < 400) || (distToPhysStop < 400 && distToPhysStop > -15)));
                 // 前車閉塞或側線轉轍器前 1M 停止點為實際停止目標，必須依減速曲線停車，不可套用站內 45km/h 固定限速
                 if (playerBlock.cbtcSpeedLimit < 0) {
 
                     cbtcSpeedLimit = -5;
-
-                } else if (!isSidingHoldOrLeadFollow && isPlayerNotAtFixedStop && (state.isStationStopBefore5mHold || (state.stationHoldInfo && distToPhysStop < 400) || (distToPhysStop < 400 && distToPhysStop > -15))) {
-
-                    cbtcSpeedLimit = 45;
 
                 } else if (blockDist <= 0.0 || (state.isStationStopBefore5mHold && (Math.abs(state.v) < 0.25 || !!state.door || !!state.doorClosing))) {
 
@@ -32076,6 +32615,9 @@
                     if (blockDist <= 4.5 && Math.abs(state.v) < 0.05) {
                         cbtcSpeedLimit = 0;
                     }
+                }
+                if (isPlayerStationCbtcExempt45 && cbtcSpeedLimit >= 0) {
+                    cbtcSpeedLimit = Math.max(cbtcSpeedLimit, 45);
                 }
 
                 state.cbtcSpeedLimit = cbtcSpeedLimit;
@@ -32240,7 +32782,7 @@
                 } else if (blockDist_3s < searchDist) {
                     cbtcLimit_3s = Math.min(maxLimit, applyBrakingCurve(120, 0, Math.max(0.1, blockDist_3s - 0.15)));
                 }
-                if (state.cbtcSpeedLimit === 45 && cbtcLimit_3s > 45) cbtcLimit_3s = 45;
+                if (isPlayerStationCbtcExempt45 && cbtcLimit_3s >= 0 && cbtcLimit_3s < 45) cbtcLimit_3s = 45;
                 dynamicLimit_3s = Math.min(dynamicLimit_3s, cbtcLimit_3s);
             }
 
@@ -32487,6 +33029,12 @@
 
                 let nowSec = performance.now() * 0.001;
 
+                let camFwdHLen = Math.hypot(fwdTx, fwdTz);
+
+                let camFwdX = camFwdHLen > 1e-4 ? (fwdTx / camFwdHLen) : 0;
+
+                let camFwdZ = camFwdHLen > 1e-4 ? (fwdTz / camFwdHLen) : 1;
+
                 for (let i = 0; i < window.sceneryShaderMats.length; i++) {
 
                     let m = window.sceneryShaderMats[i];
@@ -32494,6 +33042,12 @@
                     if (m && m.userData && m.userData.shader) {
 
                         m.userData.shader.uniforms.uCamPos.value.copy(camera.position);
+
+                        if (m.userData.shader.uniforms.uCamFwd) {
+
+                            m.userData.shader.uniforms.uCamFwd.value.set(camFwdX, camFwdZ);
+
+                        }
 
                         if (m.userData.shader.uniforms.uTime) {
 
@@ -34124,32 +34678,29 @@
 
             // 操控感手把視覺
 
-            if (ui.hBrk && ui.hPwr) {
+            let brkTop = "90%";
+            let pwrTop = "90%";
 
-                if (state.isATO) {
-
-                    if (Math.abs(state.v) < 0.05) {
-
-                        ui.hBrk.style.top = "50%"; // B4 停車
-
-                        ui.hPwr.style.top = "90%"; // P0
-
-                    } else {
-
-                        ui.hBrk.style.top = "90%"; // B0
-
-                        ui.hPwr.style.top = "90%"; // P0
-
-                    }
-
+            if (state.isATO) {
+                if (Math.abs(state.v) < 0.05) {
+                    brkTop = "50%"; // B4 停車
+                    pwrTop = "90%"; // P0
                 } else {
-
-                    ui.hPwr.style.top = (90 - state.p * 20) + "%";
-
-                    let bTop = 90 - state.b * 10; ui.hBrk.style.top = bTop + "%";
-
+                    brkTop = "90%"; // B0
+                    pwrTop = "90%"; // P0
                 }
+            } else {
+                pwrTop = (90 - state.p * 20) + "%";
+                brkTop = (90 - state.b * 10) + "%";
+            }
 
+            if (ui.hBrk && ui.hPwr) {
+                ui.hBrk.style.top = brkTop;
+                ui.hPwr.style.top = pwrTop;
+            }
+            if (ui.mBrk && ui.mPwr) {
+                ui.mBrk.style.top = brkTop;
+                ui.mPwr.style.top = pwrTop;
             }
 
         }
@@ -34566,11 +35117,15 @@
 
             }
 
-            track.addEventListener('touchstart', (e) => { e.preventDefault(); handleDrag(e); }, { passive: false });
+            track.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
 
-            track.addEventListener('touchmove', (e) => { e.preventDefault(); handleDrag(e); }, { passive: false });
+            track.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); handleDrag(e); }, { passive: false });
+
+            track.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); handleDrag(e); }, { passive: false });
 
             track.addEventListener('mousedown', (e) => {
+
+                e.stopPropagation();
 
                 handleDrag(e); const onMouseMove = (me) => handleDrag(me); document.addEventListener('mousemove', onMouseMove);
 
@@ -34659,6 +35214,23 @@
 
 
         setupDraggable('handle-pwr', 'power'); setupDraggable('handle-brk', 'brake');
+        setupDraggable('mobile-handle-pwr', 'power'); setupDraggable('mobile-handle-brk', 'brake');
+
+        function isMobileDevice() {
+            const uaMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+            const coarseTouch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+            return uaMobile || (coarseTouch && Math.min(window.innerWidth, window.innerHeight) <= 900);
+        }
+
+        function updateMobileDeviceClass() {
+            if (document.body) {
+                document.body.classList.toggle('is-mobile', isMobileDevice());
+            }
+        }
+
+        updateMobileDeviceClass();
+        window.addEventListener('resize', updateMobileDeviceClass);
+        window.addEventListener('orientationchange', updateMobileDeviceClass);
 
 
 
@@ -35630,13 +36202,13 @@
 
 
 
-            if (state.occMenu && state.occMenu.active) {
+            if (state.occMenu && state.occMenu.active && (state.occMenu.step === 'main' || state.occMenu.step === 'station')) {
 
                 if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { e.preventDefault(); navigateOccMenu(-1); return; }
 
                 if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { e.preventDefault(); navigateOccMenu(1); return; }
 
-                if (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === ' ' || e.code === 'Space') {
+                if (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter') {
 
                     e.preventDefault();
 
@@ -35656,7 +36228,9 @@
 
                 }
 
-                return;
+                if (e.key !== ' ' && e.code !== 'Space') {
+                    return;
+                }
 
             }
 

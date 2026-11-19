@@ -6950,6 +6950,7 @@
 
 
             let dynamicLimit = 120;
+            let staticDynamicLimit = 120;
 
             for (let pIdx = 0; pIdx < lookAheadPoints.length; pIdx++) {
 
@@ -6958,6 +6959,7 @@
                 let curveLim = pt.isCbtcBlock ? pt.cbtcLimit : applyBrakingCurve(120, pt.limit, pt.dist);
 
                 if (curveLim < dynamicLimit) dynamicLimit = curveLim;
+                if (!pt.isCbtcBlock && curveLim < staticDynamicLimit) staticDynamicLimit = curveLim;
 
             }
 
@@ -6999,9 +7001,11 @@
 
             lookAheadPoints.forEach(pt => {
 
+                if (pt.isCbtcBlock) return;
+
                 if (pt.limit < currentZoneLimit) {
 
-                    let dynamicPtLimit = pt.isCbtcBlock ? pt.cbtcLimit : applyBrakingCurve(currentZoneLimit, pt.limit, pt.dist);
+                    let dynamicPtLimit = applyBrakingCurve(currentZoneLimit, pt.limit, pt.dist);
 
                     if (dynamicPtLimit < currentZoneLimit - 0.1) {
 
@@ -7019,7 +7023,7 @@
 
                         isSpeedLimitDropping = true;
 
-                        let targetLim = pt.isCbtcBlock ? pt.cbtcLimit : pt.limit;
+                        let targetLim = pt.limit;
 
                         if (targetLim < speedZoneTargetLimit || (targetLim === speedZoneTargetLimit && pt.dist < speedZoneTargetDist)) {
 
@@ -7037,15 +7041,15 @@
 
 
 
-            if (dynamicLimit < currentZoneLimit - 0.1) {
+            if (staticDynamicLimit < currentZoneLimit - 0.1) {
 
                 isAtpCurveDropping = true;
 
-                if (dynamicLimit < futureTargetLimit) futureTargetLimit = dynamicLimit;
+                if (staticDynamicLimit < futureTargetLimit) futureTargetLimit = staticDynamicLimit;
 
                 isSpeedLimitDropping = true;
 
-                if (dynamicLimit < speedZoneTargetLimit) speedZoneTargetLimit = dynamicLimit;
+                if (staticDynamicLimit < speedZoneTargetLimit) speedZoneTargetLimit = staticDynamicLimit;
 
             }
 
@@ -7074,7 +7078,7 @@
 
                 st.wasHeldByCbtc = false;
 
-                if (currentKph < 45.0 && st.b > 0 && !st.isStopping) {
+                if (currentKph < 45.0 && st.b > 0 && !st.isStopping && !st.isDownhillBraking && !st.isAtpBraking) {
 
                     st.b = 0;
 
@@ -7217,10 +7221,12 @@
                 ? Math.max(0, cbtc.blockDist - stopTargetBuf)
                 : Infinity;
 
-            let isCbtcActiveMode = (typeof cbtcSpeedLim === 'number' && cbtcSpeedLim < 119.9);
-            let cbtcLim = isCbtcActiveMode ? Math.min(cbtcSpeedLim, currentZoneLimit) : currentZoneLimit;
-            if (isNotAtFixedStop && (isStationStopBlock || isStationArea)) {
-                cbtcLim = Math.min(Math.max(cbtcLim, 45), currentZoneLimit);
+            let baseStaticEffLimit = Math.min(currentZoneLimit, staticDynamicLimit);
+            let isStationApproachCbtcExempt = !!(isNotAtFixedStop && (isStationStopBlock || isStationArea));
+            let isCbtcActiveMode = (typeof cbtcSpeedLim === 'number' && cbtcSpeedLim < 119.9 && !isStationApproachCbtcExempt);
+            let cbtcLim = isCbtcActiveMode ? cbtcSpeedLim : baseStaticEffLimit;
+            if (isStationApproachCbtcExempt) {
+                cbtcLim = Math.min(Math.max(cbtcSpeedLim, 45), baseStaticEffLimit);
             }
 
             let safetyMarginKph = isDownhill ? 2.5 : 1.5;
