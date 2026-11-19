@@ -2632,9 +2632,13 @@
 
                         </button>
 
+                    </div>
+
+                    <div style="text-align:right;">
+
                         <button id="story-train-depart-btn" onclick="proceedDutyDeparture()"
 
-                            style="display:none; width:auto; margin-top:0; padding:9px 18px; font-size:14px; background:#22c55e; color:#000; font-weight:bold; border-radius:6px; cursor:pointer; border:none; transition:all 0.2s; white-space:nowrap;">
+                            style="display:none; width:100%; margin-top:8px; padding:10px 18px; font-size:15px; background:#22c55e; color:#000; font-weight:bold; border-radius:6px; cursor:pointer; border:none; transition:all 0.2s; white-space:nowrap;">
 
                             🚆 確認值勤出勤 ▶
 
@@ -2752,6 +2756,14 @@
                     style="background:var(--color-ok); color:#000; font-size:20px; padding:14px 28px; border-radius:8px; box-shadow:0 0 20px rgba(0,255,0,0.4); cursor:pointer; font-weight:bold;">
 
                     開始遊戲 (START GAME)
+
+                </button>
+
+                <button id="btn-mobile-mode" onclick="toggleMobileMode()"
+
+                    style="background:#1e293b; color:#94a3b8; font-size:20px; padding:14px 24px; border-radius:8px; cursor:pointer; font-weight:bold; border:1px solid #475569; transition:all 0.2s;">
+
+                    📱 手機板模式：關
 
                 </button>
 
@@ -3776,6 +3788,28 @@
 
 
 
+
+        let isMobileMode = false;
+
+        function toggleMobileMode() {
+            isMobileMode = !isMobileMode;
+            const btn = document.getElementById('btn-mobile-mode');
+            if (btn) {
+                if (isMobileMode) {
+                    btn.innerText = '📱 手機板模式：開';
+                    btn.style.background = '#06b6d4';
+                    btn.style.color = '#000';
+                    btn.style.border = '1px solid #22d3ee';
+                    btn.style.boxShadow = '0 0 20px rgba(6,182,212,0.5)';
+                } else {
+                    btn.innerText = '📱 手機板模式：關';
+                    btn.style.background = '#1e293b';
+                    btn.style.color = '#94a3b8';
+                    btn.style.border = '1px solid #475569';
+                    btn.style.boxShadow = 'none';
+                }
+            }
+        }
 
         let state = {
 
@@ -32292,6 +32326,36 @@
             }
 
 
+
+            // --- 手機板模式：開關門永遠自動 ---
+            if (isMobileMode && state.active && !state.isGameOver) {
+                if (!state.door && !state.doorOpening && !state.doorClosing && Math.abs(state.v) < 0.001) {
+                    let currNodeMob = getPhysicalStopInfo();
+                    let isDepotMob = isNodeDepot(currNodeMob ? currNodeMob.data : null) || (!state.stationDeparted && state.route && isNodeDepot(state.route[Math.max(0, state.idx - 1)] ? state.route[Math.max(0, state.idx - 1)].data : null));
+                    if (currNodeMob && currNodeMob.data && !isDepotMob) {
+                        let targetPosMob = getPlayerStopMarkerPosAtStation(currNodeMob.data, state.dir, state.type);
+                        let diffMob = (state.dir === 'down') ? (targetPosMob - state.d) : (state.d - targetPosMob);
+                        if (Math.abs(diffMob) <= 0.5) {
+                            state.atoAutoDoorDelaying = false;
+                            state.atoAutoDoorTimer = 0;
+                            inputDoor();
+                        }
+                    }
+                } else if (state.door && !state.doorOpening && !state.doorClosing) {
+                    let currStopMob = state.route[Math.max(0, state.idx - 1)];
+                    let isDestMob = !currStopMob || (state.idx >= state.route.length);
+                    if (!isDestMob) {
+                        let currDepSecMob = (currStopMob && currStopMob.depSecs) ? currStopMob.depSecs : state.departureSecs;
+                        let dispDepSecMob = state.departureSecs || currDepSecMob;
+                        if (typeof dispDepSecMob === 'number' && !isNaN(dispDepSecMob)) {
+                            let timeToDepMob = -getScheduleSecsDiff(state.gameTimeSecs, dispDepSecMob);
+                            if (timeToDepMob <= 20) {
+                                inputDoor();
+                            }
+                        }
+                    }
+                }
+            }
 
             updateUI();
 
