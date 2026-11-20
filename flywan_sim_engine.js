@@ -493,9 +493,9 @@
       const numCols = rows[numRow].length;
       const trains = [];
       for (let c = 2; c < numCols; c++) {
-        const num = (rows[numRow][c] || '').trim();
         const type = (rows[typeRow][c] || '').trim();
-        if (!num || !type || type.includes('回送') || type.includes('迴送')) continue;
+        if (!type || type.includes('回送') || type.includes('迴送')) continue;
+        const num = (rows[numRow][c] || '').trim() || `C${c}`;
 
         const orderedStations = (dir === 'down')
           ? STATION_PROFILES
@@ -760,6 +760,24 @@
       stationDepartures[s].up.sort((a, b) => a.depSecs - b.depSecs);
     }
 
+    // 記錄各站各方向末班車發車時刻與車次 UID，用於：
+    // 1) 某方向末班車發車後不再接收該方向進站旅客
+    // 2) 最後一班車前往目的地有空位一定上車，若無前往目的地依舊上車
+    const lastDepSec = Array.from({ length: 22 }, () => ({ down: -1, up: -1 }));
+    const lastTrainUid = Array.from({ length: 22 }, () => ({ down: null, up: null }));
+    for (let s = 0; s < 22; s++) {
+      const dd = stationDepartures[s].down;
+      if (dd.length > 0) {
+        lastDepSec[s].down = dd[dd.length - 1].depSecs;
+        lastTrainUid[s].down = dd[dd.length - 1].tr._uid;
+      }
+      const uu = stationDepartures[s].up;
+      if (uu.length > 0) {
+        lastDepSec[s].up = uu[uu.length - 1].depSecs;
+        lastTrainUid[s].up = uu[uu.length - 1].tr._uid;
+      }
+    }
+
     // 2. 預計算時刻表實際旅行時間 (含 2 分鐘轉乘懲罰) 與地鐵中央線平行分流係數
     function calcTimetableTravelMins(o, d) {
       const dir = (d > o) ? 'down' : 'up';
@@ -1001,12 +1019,21 @@
     const crowdDist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let stopSnapshotCount = 0;
     const sampleTapRecords = [];
-    const minuteWaitingTotals = new Float64Array(1681);
 
-    // 決定服務起訖分鐘 (非連假 05:25~25:05 才有累積，末班車後歸零；連假全天候 24 小時 04:00~28:00 持續補人載客)
-    const is24h = (dayType === 'holiday_long');
+    // 首班車／末班車規則分流：
+    // - holiday_long (連續假日)：全天候 24 小時跨夜營運 -> 無首班車規則、無末班車規則
+    // - weekday_to_long (平日接連假)：清晨為正常首班、深夜銜接連假跨夜 -> 有首班車規則、無末班車規則
+    // - long_to_weekday (連假接平日)：清晨銜接前日連假跨夜、深夜正常收班 -> 無首班車規則、有末班車規則
+    // - weekday / holiday (平日／假日)：有首班車規則、有末班車規則
+    const hasFirstTrainRule = (schedType !== 'holiday_long' && schedType !== 'long_to_weekday' && dayType !== 'holiday_long' && dayType !== 'long_to_weekday');
+    const hasLastTrainRule = (schedType !== 'holiday_long' && schedType !== 'weekday_to_long' && dayType !== 'holiday_long' && dayType !== 'weekday_to_long');
+
     const simStartMin = 4 * 60;       // 04:00
-    const simEndMin = 28 * 60;        // 04:00 (+1 day)
+    let simEndMin = 28 * 60;          // 04:00 (+1 day)
+    for (const depMin of stopEventsByMinute.keys()) {
+      if (depMin > simEndMin) simEndMin = depMin;
+    }
+    const minuteWaitingTotals = new Float64Array(simEndMin + 1);
 
     // 校正乘數：使 2026 平日總運量落在約 310,000 ~ 350,000 人次/日，尖峰車廂可達 85%~120% 並適度觸發留置
     const GLOBAL_FLOW_CALIBRATION = 2.68 * yearFactor.demandScale;
@@ -1024,26 +1051,101 @@
     const carryOver = Array.from({ length: 22 }, () => new Float64Array(22));
     let sampleBudgetPerHour = 14;
 
+    // 無首班車規則之跨夜銜接段 (holiday_long / long_to_weekday)：
+    // 於 04:00 之前另行預熱推算 15 分鐘 (03:45 ~ 03:59) 跨夜連續進站旅客，避免 04:05 / 04:50 班次從空月台冷啟動
+    if (!hasFirstTrainRule) {
+      for (let pm = simStartMin - 15; pm < simStartMin; pm++) {
+        const pModMin = ((pm % 1440) + 1440) % 1440;
+        const pHr = Math.floor(pModMin / 60);
+        const pSlotId = getTimeSlotId(pModMin);
+        const pSecNow = pm * 60;
+        const pKO = new Float64Array(22);
+        const pKD = new Float64Array(22);
+        for (let s = 0; s < 22; s++) {
+          const k = getStationKOKD(STATION_PROFILES[s], pModMin, dayType, { isFinalsWeek });
+          pKO[s] = k.ko;
+          pKD[s] = k.kd;
+        }
+        for (let o = 0; o < 22; o++) {
+          const originFlowBase = pKO[o] * dailyKOBalance[o] * SCALE_WEIGHT[STATION_PROFILES[o].scale] * GLOBAL_FLOW_CALIBRATION;
+          if (originFlowBase <= 0.0001) continue;
+          let denom = 0;
+          for (let d = 0; d < 22; d++) {
+            if (d === o) continue;
+            denom += odGravity[o][d] * (0.25 + pKD[d]);
+          }
+          if (denom <= 0) continue;
+          for (let d = 0; d < 22; d++) {
+            if (d === o) continue;
+            const share = (odGravity[o][d] * (0.25 + pKD[d])) / denom;
+            const noise = randNormal(rng, 1.0, 0.14, 0.55, 1.55);
+            const rate = originFlowBase * share * noise * 4.85;
+            const totalAcc = carryOver[o][d] + rate;
+            const arrPax = Math.floor(totalAcc);
+            carryOver[o][d] = totalAcc - arrPax;
+            if (arrPax <= 0) continue;
+            const pool = platformPools[o][d];
+            const nGroups = Math.min(arrPax, 10);
+            const baseQty = Math.floor(arrPax / nGroups);
+            const extraQty = arrPax - baseQty * nGroups;
+            let enteredQty = 0;
+            for (let g = 0; g < nGroups; g++) {
+              const qty = baseQty + (g < extraQty ? 1 : 0);
+              const readySec = pSecNow + Math.floor(rng() * 60) + 15;
+              const plan = findBestTargetTrain(o, d, readySec);
+              if (!plan.bestTrainUid) continue;
+              pool.planned.set(plan.bestTrainUid, (pool.planned.get(plan.bestTrainUid) || 0) + qty);
+              enteredQty += qty;
+            }
+            if (enteredQty > 0) {
+              stationEntries[o] += enteredQty;
+              stationHourlyEntries[o][pHr] += enteredQty;
+              stationSlotEntries[o][pSlotId] += enteredQty;
+            }
+          }
+        }
+      }
+    }
+
     for (let m = simStartMin; m <= simEndMin; m++) {
       const modMin = m % 1440;
       const hr = Math.floor(modMin / 60);
       const slotId = getTimeSlotId(modMin);
       const secNow = m * 60;
 
-      // 是否處於收班停止進站期間 (非連假 00:45 - 05:20)
-      const isNightClosed = !is24h && (modMin >= 45 && modMin < 320);
+      // 依首／末班車規則分別判定清晨前與深夜後是否收班：
+      // - 有首班車規則才於 04:00~05:19 收班；連假與連假接平日清晨不收班
+      // - 有末班車規則才於 00:45(+1) 後收班；連假與平日接連假深夜不收班
+      const isMorningClosed = hasFirstTrainRule && (m < 320);
+      const isLateNightClosed = hasLastTrainRule && (m >= 1485);
+      const isNightClosed = isMorningClosed || isLateNightClosed;
 
       if (isNightClosed) {
-        // 末班車收班後，候車池於清晨前歸零
+        // 末班車收班後，僅針對該方向末班車已發車之候車池清空並強制出站，避免誤刪跨夜延駛班次之候車旅客
         for (let o = 0; o < 22; o++) {
           for (let d = 0; d < 22; d++) {
-            platformPools[o][d].planned.clear();
-            platformPools[o][d].replan1.clear();
-            platformPools[o][d].replan2.clear();
-            platformPools[o][d].urgent = 0;
-            platformPools[o][d].fallback = 0;
-            platformPools[o][d].transferQueue.length = 0;
+            if (o === d) continue;
+            const dir = (d > o) ? 'down' : 'up';
+            const dirLastDep = lastDepSec[o][dir];
+            if (dirLastDep >= 0 && secNow <= dirLastDep) continue;
+            const pool = platformPools[o][d];
+            let stranded = pool.urgent + pool.fallback;
+            for (const v of pool.planned.values()) stranded += v;
+            for (const v of pool.replan1.values()) stranded += v;
+            for (const v of pool.replan2.values()) stranded += v;
+            for (const tq of pool.transferQueue) stranded += tq.qty;
+            pool.planned.clear();
+            pool.replan1.clear();
+            pool.replan2.clear();
+            pool.urgent = 0;
+            pool.fallback = 0;
+            pool.transferQueue.length = 0;
             carryOver[o][d] = 0;
+            if (stranded > 0.01) {
+              stationExits[o] += stranded;
+              stationHourlyExits[o][hr] += stranded;
+              stationSlotExits[o][slotId] += stranded;
+            }
           }
         }
       } else {
@@ -1059,18 +1161,34 @@
         // 先解除已到達轉乘緩衝時間 (2分鐘) 的轉乘旅客
         for (let o = 0; o < 22; o++) {
           for (let d = 0; d < 22; d++) {
+            if (o === d) continue;
             const pool = platformPools[o][d];
             if (pool.transferQueue.length > 0) {
+              const dir = (d > o) ? 'down' : 'up';
+              const dirLastDep = lastDepSec[o][dir];
               const remain = [];
               for (const tq of pool.transferQueue) {
                 if (secNow >= tq.readySec) {
+                  // 若有末班車規則且該方向末班車已發車，轉乘旅客無法再續搭，強制於本站出站；
+                  // 若無末班車規則（跨夜銜接隔日連假）且已超過本日 CSV 末段班次，則視同由隔日跨夜班次銜接載走
+                  if (dirLastDep < 0 || secNow > dirLastDep) {
+                    stationExits[o] += tq.qty;
+                    stationHourlyExits[o][hr] += tq.qty;
+                    stationSlotExits[o][slotId] += tq.qty;
+                    continue;
+                  }
                   if (tq.fallback) replanQty(o, d, tq.qty, secNow);
                   else {
                     const plan = findBestTargetTrain(o, d, secNow);
                     if (plan.bestTrainUid) {
                       pool.planned.set(plan.bestTrainUid, (pool.planned.get(plan.bestTrainUid) || 0) + tq.qty);
-                    } else {
+                    } else if (hasLastTrainRule) {
                       pool.fallback += tq.qty;
+                    } else {
+                      // 無末班車規則：交由隔日跨夜班次銜接，不強制併入非直達車
+                      stationExits[o] += tq.qty;
+                      stationHourlyExits[o][hr] += tq.qty;
+                      stationSlotExits[o][slotId] += tq.qty;
                     }
                   }
                 } else {
@@ -1098,6 +1216,14 @@
 
           for (let d = 0; d < 22; d++) {
             if (d === o) continue;
+            const dir = (d > o) ? 'down' : 'up';
+            const dirLastDep = lastDepSec[o][dir];
+            // 有末班車規則：某方向末班車發車後不再接收該方向進站旅客；
+            // 無末班車規則 (holiday_long / weekday_to_long)：超過本日 CSV 末段發車時刻者歸入隔日跨夜銜接班次，不堆積於本日月台
+            if (dirLastDep < 0 || secNow > dirLastDep) {
+              carryOver[o][d] = 0;
+              continue;
+            }
             const share = (odGravity[o][d] * (0.25 + stationKD[d])) / denom;
             // 每分鐘進站期望人數（含常態分布微擾）
             const noise = randNormal(rng, 1.0, 0.14, 0.55, 1.55);
@@ -1116,9 +1242,18 @@
             for (let g = 0; g < nGroups; g++) {
               const qty = baseQty + (g < extraQty ? 1 : 0);
               const arrSec = secNow + Math.floor(rng() * 60);
-              const plan = findBestTargetTrain(o, d, arrSec + 15); // +15 秒為閘門至月台步行時間
-              if (!plan.bestTrainUid) continue; // 末班車已過
-              pool.planned.set(plan.bestTrainUid, (pool.planned.get(plan.bestTrainUid) || 0) + qty);
+              const readySec = arrSec + 15; // +15 秒為閘門至月台步行時間
+              if (readySec > dirLastDep) continue;
+              const plan = findBestTargetTrain(o, d, readySec);
+              if (plan.bestTrainUid) {
+                pool.planned.set(plan.bestTrainUid, (pool.planned.get(plan.bestTrainUid) || 0) + qty);
+              } else if (hasLastTrainRule && lastTrainUid[o][dir]) {
+                // 僅在「有末班車規則」時，末班車尚未發車但無法直達／轉乘者仍進站搭乘末班車；
+                // 無末班車規則時 (連假／平日接連假) 後續仍有隔日跨夜班次，不強制搭上不符目的地之列車
+                pool.planned.set(lastTrainUid[o][dir], (pool.planned.get(lastTrainUid[o][dir]) || 0) + qty);
+              } else {
+                continue;
+              }
               enteredQty += qty;
             }
             if (enteredQty <= 0) continue;
@@ -1173,7 +1308,7 @@
             tr._totalBiz = Math.max(0, tr._totalBiz - xb);
           }
 
-          // 若抵達終點站，清空車上任何未下車旅客
+          // 若抵達終點站，強制清空車上所有未下車旅客並全數計入本站出站人次
           if (isTerminal) {
             for (let d = 0; d < 22; d++) {
               const remFinal = tr._onBoardOrd[d] + tr._onBoardBiz[d];
@@ -1190,6 +1325,9 @@
               if (remXfer > 0) {
                 alightedOrd += tr._xferOrd[d];
                 alightedBiz += tr._xferBiz[d];
+                stationExits[s] += remXfer;
+                stationHourlyExits[s][hr] += remXfer;
+                stationSlotExits[s][slotId] += remXfer;
                 tr._xferOrd[d] = 0;
                 tr._xferBiz[d] = 0;
               }
@@ -1209,10 +1347,34 @@
             let remCapOrd = Math.max(0, spec.physCapOrd - tr._totalOrd);
             let remCapBiz = Math.max(0, spec.physCapBiz - tr._totalBiz);
 
-            // 收集該站往此列車可達 (或可向前推進至快速轉乘站) 的候車需求
+            const dirNext = (dir === 'down') ? 'down' : 'up';
+            const depsHere = stationDepartures[s][dirNext];
+            const isLastTrainHere = hasLastTrainRule && (depsHere.length > 0 && depsHere[depsHere.length - 1].tr._uid === tr._uid);
+            const termNode = tr.stopNodes[tr.stopNodes.length - 1];
+            const termIdx = termNode.stationIdx;
+
+            // 收集該站往此列車可達 (或可向前推進至快速轉乘站；若為該方向最後一班車則全部候車旅客皆上車) 的候車需求
             const stepIndices = (dir === 'down')
               ? Array.from({ length: 21 - s }, (_, k) => s + 1 + k)
               : Array.from({ length: s }, (_, k) => s - 1 - k);
+
+            // 若為該方向最後一班車，先將已到站可轉乘之 transferQueue 旅客併入 fallback，確保能趕上末班車
+            if (isLastTrainHere) {
+              for (const d of stepIndices) {
+                const pool = platformPools[s][d];
+                if (pool.transferQueue.length > 0) {
+                  const remain = [];
+                  for (const tq of pool.transferQueue) {
+                    if (tq.readySec <= sn.depSecs) {
+                      pool.fallback += tq.qty;
+                    } else {
+                      remain.push(tq);
+                    }
+                  }
+                  pool.transferQueue = remain;
+                }
+              }
+            }
 
             // 檢查此車是否能向前推進到至少一個快速轉乘站
             let nextRapidAhead = -1;
@@ -1231,30 +1393,52 @@
               const canAdvanceToTransfer = !canReachDirect && nextRapidAhead !== -1 &&
                 ((dir === 'down' && nextRapidAhead < d) || (dir === 'up' && nextRapidAhead > d));
 
-              // 若本車無法直達也無法推進轉乘，但旅客原鎖定本車？不可能；若是 fallback 也不上無法抵達的車
-              if (!canReachDirect && !canAdvanceToTransfer) continue;
+              // 一般班次：若本車無法直達也無法推進轉乘則不上車；
+              // 最後一班車：前往目的地有空位一定上車，若無前往目的地依舊上車
+              if (!isLastTrainHere && !canReachDirect && !canAdvanceToTransfer) continue;
 
               // a0) 三班車以上沒搭到者 (urgent)：只要能到達目的地(直達或轉乘)，最快到達或最早發車的車都上車
               if (pool.urgent > 0) {
-                wantRequests.push({ d, qty: pool.urgent, kind: 'urgent', missCount: 3, canReachDirect });
+                wantRequests.push({ d, qty: pool.urgent, kind: 'urgent', missCount: 3, canReachDirect, canAdvanceToTransfer });
               }
-              // a) 階段 B：錯過 1~2 班後已重新查詢到本班者 (最早抵達目的地班次)
-              const replan1Qty = pool.replan1.get(tr._uid) || 0;
-              if (replan1Qty > 0) {
-                wantRequests.push({ d, qty: replan1Qty, kind: 'replan', missCount: 1, src: 'replan1', canReachDirect });
+              // a) 階段 B：錯過 1~2 班後已重新查詢到本班者 (末班車則納入該方向所有殘餘 replan)
+              if (isLastTrainHere) {
+                let r1Sum = 0;
+                for (const v of pool.replan1.values()) r1Sum += v;
+                if (r1Sum > 0) {
+                  wantRequests.push({ d, qty: r1Sum, kind: 'replan', missCount: 1, src: 'replan1', clearAllMap: true, canReachDirect, canAdvanceToTransfer });
+                }
+                let r2Sum = 0;
+                for (const v of pool.replan2.values()) r2Sum += v;
+                if (r2Sum > 0) {
+                  wantRequests.push({ d, qty: r2Sum, kind: 'replan', missCount: 2, src: 'replan2', clearAllMap: true, canReachDirect, canAdvanceToTransfer });
+                }
+              } else {
+                const replan1Qty = pool.replan1.get(tr._uid) || 0;
+                if (replan1Qty > 0) {
+                  wantRequests.push({ d, qty: replan1Qty, kind: 'replan', missCount: 1, src: 'replan1', canReachDirect, canAdvanceToTransfer });
+                }
+                const replan2Qty = pool.replan2.get(tr._uid) || 0;
+                if (replan2Qty > 0) {
+                  wantRequests.push({ d, qty: replan2Qty, kind: 'replan', missCount: 2, src: 'replan2', canReachDirect, canAdvanceToTransfer });
+                }
               }
-              const replan2Qty = pool.replan2.get(tr._uid) || 0;
-              if (replan2Qty > 0) {
-                wantRequests.push({ d, qty: replan2Qty, kind: 'replan', missCount: 2, src: 'replan2', canReachDirect });
-              }
-              // a2) 當日已無班次可查者 (保險機制：只要可達或能推進就上車)
+              // a2) 當日已無班次可查者 (保險機制：只要可達或能推進就上車；末班車全部上車)
               if (pool.fallback > 0) {
-                wantRequests.push({ d, qty: pool.fallback, kind: 'fallback', missCount: 3, src: 'stranded', canReachDirect });
+                wantRequests.push({ d, qty: pool.fallback, kind: 'fallback', missCount: 3, src: 'stranded', canReachDirect, canAdvanceToTransfer });
               }
-              // b) Planned 旅客：鎖定本車者
-              const plannedQty = pool.planned.get(tr._uid) || 0;
-              if (plannedQty > 0) {
-                wantRequests.push({ d, qty: plannedQty, kind: 'planned', missCount: 0, canReachDirect });
+              // b) Planned 旅客：鎖定本車者 (末班車則納入該方向所有殘餘 planned)
+              if (isLastTrainHere) {
+                let pSum = 0;
+                for (const v of pool.planned.values()) pSum += v;
+                if (pSum > 0) {
+                  wantRequests.push({ d, qty: pSum, kind: 'planned', missCount: 0, clearAllMap: true, canReachDirect, canAdvanceToTransfer });
+                }
+              } else {
+                const plannedQty = pool.planned.get(tr._uid) || 0;
+                if (plannedQty > 0) {
+                  wantRequests.push({ d, qty: plannedQty, kind: 'planned', missCount: 0, canReachDirect, canAdvanceToTransfer });
+                }
               }
             }
 
@@ -1268,18 +1452,14 @@
               if (s === 15 || s === 3) bizRatioBase = 0.11; // 機場/郵輪港商務客較高
               if (s === 4 || s === 7) bizRatioBase = 0.075;
 
-              const availTotal = remCapOrd + remCapBiz;
-              const baseCapTotal = spec.baseCapOrd + spec.baseCapBiz;
-              const onBoardTotal = tr._totalOrd + tr._totalBiz;
-              // 若乘車率超過 100%，超過 100% 部分的旅客優先挑下一班也能直達目的地的進站列車：
-              // 預設每人 50% 機率改搭；若該下班車當前搭乘人數不滿 75%，意願提高為 75%
-              const excessOver100 = Math.max(0, (onBoardTotal + totalWant) - baseCapTotal);
-              const excessWant = Math.min(totalWant, excessOver100);
-              const excessRatio = (totalWant > 0 && excessWant > 0) ? (excessWant / totalWant) : 0;
+              // 末班車分層上車：第一層「前往目的地(直達)」有空位一定先上車；第二層「無前往目的地」依剩餘空位依舊上車
+              const requestTiers = isLastTrainHere
+                ? [
+                    wantRequests.filter(r => r.canReachDirect),
+                    wantRequests.filter(r => !r.canReachDirect)
+                  ]
+                : [wantRequests];
 
-              let totalWillingWant = 0;
-              const dirNext = (dir === 'down') ? 'down' : 'up';
-              const depsHere = stationDepartures[s][dirNext];
               let nextLo = 0, nextHi = depsHere.length;
               while (nextLo < nextHi) {
                 const mid = (nextLo + nextHi) >> 1;
@@ -1287,159 +1467,238 @@
                 else nextHi = mid;
               }
 
-              for (const req of wantRequests) {
-                let skipProb = 0;
-                // 三班以上沒搭到(urgent)或 fallback 旅客不挑車，不主動改搭下一班
-                if (excessRatio > 0 && req.kind !== 'urgent' && req.kind !== 'fallback') {
-                  let nextDirectTr = null;
-                  for (let ni = nextLo; ni < depsHere.length; ni++) {
-                    if (depsHere[ni].tr._stopsMap.has(req.d)) {
-                      nextDirectTr = depsHere[ni].tr;
-                      break;
+              for (const tierReqs of requestTiers) {
+                if (tierReqs.length === 0) continue;
+                let tierWant = 0;
+                for (const req of tierReqs) tierWant += req.qty;
+                if (tierWant <= 0) continue;
+
+                const availTotal = isLastTrainHere
+                  ? (tierReqs[0].canReachDirect ? (remCapOrd + remCapBiz) : remCapOrd)
+                  : (remCapOrd + remCapBiz);
+                const baseCapTotal = spec.baseCapOrd + spec.baseCapBiz;
+                const onBoardTotal = tr._totalOrd + tr._totalBiz;
+                // 若乘車率超過 100%，超過 100% 部分的旅客優先挑下一班也能直達目的地的進站列車 (末班車不挑車、全數上車)
+                const excessOver100 = isLastTrainHere ? 0 : Math.max(0, (onBoardTotal + tierWant) - baseCapTotal);
+                const excessWant = Math.min(tierWant, excessOver100);
+                const excessRatio = (!isLastTrainHere && tierWant > 0 && excessWant > 0) ? (excessWant / tierWant) : 0;
+
+                let totalWillingWant = 0;
+                for (const req of tierReqs) {
+                  let skipProb = 0;
+                  // 三班以上沒搭到(urgent)、fallback 或末班車旅客不挑車，不主動改搭下一班
+                  if (!isLastTrainHere && excessRatio > 0 && req.kind !== 'urgent' && req.kind !== 'fallback') {
+                    let nextDirectTr = null;
+                    for (let ni = nextLo; ni < depsHere.length; ni++) {
+                      if (depsHere[ni].tr._stopsMap.has(req.d)) {
+                        nextDirectTr = depsHere[ni].tr;
+                        break;
+                      }
+                    }
+                    if (nextDirectTr) {
+                      const nextCapBase = nextDirectTr._spec.baseCapOrd + nextDirectTr._spec.baseCapBiz;
+                      const nextLoadRatio = nextCapBase > 0 ? ((nextDirectTr._totalOrd + nextDirectTr._totalBiz) / nextCapBase) : 1;
+                      skipProb = (nextLoadRatio < 0.75) ? 0.75 : 0.50;
                     }
                   }
-                  if (nextDirectTr) {
-                    const nextCapBase = nextDirectTr._spec.baseCapOrd + nextDirectTr._spec.baseCapBiz;
-                    const nextLoadRatio = nextCapBase > 0 ? ((nextDirectTr._totalOrd + nextDirectTr._totalBiz) / nextCapBase) : 1;
-                    skipProb = (nextLoadRatio < 0.75) ? 0.75 : 0.50;
+                  req._willingQty = req.qty * (1 - excessRatio * skipProb);
+                  totalWillingWant += req._willingQty;
+                }
+
+                const physScale = (totalWillingWant <= availTotal || totalWillingWant <= 0) ? 1.0 : (availTotal / totalWillingWant);
+
+                for (const req of tierReqs) {
+                  const pool = platformPools[s][req.d];
+                  const boardTotal = Math.min(req.qty, Math.round(req._willingQty * physScale * 1000) / 1000);
+                  const missedQty = Math.max(0, req.qty - boardTotal);
+
+                  // 從原池扣除
+                  if (req.kind === 'urgent') {
+                    pool.urgent = Math.max(0, pool.urgent - req.qty);
+                  } else if (req.kind === 'replan') {
+                    if (req.clearAllMap) {
+                      if (req.src === 'replan1') pool.replan1.clear();
+                      else pool.replan2.clear();
+                    } else {
+                      if (req.src === 'replan1') pool.replan1.delete(tr._uid);
+                      else pool.replan2.delete(tr._uid);
+                    }
+                  } else if (req.kind === 'fallback') {
+                    pool.fallback = Math.max(0, pool.fallback - req.qty);
+                  } else {
+                    if (req.clearAllMap) pool.planned.clear();
+                    else pool.planned.delete(tr._uid);
                   }
-                }
-                req._willingQty = req.qty * (1 - excessRatio * skipProb);
-                totalWillingWant += req._willingQty;
-              }
 
-              const physScale = (totalWillingWant <= availTotal || totalWillingWant <= 0) ? 1.0 : (availTotal / totalWillingWant);
-
-              for (const req of wantRequests) {
-                const pool = platformPools[s][req.d];
-                const boardTotal = Math.min(req.qty, Math.round(req._willingQty * physScale * 1000) / 1000);
-                const missedQty = Math.max(0, req.qty - boardTotal);
-
-                // 從原池扣除
-                if (req.kind === 'urgent') {
-                  pool.urgent = Math.max(0, pool.urgent - req.qty);
-                } else if (req.kind === 'replan') {
-                  if (req.src === 'replan1') pool.replan1.delete(tr._uid);
-                  else pool.replan2.delete(tr._uid);
-                } else if (req.kind === 'fallback') {
-                  pool.fallback = Math.max(0, pool.fallback - req.qty);
-                } else {
-                  pool.planned.delete(tr._uid);
-                }
-
-                // 未能擠上車者 -> 留置，並累計未搭上次數 (達 3 班以上進入 urgent 池不挑車)
-                if (missedQty > 0.01) {
-                  replanQty(s, req.d, missedQty, sn.depSecs + 1, req.missCount || 0);
-                  // 僅在首次從階段 A 被迫留置時累計人次，避免同一位旅客連等數班重複灌水
-                  if (req.kind === 'planned') leftBehindHere += missedQty;
-                }
-
-                if (boardTotal <= 0.001) continue;
-
-                // 分配商務艙 vs 普通艙
-                let bBiz = 0;
-                if (tr.is6Cars && req.canReachDirect && RAPID_INDICES.has(req.d) && remCapBiz > 0) {
-                  const wantBiz = boardTotal * bizRatioBase;
-                  bBiz = Math.min(remCapBiz, wantBiz);
-                  remCapBiz -= bBiz;
-                }
-                const bOrd = Math.min(remCapOrd, boardTotal - bBiz);
-                remCapOrd -= bOrd;
-                const overflowMissed = Math.max(0, (boardTotal - bBiz - bOrd));
-                if (overflowMissed > 0.01) {
-                  replanQty(s, req.d, overflowMissed, sn.depSecs + 1, req.missCount || 0);
-                  leftBehindHere += overflowMissed;
-                }
-
-                const actualBoarded = bOrd + bBiz;
-                if (actualBoarded <= 0.001) continue;
-
-                if (req.canReachDirect) {
-                  tr._onBoardOrd[req.d] += bOrd;
-                  tr._onBoardBiz[req.d] += bBiz;
-                  tr._totalOrd += bOrd;
-                  tr._totalBiz += bBiz;
-
-                  // 記錄 OD 旅次與票務收入
-                  const distKm = Math.abs(STATION_PROFILES[req.d].km - STATION_PROFILES[s].km);
-                  // 定期票/IC卡平均實收折扣約為單程票之 88%
-                  const ordFare = calculateFareFWC(distKm, 'single') * 0.88;
-                  const bizFare = calculateFareFWC(distKm, 'business') * 0.92;
-                  odTrips[s][req.d] += actualBoarded;
-                  odBizTrips[s][req.d] += bBiz;
-                  odRevenueFWC[s][req.d] += (bOrd * ordFare + bBiz * bizFare);
-
-                  const destNode = tr.stopNodes[tr._stopsMap.get(req.d)];
-                  const rideSecs = Math.max(60, destNode.arrSecs - sn.depSecs);
-                  odSumRideSecs[s][req.d] += actualBoarded * rideSecs;
-
-                  // 抽樣刷卡進出站明細 (僅收錄完整直達/代表性樣本)
-                  if (collectSamples && sampleTapRecords.length < 360 && rng() < 0.028) {
-                    const waitOffset = Math.round(randNormal(rng, 210, 85, 25, 650));
-                    const tapInSec = sn.depSecs - waitOffset;
-                    const tapOutSec = destNode.arrSecs + Math.round(randNormal(rng, 75, 25, 20, 180));
-                    const isBizTrip = bBiz >= 0.5 && tr.is6Cars;
-                    const ticketLabel = isBizTrip
-                      ? '商務艙特急券'
-                      : (rng() < 0.58 ? '飛灣國民卡 IC' : (rng() < 0.35 ? '30日定期票' : '單程票'));
-                    const fareCharged = isBizTrip
-                      ? calculateFareFWC(distKm, 'business')
-                      : calculateFareFWC(distKm, 'single');
-                    sampleTapRecords.push({
-                      cardId: `FW-${String(Math.floor(rng() * 900000) + 100000)}`,
-                      originCode: STATION_PROFILES[s].code,
-                      originName: STATION_PROFILES[s].name,
-                      destCode: STATION_PROFILES[req.d].code,
-                      destName: STATION_PROFILES[req.d].name,
-                      trainNum: tr.num,
-                      trainType: tr.type,
-                      tapInSec,
-                      tapOutSec,
-                      rideMins: Math.round((tapOutSec - tapInSec) / 60),
-                      distKm: parseFloat(distKm.toFixed(1)),
-                      ticketLabel,
-                      fareFWC: parseFloat(fareCharged.toFixed(2)),
-                      fareUSD: parseFloat((fareCharged * USD_PER_FWC).toFixed(2)),
-                      wasFallback: (req.kind === 'fallback' || req.kind === 'replan' || req.kind === 'urgent')
-                    });
+                  // 未能擠上車者 -> 非末班車留置重排；末班車已客滿未能上車者強制於本站出站
+                  if (missedQty > 0.01) {
+                    if (isLastTrainHere) {
+                      stationExits[s] += missedQty;
+                      stationHourlyExits[s][hr] += missedQty;
+                      stationSlotExits[s][slotId] += missedQty;
+                    } else {
+                      replanQty(s, req.d, missedQty, sn.depSecs + 1, req.missCount || 0);
+                    }
+                    // 僅在首次從階段 A 被迫留置時累計人次，避免同一位旅客連等數班重複灌水
+                    if (req.kind === 'planned') leftBehindHere += missedQty;
                   }
-                } else {
-                  // 中途推進轉乘：先上車搭到 nextRapidAhead 下車進入轉乘池 (不計為車站出站)
-                  tr._xferOrd[nextRapidAhead] += bOrd;
-                  tr._xferBiz[nextRapidAhead] += bBiz;
-                  tr._totalOrd += bOrd;
-                  tr._totalBiz += bBiz;
-                  const xNode = tr.stopNodes[tr._stopsMap.get(nextRapidAhead)];
-                  platformPools[nextRapidAhead][req.d].transferQueue.push({
-                    readySec: xNode.arrSecs + 45,
-                    qty: actualBoarded,
-                    fallback: (req.kind === 'fallback')
-                  });
-                }
 
-                boardedOrd += bOrd;
-                boardedBiz += bBiz;
-                if (req.kind === 'fallback' || req.kind === 'replan' || req.kind === 'urgent') totalFallbackBoardings += actualBoarded;
+                  if (boardTotal <= 0.001) continue;
+
+                  // 分配商務艙 vs 普通艙
+                  let bBiz = 0;
+                  if (tr.is6Cars && req.canReachDirect && RAPID_INDICES.has(req.d) && remCapBiz > 0) {
+                    const wantBiz = boardTotal * bizRatioBase;
+                    bBiz = Math.min(remCapBiz, wantBiz);
+                    remCapBiz -= bBiz;
+                  }
+                  const bOrd = Math.min(remCapOrd, boardTotal - bBiz);
+                  remCapOrd -= bOrd;
+                  const overflowMissed = Math.max(0, (boardTotal - bBiz - bOrd));
+                  if (overflowMissed > 0.01) {
+                    if (isLastTrainHere) {
+                      stationExits[s] += overflowMissed;
+                      stationHourlyExits[s][hr] += overflowMissed;
+                      stationSlotExits[s][slotId] += overflowMissed;
+                    } else {
+                      replanQty(s, req.d, overflowMissed, sn.depSecs + 1, req.missCount || 0);
+                    }
+                    leftBehindHere += overflowMissed;
+                  }
+
+                  const actualBoarded = bOrd + bBiz;
+                  if (actualBoarded <= 0.001) continue;
+
+                  if (req.canReachDirect) {
+                    tr._onBoardOrd[req.d] += bOrd;
+                    tr._onBoardBiz[req.d] += bBiz;
+                    tr._totalOrd += bOrd;
+                    tr._totalBiz += bBiz;
+
+                    // 記錄 OD 旅次與票務收入
+                    const distKm = Math.abs(STATION_PROFILES[req.d].km - STATION_PROFILES[s].km);
+                    // 定期票/IC卡平均實收折扣約為單程票之 88%
+                    const ordFare = calculateFareFWC(distKm, 'single') * 0.88;
+                    const bizFare = calculateFareFWC(distKm, 'business') * 0.92;
+                    odTrips[s][req.d] += actualBoarded;
+                    odBizTrips[s][req.d] += bBiz;
+                    odRevenueFWC[s][req.d] += (bOrd * ordFare + bBiz * bizFare);
+
+                    const destNode = tr.stopNodes[tr._stopsMap.get(req.d)];
+                    const rideSecs = Math.max(60, destNode.arrSecs - sn.depSecs);
+                    odSumRideSecs[s][req.d] += actualBoarded * rideSecs;
+
+                    // 抽樣刷卡進出站明細 (僅收錄完整直達/代表性樣本)
+                    if (collectSamples && sampleTapRecords.length < 360 && rng() < 0.028) {
+                      const waitOffset = Math.round(randNormal(rng, 210, 85, 25, 650));
+                      const tapInSec = sn.depSecs - waitOffset;
+                      const tapOutSec = destNode.arrSecs + Math.round(randNormal(rng, 75, 25, 20, 180));
+                      const isBizTrip = bBiz >= 0.5 && tr.is6Cars;
+                      const ticketLabel = isBizTrip
+                        ? '商務艙特急券'
+                        : (rng() < 0.58 ? '飛灣國民卡 IC' : (rng() < 0.35 ? '30日定期票' : '單程票'));
+                      const fareCharged = isBizTrip
+                        ? calculateFareFWC(distKm, 'business')
+                        : calculateFareFWC(distKm, 'single');
+                      sampleTapRecords.push({
+                        cardId: `FW-${String(Math.floor(rng() * 900000) + 100000)}`,
+                        originCode: STATION_PROFILES[s].code,
+                        originName: STATION_PROFILES[s].name,
+                        destCode: STATION_PROFILES[req.d].code,
+                        destName: STATION_PROFILES[req.d].name,
+                        trainNum: tr.num,
+                        trainType: tr.type,
+                        tapInSec,
+                        tapOutSec,
+                        rideMins: Math.round((tapOutSec - tapInSec) / 60),
+                        distKm: parseFloat(distKm.toFixed(1)),
+                        ticketLabel,
+                        fareFWC: parseFloat(fareCharged.toFixed(2)),
+                        fareUSD: parseFloat((fareCharged * USD_PER_FWC).toFixed(2)),
+                        wasFallback: (req.kind === 'fallback' || req.kind === 'replan' || req.kind === 'urgent')
+                      });
+                    }
+                  } else {
+                    const xNode = (req.canAdvanceToTransfer && nextRapidAhead !== -1 && tr._stopsMap.has(nextRapidAhead))
+                      ? tr.stopNodes[tr._stopsMap.get(nextRapidAhead)]
+                      : null;
+                    const hasOnwardConn = !!(xNode && lastDepSec[nextRapidAhead][dirNext] >= xNode.arrSecs + 45);
+
+                    if (hasOnwardConn) {
+                      // 中途推進轉乘：先上車搭到 nextRapidAhead 下車進入轉乘池 (不計為車站出站)
+                      tr._xferOrd[nextRapidAhead] += bOrd;
+                      tr._xferBiz[nextRapidAhead] += bBiz;
+                      tr._totalOrd += bOrd;
+                      tr._totalBiz += bBiz;
+                      platformPools[nextRapidAhead][req.d].transferQueue.push({
+                        readySec: xNode.arrSecs + 45,
+                        qty: actualBoarded,
+                        fallback: (req.kind === 'fallback')
+                      });
+                    } else {
+                      // 最後一班車無法直達目的地亦無後續轉乘班次：仍先上車搭至本列車終點站，抵達終點站後強制出站
+                      tr._onBoardOrd[termIdx] += bOrd;
+                      tr._onBoardBiz[termIdx] += bBiz;
+                      tr._totalOrd += bOrd;
+                      tr._totalBiz += bBiz;
+
+                      const distKm = Math.abs(STATION_PROFILES[termIdx].km - STATION_PROFILES[s].km);
+                      const ordFare = calculateFareFWC(distKm, 'single') * 0.88;
+                      const bizFare = calculateFareFWC(distKm, 'business') * 0.92;
+                      odTrips[s][termIdx] += actualBoarded;
+                      odBizTrips[s][termIdx] += bBiz;
+                      odRevenueFWC[s][termIdx] += (bOrd * ordFare + bBiz * bizFare);
+                      const rideSecs = Math.max(60, termNode.arrSecs - sn.depSecs);
+                      odSumRideSecs[s][termIdx] += actualBoarded * rideSecs;
+                    }
+                  }
+
+                  boardedOrd += bOrd;
+                  boardedBiz += bBiz;
+                  if (req.kind === 'fallback' || req.kind === 'replan' || req.kind === 'urgent') totalFallbackBoardings += actualBoarded;
+                }
               }
             }
 
-            // 本列車已離開本站，任何原鎖定本列車卻因故未上車的殘餘旅客，依當下時刻重新查詢最早可上車的方式
+            // 本列車已離開本站：
+            // 若為該方向末班車，清空該方向所有殘餘候車池並強制出站，且不再累計進站尾數；
+            // 若非末班車，原鎖定本列車卻未上車者依當下時刻重新查詢最早可上車的方式
             for (const d of stepIndices) {
               const pool = platformPools[s][d];
-              const leftoverPlan = pool.planned.get(tr._uid) || 0;
-              if (leftoverPlan > 0) {
-                pool.planned.delete(tr._uid);
-                replanQty(s, d, leftoverPlan, sn.depSecs + 1, 0);
-              }
-              const leftoverR1 = pool.replan1.get(tr._uid) || 0;
-              if (leftoverR1 > 0) {
-                pool.replan1.delete(tr._uid);
-                replanQty(s, d, leftoverR1, sn.depSecs + 1, 1);
-              }
-              const leftoverR2 = pool.replan2.get(tr._uid) || 0;
-              if (leftoverR2 > 0) {
-                pool.replan2.delete(tr._uid);
-                replanQty(s, d, leftoverR2, sn.depSecs + 1, 2);
+              if (isLastTrainHere) {
+                let stranded = pool.urgent + pool.fallback;
+                for (const v of pool.planned.values()) stranded += v;
+                for (const v of pool.replan1.values()) stranded += v;
+                for (const v of pool.replan2.values()) stranded += v;
+                for (const tq of pool.transferQueue) stranded += tq.qty;
+                pool.planned.clear();
+                pool.replan1.clear();
+                pool.replan2.clear();
+                pool.urgent = 0;
+                pool.fallback = 0;
+                pool.transferQueue.length = 0;
+                carryOver[s][d] = 0;
+                if (stranded > 0.01) {
+                  stationExits[s] += stranded;
+                  stationHourlyExits[s][hr] += stranded;
+                  stationSlotExits[s][slotId] += stranded;
+                }
+              } else {
+                const leftoverPlan = pool.planned.get(tr._uid) || 0;
+                if (leftoverPlan > 0) {
+                  pool.planned.delete(tr._uid);
+                  replanQty(s, d, leftoverPlan, sn.depSecs + 1, 0);
+                }
+                const leftoverR1 = pool.replan1.get(tr._uid) || 0;
+                if (leftoverR1 > 0) {
+                  pool.replan1.delete(tr._uid);
+                  replanQty(s, d, leftoverR1, sn.depSecs + 1, 1);
+                }
+                const leftoverR2 = pool.replan2.get(tr._uid) || 0;
+                if (leftoverR2 > 0) {
+                  pool.replan2.delete(tr._uid);
+                  replanQty(s, d, leftoverR2, sn.depSecs + 1, 2);
+                }
               }
             }
           }
@@ -1602,7 +1861,7 @@
   }
 
   function getTrainLoadAtTime(simResult, tl, simTimeSecs, liveState) {
-    const is6Cars = (tl.gameType === 'express' || tl.length === 130);
+    const is6Cars = !!(tl && (tl.gameType === 'express' || tl.length === 130));
     const spec = getTrainCapacitySpec(is6Cars);
     const fallbackRes = {
       is6Cars,
@@ -1617,37 +1876,83 @@
       crowding: 1,
       leftBehind: 0
     };
+    if (!tl || tl.isDeadhead || tl.gameType === 'deadhead' || (tl.type && (String(tl.type).includes('回送') || String(tl.type).includes('迴送')))) {
+      return fallbackRes;
+    }
     if (!simResult || !simResult.trainLookup) return fallbackRes;
 
     const uid = `${tl.dir}-${tl.num}`;
     const rec = simResult.trainLookup.get(uid);
     if (!rec || !rec.snapshots || rec.snapshots.length === 0) return fallbackRes;
 
-    const tNorm = normalizeTimetableSecs(simTimeSecs);
     const snaps = rec.snapshots;
+    const cleanStName = (name) => String(name || '')
+      .replace(/^FR\d+\s*/i, '')
+      .replace(/\([^)]*\)/g, '')
+      .trim();
 
-    // 找出目前停靠中或剛駛離之車站快照 (車門關閉行駛期間維持鎖定剛發車站之人數)
-    let chosen = snaps[0];
-    for (let i = 0; i < snaps.length; i++) {
-      if (tNorm >= snaps[i].arrSecs) {
-        chosen = snaps[i];
-      } else {
-        break;
+    // 優先依據列車實際停靠/駛離車站 (liveState.currentStationName / liveState.stopIdx) 定位對應快照，
+    // 完全不依賴時刻表表定到開時間 arrSecs / depSecs
+    let chosenIdx = -1;
+    if (liveState) {
+      if (liveState.currentStationName) {
+        const targetClean = cleanStName(liveState.currentStationName);
+        if (targetClean) {
+          for (let i = 0; i < snaps.length; i++) {
+            if (cleanStName(snaps[i].stationName) === targetClean) {
+              chosenIdx = i;
+              break;
+            }
+          }
+        }
+      }
+      if (chosenIdx === -1 && typeof liveState.stopIdx === 'number') {
+        const tlStops = tl.targetNodes || (tl.isDeadhead ? tl.nodes : tl.stopNodes) || tl.stopNodes || [];
+        const startI = Math.min(Math.max(0, liveState.stopIdx), tlStops.length - 1);
+        for (let k = startI; k >= 0; k--) {
+          const nd = tlStops[k];
+          if (!nd) continue;
+          const ndName = cleanStName(nd.cleanName || nd.name);
+          if (!ndName) continue;
+          const matchI = snaps.findIndex(sn => cleanStName(sn.stationName) === ndName);
+          if (matchI !== -1) {
+            chosenIdx = matchI;
+            break;
+          }
+        }
       }
     }
 
-    // 停靠中：開門瞬間減少到達目的地之下車旅客；關門瞬間增加選擇搭乘該班車之上車旅客
-    if (liveState && liveState.isStoppedAtStation && tNorm >= chosen.arrSecs && tNorm < chosen.depSecs) {
-      const prevIdx = Math.max(0, snaps.indexOf(chosen) - 1);
-      const prev = snaps[prevIdx];
+    // 若無即時車站定位資訊（離線/非即時查詢）才退回依時刻表時間推估
+    if (chosenIdx === -1) {
+      const tNorm = normalizeTimetableSecs(simTimeSecs);
+      chosenIdx = 0;
+      for (let i = 0; i < snaps.length; i++) {
+        if (tNorm >= snaps[i].arrSecs) {
+          chosenIdx = i;
+        } else {
+          break;
+        }
+      }
+    }
+
+    const chosen = snaps[chosenIdx];
+    const prev = (chosenIdx > 0) ? snaps[chosenIdx - 1] : { onBoardOrd: 0, onBoardBiz: 0 };
+
+    // 嚴格依照實際開關門狀態切換人數 (不判斷時刻表 arrSecs / depSecs)：
+    // - 停靠中且尚未開門：維持前站載客量 (起站為 0)
+    // - 開門中 / 開門中停靠 / 關門倒數中 (門尚未完全關閉)：開門瞬間立即扣除本站下車人數
+    // - 車門完全關閉 (doorsWereClosed) 或已離站行駛中：關門瞬間立即加上本站上車人數並鎖定至下一站開門
+    if (liveState && liveState.isStoppedAtStation) {
       let ord = prev.onBoardOrd;
       let biz = prev.onBoardBiz;
       let leftBehind = 0;
-      if (liveState.doorsWereClosed) {
+      const isDoorFullyClosed = !!liveState.doorsWereClosed && !liveState.doorOpen && !liveState.doorOpening && !liveState.doorClosing;
+      if (isDoorFullyClosed) {
         ord = chosen.onBoardOrd;
         biz = chosen.onBoardBiz;
         leftBehind = chosen.leftBehind;
-      } else if (liveState.doorOpen || liveState.doorClosing) {
+      } else if (liveState.doorOpen || liveState.doorOpening || liveState.doorClosing) {
         ord = Math.max(0, prev.onBoardOrd - (chosen.alightedOrd || 0));
         biz = Math.max(0, prev.onBoardBiz - (chosen.alightedBiz || 0));
       }
