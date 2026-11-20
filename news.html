@@ -42,17 +42,17 @@
     <h2>營運公告</h2>
     <div class="grid grid-2">
       <article class="card">
-        <small class="meta">2026-01-23</small>
+        <small class="meta">飛灣曆 20-01-23</small>
         <h3>政府政策｜海岸線解放法案</h3>
         <p>
-          【2025 「海岸線解放」法案】中央政府頒布《海岸景觀復育法》，除飛灣核心特區外，優先拆除沿海城市濱海鐵路設施，改建為濱海公園與生態溼地。
+          【飛灣曆 19 年「海岸線解放」法案】中央政府頒布《海岸景觀復育法》，除飛灣核心特區外，優先拆除沿海城市濱海鐵路設施，改建為濱海公園與生態溼地。
         </p>
       </article>
       <article class="card">
-        <small class="meta">2026-01-23</small>
+        <small class="meta">飛灣曆 20-01-23</small>
         <h3>政府政策｜綠色縫合計畫</h3>
         <p>
-          【2025 全京綠色縫合計畫】配合全京市與綾路市轉型為「低噪音寧靜特區」，本公司將執行「路廊升級手術」，以更環保的運具取代傳統重軌。
+          【飛灣曆 19 年 全京綠色縫合計畫】配合全京市與綾路市轉型為「低噪音寧靜特區」，本公司將執行「路廊升級手術」，以更環保的運具取代傳統重軌。
         </p>
       </article>
     </div>
@@ -234,7 +234,7 @@
     }
 
     const startDay = (weekIdx - 1) * 5 + 1;
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const dateStr = `飛灣曆 ${year - 2006}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const seed = year * 1000 + month * 10 + weekIdx;
     return { year, month, weekIdx, dateStr, seed };
   }
@@ -336,8 +336,8 @@
   function fmtFlywan(dt) {
     const info = getFlywanDayInfo(dt);
     return info.month === 0
-      ? `${info.year}年 年初假期週 第${info.day}天`
-      : `飛灣曆 ${info.year}年${info.month}月${info.day}日`;
+      ? `飛灣曆 ${info.year - 2006}年 年初假期週 第${info.day}天`
+      : `飛灣曆 ${info.year - 2006}年${info.month}月${info.day}日`;
   }
 
   function generateHolidayPackageNews(now) {

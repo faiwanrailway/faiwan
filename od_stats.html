@@ -209,7 +209,7 @@
 <section class="hero">
   <div class="container">
     <h1>22 × 22 OD 旅運矩陣熱力圖與前五大熱門走廊</h1>
-    <p>支援「近一年」、「近一個月」、「年度（2020 起至今）」、「年度月（2020 年起選月至今）」及「近一年年平均日」查詢，並可切換不同時刻表情境（實際日曆權重／平日／假日／連續假日／平日接連假／連假接平日）；錦湖（FR13）與鷺島（FR14）依車站規模 3 計列，並自動於跨年新增年度。</p>
+    <p>支援「近一年」、「近一個月」、「年度（飛灣曆 14 年起至今）」、「年度月（飛灣曆 14 年起選月至今）」及「近一年年平均日」查詢，並可切換不同時刻表情境（實際日曆權重／平日／假日／連續假日／平日接連假／連假接平日）；錦湖（FR13）與鷺島（FR14）依車站規模 3 計列，並自動於跨年新增年度。</p>
   </div>
 </section>
 
@@ -221,8 +221,8 @@
         <select id="sel-mode" style="min-width:230px;">
           <option value="rolling_1y">近一年（滾動近 365 日合計）</option>
           <option value="rolling_1m">近一個月（滾動近一月合計）</option>
-          <option value="year" selected>年度（2020 年起，今年至當日）</option>
-          <option value="year_month">年度月（2020 年起選月，本月至今）</option>
+          <option value="year" selected>年度（飛灣曆 14 年起，今年至當日）</option>
+          <option value="year_month">年度月（飛灣曆 14 年起選月，本月至今）</option>
           <option value="rolling_1y_daily">近一年年平均日（平均單日水準）</option>
         </select>
       </div>
@@ -331,10 +331,10 @@
     const opt = document.createElement('option');
     opt.value = String(y);
     if (y === dateCtx.currentYear) {
-      opt.textContent = `${y} 年（至當日 ${dateCtx.todayStr}）`;
+      opt.textContent = `飛灣曆 ${y - 2006} 年（至當日 ${dateCtx.todayStr}）`;
       opt.selected = true;
     } else {
-      opt.textContent = `${y} 年`;
+      opt.textContent = `飛灣曆 ${y - 2006} 年`;
     }
     selYear.appendChild(opt);
   }

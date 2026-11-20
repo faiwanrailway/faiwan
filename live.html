@@ -11865,7 +11865,7 @@
                     const dayOfYear = Math.floor((s - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
 
                     if (dayOfYear <= holidayDays) {
-                        return `飛灣曆 ${year}年 年初假期週 D${dayOfYear} (連假)`;
+                        return `飛灣曆 ${year - 2006}年 年初假期週 D${dayOfYear} (連假)`;
                     }
 
                     const regDay = dayOfYear - holidayDays;
@@ -11876,7 +11876,7 @@
                     const fest = getFlywanFestival(m, d);
                     const festTag = fest ? `・${fest.name}` : '';
                     const connTag = (this.schedType === 'weekday_to_long') ? '・接連假' : ((this.schedType === 'long_to_weekday') ? '・連假接平日' : '');
-                    return `飛灣曆 ${year}年 第${m}月${d}日 (${wName}${festTag}${connTag})`;
+                    return `飛灣曆 ${year - 2006}年 第${m}月${d}日 (${wName}${festTag}${connTag})`;
                 },
                 badgeBgColor() {
                     if (this.schedType === 'holiday_long') return '#db2777';

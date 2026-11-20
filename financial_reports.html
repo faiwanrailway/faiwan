@@ -221,14 +221,14 @@
       <a href="financial_reports.html" class="active">年度財務報表</a>
       <a href="service_quality.html">服務品質統計</a>
     </div>
-    <span class="seed-pill" id="seed-indicator">SEED: flywan-finance-annual-2020-2026</span>
+    <span class="seed-pill" id="seed-indicator">SEED: flywan-finance-annual-fw14-20</span>
   </div>
 </div>
 
 <section class="hero">
   <div class="container">
-    <h1>飛灣鐵路公司年度財務報表（2020 年起可查）</h1>
-    <p>依法揭露綜合損益表、資產負債表與現金流量表三大報表；依公司歷史里程碑（2020 成立、2021 機場線、2022 全線、2024 環狀線聯網、2026 海岸轉型）及校準票價模型編製，採固定匯率 <strong>1 飛灣幣 = 10 美元</strong>。</p>
+    <h1>飛灣鐵路公司年度財務報表（飛灣曆 14 年起可查）</h1>
+    <p>依法揭露綜合損益表、資產負債表與現金流量表三大報表；依公司歷史里程碑（飛灣曆 14 年成立、15 年機場線、16 年全線、18 年環狀線聯網、20 年海岸轉型）及校準票價模型編製，採固定匯率 <strong>1 飛灣幣 = 10 美元</strong>。</p>
   </div>
 </section>
 
@@ -236,7 +236,7 @@
   <article class="card controls-card">
     <div class="controls-left">
       <div class="control-group">
-        <label for="sel-year">查詢會計年度（2020 年起，當年統計至當日）</label>
+        <label for="sel-year">查詢會計年度（飛灣曆 14 年起，當年統計至當日）</label>
         <select id="sel-year"></select>
       </div>
       <div class="control-group">
@@ -255,7 +255,7 @@
   </article>
 
   <div class="fare-note">
-    <strong>票價模型連動與修正說明：</strong>依 <code>tickets.html</code> 與全線旅運模型核算，原短途／定期票（如 1 日定期票 0.50 FWC 低於全線單程 0.69 FWC）會造成套利與前期虧損壓力。現已同步修訂票價基準：一般單程 <strong>0.12 + 0.012/km 飛灣幣</strong>（約 $1.20 + $0.12/km 美元）、商務艙 <strong>0.35 + 0.030/km 飛灣幣</strong>、1 日～30 日定期票 <strong>0.85～10.80 飛灣幣</strong>，帶動 2024 年起本業穩定轉虧為盈。
+    <strong>票價模型連動與修正說明：</strong>依 <code>tickets.html</code> 與全線旅運模型核算，原短途／定期票（如 1 日定期票 0.50 FWC 低於全線單程 0.69 FWC）會造成套利與前期虧損壓力。現已同步修訂票價基準：一般單程 <strong>0.12 + 0.012/km 飛灣幣</strong>（約 $1.20 + $0.12/km 美元）、商務艙 <strong>0.35 + 0.030/km 飛灣幣</strong>、1 日～30 日定期票 <strong>0.85～10.80 飛灣幣</strong>，帶動飛灣曆 18 年起本業穩定轉虧為盈。
   </div>
 
   <div id="milestone-banner" class="card" style="margin-bottom: 20px; border-left: 4px solid var(--secondary); padding: 12px 18px; background: #F0F9FF;"></div>
@@ -284,7 +284,7 @@
   </div>
 
   <div class="chart-box">
-    <h3 style="margin:0 0 6px 0; color: var(--primary);" id="trend-title">2020 年起各年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）</h3>
+    <h3 style="margin:0 0 6px 0; color: var(--primary);" id="trend-title">飛灣曆 14 年起各年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）</h3>
     <div style="font-size:0.82rem; color: var(--muted); margin-bottom: 10px;">
       <span style="margin-right:16px;"><strong style="color:#064663">■</strong> 營業總收入</span>
       <span style="margin-right:16px;"><strong style="color:#00B4D8">■</strong> 營業成本及費用</span>
@@ -344,18 +344,18 @@
   const selYear = document.getElementById('sel-year');
   const selCurr = document.getElementById('sel-currency');
 
-  document.getElementById('seed-indicator').textContent = `SEED: flywan-finance-annual-2020-${dateCtx.currentYear}`;
-  document.getElementById('trend-title').textContent = `2020–${dateCtx.currentYear} 年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）`;
+  document.getElementById('seed-indicator').textContent = `SEED: flywan-finance-annual-fw14-${dateCtx.currentYear - 2006}`;
+  document.getElementById('trend-title').textContent = `飛灣曆 14–${dateCtx.currentYear - 2006} 年度營收、營業成本與稅後淨利趨勢圖（千飛灣幣 kFWC｜點擊年份柱切換明細）`;
 
   // 動態建立 2020 ~ 當年度選單，跨年時會自動新增年度
   for (let y = dateCtx.currentYear; y >= 2020; y--) {
     const opt = document.createElement('option');
     opt.value = String(y);
     if (y === dateCtx.currentYear) {
-      opt.textContent = `${y} 年度（統計至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
+      opt.textContent = `飛灣曆 ${y - 2006} 年度（統計至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
       opt.selected = true;
     } else {
-      opt.textContent = `${y} 全年度`;
+      opt.textContent = `飛灣曆 ${y - 2006} 全年度`;
     }
     selYear.appendChild(opt);
   }
@@ -468,9 +468,9 @@
         out += `<rect x="${(x0 + 6).toFixed(1)}" y="${T}" width="${(step - 12).toFixed(1)}" height="${ch}" rx="6" fill="rgba(0,180,216,0.10)"/>`;
       }
       out += `<g style="cursor:pointer" data-yr="${y}">`;
-      out += `<rect x="${bx1.toFixed(1)}" y="${(T + ch - h1).toFixed(1)}" width="${bw}" height="${h1.toFixed(1)}" rx="2" fill="#064663"><title>${y} 營收: ${r.totalRevenueK.toLocaleString()} kFWC</title></rect>`;
-      out += `<rect x="${bx2.toFixed(1)}" y="${(T + ch - h2).toFixed(1)}" width="${bw}" height="${h2.toFixed(1)}" rx="2" fill="#00B4D8"><title>${y} 營業成本+費用: ${totCost.toLocaleString()} kFWC</title></rect>`;
-      out += `<text x="${(x0 + step/2).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="12" font-weight="${isActive?'800':'600'}" fill="${isActive?'#064663':'#475569'}">${y}</text>`;
+      out += `<rect x="${bx1.toFixed(1)}" y="${(T + ch - h1).toFixed(1)}" width="${bw}" height="${h1.toFixed(1)}" rx="2" fill="#064663"><title>飛灣曆 ${y - 2006} 年營收: ${r.totalRevenueK.toLocaleString()} kFWC</title></rect>`;
+      out += `<rect x="${bx2.toFixed(1)}" y="${(T + ch - h2).toFixed(1)}" width="${bw}" height="${h2.toFixed(1)}" rx="2" fill="#00B4D8"><title>飛灣曆 ${y - 2006} 年營業成本+費用: ${totCost.toLocaleString()} kFWC</title></rect>`;
+      out += `<text x="${(x0 + step/2).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="12" font-weight="${isActive?'800':'600'}" fill="${isActive?'#064663':'#475569'}">曆${y - 2006}年</text>`;
       out += `</g>`;
 
       const cx = x0 + step / 2;
@@ -567,7 +567,7 @@
       makeSectionRow('營業外收支、稅項與本期淨利', currMode),
       makeRow('綠色交通補助與存款利息收入', is.nonOpSubsidyAndInterestK, pis?.nonOpSubsidyAndInterestK, '政府節能運輸補貼及帳上資金孳息', currMode),
       makeRow('銀行借款及綠色債券利息費用', -is.interestExpK, pis ? -pis.interestExpK : null, '約 2.2% 加權資金成本', currMode),
-      makeRow('海岸重軌設施除役資產處分損失', -is.assetDisposalLossK, pis ? -pis.assetDisposalLossK : null, year === 2026 ? '2026/01 海岸復育除役一次性帳面損失' : '無重大處分損益', currMode),
+      makeRow('海岸重軌設施除役資產處分損失', -is.assetDisposalLossK, pis ? -pis.assetDisposalLossK : null, year === 2026 ? '飛灣曆 20/01 海岸復育除役一次性帳面損失' : '無重大處分損益', currMode),
       makeRow('營業外收支淨額', is.nonOpNetK, pis?.nonOpNetK, '', currMode, 'fin-subtotal'),
       makeRow('稅前淨利 (EBT)', is.ebtK, pis?.ebtK, '', currMode),
       makeRow('所得稅費用 (估計有效稅率 20%)', -is.incomeTaxK, pis ? -pis.incomeTaxK : null, '稅前虧損年度不計所得稅', currMode),
@@ -582,10 +582,10 @@
       makeRow('應收票款及聯運清算帳款 (AR)', bs.arK, pbs?.arK, '信用卡與航空／轉乘清算應收', currMode),
       makeRow('備品耗材與存貨 (Inventory)', bs.inventoryK, pbs?.inventoryK, '軌道材料、號誌與列車備品', currMode),
       makeRow('流動資產合計 (Current Assets)', bs.currentAssetsK, pbs?.currentAssetsK, '', currMode, 'fin-subtotal'),
-      makeRow('不動產、廠房、軌道及電聯車原始成本', bs.ppeGrossK, pbs?.ppeGrossK, '累積資本支出與 2026 海岸路段除役調整', currMode),
+      makeRow('不動產、廠房、軌道及電聯車原始成本', bs.ppeGrossK, pbs?.ppeGrossK, '累積資本支出與飛灣曆 20 年海岸路段除役調整', currMode),
       makeRow('減：累計折舊 (Accumulated Depreciation)', -bs.accumDepK, pbs ? -pbs.accumDepK : null, '', currMode),
       makeRow('不動產、廠房及設備淨額 (Net PP&E)', bs.netPPEK, pbs?.netPPEK, '', currMode, 'fin-subtotal'),
-      makeRow('使用權資產、CBTC 軟體暨路網授權無形資產', bs.rouAndIntangibleK, pbs?.rouAndIntangibleK, '2020 初始化暨 2024 環狀線聯網系統建置', currMode),
+      makeRow('使用權資產、CBTC 軟體暨路網授權無形資產', bs.rouAndIntangibleK, pbs?.rouAndIntangibleK, '飛灣曆 14 年初始化暨 18 年環狀線聯網系統建置', currMode),
       makeRow('非流動資產合計 (Non-Current Assets)', bs.nonCurrentAssetsK, pbs?.nonCurrentAssetsK, '', currMode, 'fin-subtotal'),
       makeRow('資產總計 (Total Assets)', bs.totalAssetsK, pbs?.totalAssetsK, '', currMode, 'fin-total'),
 
@@ -595,12 +595,12 @@
       makeRow('一年內到期長期借款 (Current Portion of Debt)', bs.shortTermDebtK, pbs?.shortTermDebtK, '', currMode),
       makeRow('流動負債合計 (Current Liabilities)', bs.currentLiabK, pbs?.currentLiabK, '', currMode, 'fin-subtotal'),
       makeRow('長期銀行融資借款 (Long-Term Debt)', bs.nonCurrentDebtK, pbs?.nonCurrentDebtK, '', currMode),
-      makeRow('飛灣綠色鐵道永續債券 (Green Bonds)', bs.greenBondsK, pbs?.greenBondsK, '2024 年發行支應環狀線轉乘與綠色計畫', currMode),
+      makeRow('飛灣綠色鐵道永續債券 (Green Bonds)', bs.greenBondsK, pbs?.greenBondsK, '飛灣曆 18 年發行支應環狀線轉乘與綠色計畫', currMode),
       makeRow('非流動負債合計 (Non-Current Liabilities)', bs.nonCurrentLiabK, pbs?.nonCurrentLiabK, '', currMode, 'fin-subtotal'),
       makeRow('負債總計 (Total Liabilities)', bs.totalLiabK, pbs?.totalLiabK, `負債佔總資產比率 ${kp.debtRatioPct}%`, currMode, 'fin-total'),
 
       makeSectionRow('股東權益 (Shareholders\' Equity)', currMode),
-      makeRow('股本 (Share Capital)', bs.shareCapitalK, pbs?.shareCapitalK, '創始暨 2021 增資股本', currMode),
+      makeRow('股本 (Share Capital)', bs.shareCapitalK, pbs?.shareCapitalK, '創始暨飛灣曆 15 年增資股本', currMode),
       makeRow('資本公積 (Capital Surplus)', bs.capitalSurplusK, pbs?.capitalSurplusK, '發行溢價公積', currMode),
       makeRow('保留盈餘 (Retained Earnings)', bs.retainedEarningsK, pbs?.retainedEarningsK, '歷年稅後損益累計（減已配發股利）', currMode),
       makeRow('股東權益總計 (Total Equity)', bs.totalEquityK, pbs?.totalEquityK, `權益報酬率 ROE ${kp.roePct}%`, currMode, 'fin-subtotal'),
@@ -656,7 +656,7 @@
     const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `flywan_financial_statements_${year}.csv`;
+    a.download = `flywan_financial_statements_fw${year - 2006}.csv`;
     a.click();
   });
 

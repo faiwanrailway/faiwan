@@ -93,7 +93,7 @@
   <section>
     <h2>公司簡介 About Flywan Railway</h2>
     <p>
-      響應 2025 年《海岸景觀復育法》與《綠色縫合計畫》，我們毅然拆除切割海岸與城市的傳統重軌，將珍貴的空間歸還給濕地與寧靜。
+      響應飛灣曆 19 年《海岸景觀復育法》與《綠色縫合計畫》，我們毅然拆除切割海岸與城市的傳統重軌，將珍貴的空間歸還給濕地與寧靜。
     </p>
     <a href="company.html" class="btn btn-outline">瞭解更多公司介紹</a>
   </section>
@@ -197,7 +197,7 @@
     }
 
     const startDay = (weekIdx - 1) * 5 + 1;
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const dateStr = `飛灣曆 ${year - 2006}-${String(month).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
     const seed = year * 1000 + month * 10 + weekIdx;
     return { year, month, weekIdx, dateStr, seed };
   }
@@ -300,8 +300,8 @@
   function fmtFlywan(dt) {
     const info = getFlywanDayInfo(dt);
     return info.month === 0
-      ? `${info.year}年 年初假期週 第${info.day}天`
-      : `飛灣曆 ${info.year}年${info.month}月${info.day}日`;
+      ? `飛灣曆 ${info.year - 2006}年 年初假期週 第${info.day}天`
+      : `飛灣曆 ${info.year - 2006}年${info.month}月${info.day}日`;
   }
 
   function generateHolidayPackageNews(now) {

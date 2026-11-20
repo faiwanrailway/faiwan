@@ -47,26 +47,26 @@
   const STATION_PROFILES = [
     { idx: 0,  code: 'FR01', name: '飛灣工業區',   distM: 0,     km: 0.0,  exp: true,  scale: 4, landUse: { C: 1.0 }, landLabel: 'C', transfers: ['地鐵工業線 (T1)', '地鐵環狀線 (T1)'], note: '' },
     { idx: 1,  code: 'FR02', name: '飛灣港',       distM: 7300,  km: 7.3,  exp: false, scale: 3, landUse: { H: 1.0 }, landLabel: 'H', transfers: ['地鐵環狀線 (T1)'], note: '' },
-    { idx: 2,  code: 'FR03', name: '物流中心',     distM: 8600,  km: 8.5,  exp: false, scale: 3, landUse: { H: 1.0 }, landLabel: 'H', transfers: ['地鐵環狀線 (T1)'], note: '' },
-    { idx: 3,  code: 'FR04', name: '飛灣郵輪港',   distM: 9800,  km: 9.7,  exp: true,  scale: 5, landUse: { B: 0.2, H: 0.3, G: 0.5 }, landLabel: '20%B+30%H+50%G', transfers: ['WRT環島線 (城際幹線)', '地鐵中央線 (T1)', '地鐵環狀線 (T1)'], note: '城際長途樞紐，連假前後波峰顯著' },
-    { idx: 4,  code: 'FR05', name: '濱江商務區',   distM: 17000, km: 16.9, exp: false, scale: 4, landUse: { B: 1.0 }, landLabel: 'B', transfers: ['地鐵環狀線 (T1)'], note: '' },
-    { idx: 5,  code: 'FR06', name: '市民廣場',     distM: 18500, km: 18.4, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 }, landLabel: '80%E+20%F', transfers: ['地鐵環狀線 (T1)'], note: '' },
-    { idx: 6,  code: 'FR07', name: '文化中心',     distM: 19800, km: 19.7, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 }, landLabel: '80%E+20%F', transfers: ['地鐵環狀線 (T1)'], note: '' },
-    { idx: 7,  code: 'FR08', name: '飛灣新站',     distM: 21700, km: 21.6, exp: true,  scale: 5, landUse: { E: 1.0 }, landLabel: 'E', transfers: ['地鐵南北線 (T1)', '地鐵環狀線 (T1)'], note: '' },
-    { idx: 8,  code: 'FR09', name: '科創園',       distM: 24000, km: 23.9, exp: false, scale: 4, landUse: { B: 0.85, C: 0.05, F: 0.1 }, landLabel: '85%B+5%C+10%F', transfers: [], note: '' },
-    { idx: 9,  code: 'FR10', name: '飛灣學區',     distM: 25200, km: 25.1, exp: false, scale: 4, landUse: { A: 0.4, D: 0.6 }, landLabel: '40%A+60%D', transfers: [], note: '' },
-    { idx: 10, code: 'FR11', name: '飛灣大道',     distM: 26900, km: 26.8, exp: false, scale: 4, landUse: { A: 0.5, E: 0.5 }, landLabel: '50%A+50%E', transfers: [], note: '' },
-    { idx: 11, code: 'FR12', name: '飛灣公園',     distM: 28500, km: 28.4, exp: true,  scale: 5, landUse: { A: 0.1, F: 0.9 }, landLabel: '10%A+90%F', transfers: ['地鐵公園線 (T1)'], note: '巨蛋賽事轉運樞紐' },
-    { idx: 12, code: 'FR13', name: '錦湖',         distM: 29900, km: 29.8, exp: false, scale: 3, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
-    { idx: 13, code: 'FR14', name: '鷺島',         distM: 30400, km: 30.3, exp: false, scale: 3, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
-    { idx: 14, code: 'FR15', name: '空港新城',     distM: 33200, km: 33.1, exp: false, scale: 2, landUse: { C: 1.0 }, landLabel: 'C', transfers: [], note: '' },
-    { idx: 15, code: 'FR16', name: '飛灣機場',     distM: 38100, km: 38.0, exp: true,  scale: 5, landUse: { G: 1.0 }, landLabel: 'G', transfers: [], note: '24小時全天候基礎客流，連假紅眼時段活躍' },
-    { idx: 16, code: 'FR17', name: '翡翠花園',     distM: 43300, km: 43.2, exp: false, scale: 2, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
-    { idx: 17, code: 'FR18', name: '紫荊苑',       distM: 46500, km: 46.4, exp: false, scale: 4, landUse: { A: 0.9, E: 0.1 }, landLabel: '90%A+10%E', transfers: ['地鐵中央線 (T1)'], note: '地鐵中央線平行分流 (FR18↔FR12/FR08/FR04)' },
-    { idx: 18, code: 'FR19', name: '御景新村',     distM: 54700, km: 54.8, exp: false, scale: 1, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
-    { idx: 19, code: 'FR20', name: '自然保育中心', distM: 56100, km: 56.2, exp: false, scale: 1, landUse: { H: 0.7, F: 0.3 }, landLabel: '70%H+30%F', transfers: [], note: '' },
-    { idx: 20, code: 'FR21', name: '綾路北站',     distM: 57900, km: 58.0, exp: true,  scale: 5, landUse: { A: 0.7, E: 0.3 }, landLabel: '70%A+30%E', transfers: ['ART綾京線 (T2)', '觀光紅楓線 (T3)'], note: '早尖峰ART帶人來、晚尖峰ART接人走' },
-    { idx: 21, code: 'FR22', name: '全京大道',     distM: 59100, km: 59.2, exp: false, scale: 3, landUse: { A: 0.8, E: 0.2 }, landLabel: '80%A+20%E', transfers: ['ART綾京線 (T2)'], note: '早尖峰ART帶人來、晚尖峰ART接人走' }
+    { idx: 2,  code: 'FR03', name: '物流中心',     distM: 8600,  km: 8.6,  exp: false, scale: 3, landUse: { H: 1.0 }, landLabel: 'H', transfers: ['地鐵環狀線 (T1)'], note: '' },
+    { idx: 3,  code: 'FR04', name: '飛灣郵輪港',   distM: 9800,  km: 9.8,  exp: true,  scale: 5, landUse: { B: 0.2, H: 0.3, G: 0.5 }, landLabel: '20%B+30%H+50%G', transfers: ['WRT環島線 (城際幹線)', '地鐵中央線 (T1)', '地鐵環狀線 (T1)'], note: '城際長途樞紐，連假前後波峰顯著' },
+    { idx: 4,  code: 'FR05', name: '濱江商務區',   distM: 17000, km: 17.0, exp: false, scale: 4, landUse: { B: 1.0 }, landLabel: 'B', transfers: ['地鐵環狀線 (T1)'], note: '' },
+    { idx: 5,  code: 'FR06', name: '市民廣場',     distM: 18500, km: 18.5, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 }, landLabel: '80%E+20%F', transfers: ['地鐵環狀線 (T1)'], note: '' },
+    { idx: 6,  code: 'FR07', name: '文化中心',     distM: 19800, km: 19.8, exp: false, scale: 4, landUse: { E: 0.8, F: 0.2 }, landLabel: '80%E+20%F', transfers: ['地鐵環狀線 (T1)'], note: '' },
+    { idx: 7,  code: 'FR08', name: '飛灣新站',     distM: 21700, km: 21.7, exp: true,  scale: 5, landUse: { E: 1.0 }, landLabel: 'E', transfers: ['地鐵南北線 (T1)', '地鐵環狀線 (T1)'], note: '' },
+    { idx: 8,  code: 'FR09', name: '科創園',       distM: 24000, km: 24.0, exp: false, scale: 4, landUse: { B: 0.85, C: 0.05, F: 0.1 }, landLabel: '85%B+5%C+10%F', transfers: [], note: '' },
+    { idx: 9,  code: 'FR10', name: '飛灣學區',     distM: 25200, km: 25.2, exp: false, scale: 4, landUse: { A: 0.4, D: 0.6 }, landLabel: '40%A+60%D', transfers: [], note: '' },
+    { idx: 10, code: 'FR11', name: '飛灣大道',     distM: 26900, km: 26.9, exp: false, scale: 4, landUse: { A: 0.5, E: 0.5 }, landLabel: '50%A+50%E', transfers: [], note: '' },
+    { idx: 11, code: 'FR12', name: '飛灣公園',     distM: 28500, km: 28.5, exp: true,  scale: 5, landUse: { A: 0.1, F: 0.9 }, landLabel: '10%A+90%F', transfers: ['地鐵公園線 (T1)'], note: '巨蛋賽事轉運樞紐' },
+    { idx: 12, code: 'FR13', name: '錦湖',         distM: 29900, km: 29.9, exp: false, scale: 3, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
+    { idx: 13, code: 'FR14', name: '鷺島',         distM: 30400, km: 30.4, exp: false, scale: 3, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
+    { idx: 14, code: 'FR15', name: '空港新城',     distM: 33200, km: 33.2, exp: false, scale: 2, landUse: { C: 1.0 }, landLabel: 'C', transfers: [], note: '' },
+    { idx: 15, code: 'FR16', name: '飛灣機場',     distM: 38100, km: 38.1, exp: true,  scale: 5, landUse: { G: 1.0 }, landLabel: 'G', transfers: [], note: '24小時全天候基礎客流，連假紅眼時段活躍' },
+    { idx: 16, code: 'FR17', name: '翡翠花園',     distM: 43300, km: 43.3, exp: false, scale: 2, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
+    { idx: 17, code: 'FR18', name: '紫荊苑',       distM: 46500, km: 46.5, exp: false, scale: 4, landUse: { A: 0.9, E: 0.1 }, landLabel: '90%A+10%E', transfers: ['地鐵中央線 (T1)'], note: '地鐵中央線平行分流 (FR18↔FR12/FR08/FR04)' },
+    { idx: 18, code: 'FR19', name: '御景新村',     distM: 54700, km: 54.7, exp: false, scale: 1, landUse: { A: 1.0 }, landLabel: 'A', transfers: [], note: '' },
+    { idx: 19, code: 'FR20', name: '自然保育中心', distM: 56100, km: 56.1, exp: false, scale: 1, landUse: { H: 0.7, F: 0.3 }, landLabel: '70%H+30%F', transfers: [], note: '' },
+    { idx: 20, code: 'FR21', name: '綾路北站',     distM: 57900, km: 57.9, exp: true,  scale: 5, landUse: { A: 0.7, E: 0.3 }, landLabel: '70%A+30%E', transfers: ['ART綾京線 (T2)', '觀光紅楓線 (T3)'], note: '早尖峰ART帶人來、晚尖峰ART接人走' },
+    { idx: 21, code: 'FR22', name: '全京大道',     distM: 59100, km: 59.1, exp: false, scale: 3, landUse: { A: 0.8, E: 0.2 }, landLabel: '80%A+20%E', transfers: ['ART綾京線 (T2)'], note: '早尖峰ART帶人來、晚尖峰ART接人走' }
   ];
 
   const STATION_BY_NAME = {};
@@ -353,6 +353,7 @@
   function convertDateToFlywanInfo(dateObj) {
     const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
     const year = d.getFullYear();
+    const fwYear = year - 2006;
     const leap = isFlywanLeapYear(year);
     const holidayDays = leap ? 6 : 5;
     const startOfYear = new Date(year, 0, 1);
@@ -360,12 +361,12 @@
 
     if (dayOfYear <= holidayDays) {
       return {
-        year, month: 0, day: dayOfYear, dayOfWeekIdx: 5,
+        year, fwYear, month: 0, day: dayOfYear, dayOfWeekIdx: 5,
         dayName: '連假', isFinalsWeek: false,
         festival: { name: '年初假期週', scheduleType: 'holiday_long' },
         baseSchedType: 'holiday_long',
         dayType: 'holiday_long',
-        label: `飛灣曆 ${year}年 年初假期週 D${dayOfYear}`
+        label: `飛灣曆 ${fwYear}年 年初假期週 D${dayOfYear}`
       };
     }
 
@@ -380,9 +381,9 @@
     const isFinalsWeek = (dayInMonth >= 26); // 每月第6週巨蛋總決賽
 
     return {
-      year, month: m, day: dayInMonth, dayOfWeekIdx: wIdx + 1,
+      year, fwYear, month: m, day: dayInMonth, dayOfWeekIdx: wIdx + 1,
       dayName: wNames[wIdx], isFinalsWeek, festival: fest, baseSchedType,
-      label: `飛灣曆 ${year}年 第${m}月${dayInMonth}日 (${wNames[wIdx]}${fest ? '・' + fest.name : ''})`
+      label: `飛灣曆 ${fwYear}年 第${m}月${dayInMonth}日 (${wNames[wIdx]}${fest ? '・' + fest.name : ''})`
     };
   }
 
@@ -636,33 +637,33 @@
   function getYearHistoryFactor(year) {
     if (year <= 2020) {
       return {
-        activeMonths: 2.5, // 2020年底試運轉/籌備測試期
+        activeMonths: 2.5, // 飛灣曆14年底試運轉/籌備測試期
         demandScale: 0.14,
-        label: '2020 創設暨試運轉籌備期',
-        note: '2020/01/01 公司成立，全年投入機場線土建與機電採購，年底展開部分路段試運轉。'
+        label: '飛灣曆 14年 創設暨試運轉籌備期',
+        note: '飛灣曆 14/01/01 公司成立，全年投入機場線土建與機電採購，年底展開部分路段試運轉。'
       };
     }
     if (year === 2021) {
       return {
-        activeMonths: 10.0, // 2021/03/01 延伸至飛灣機場通車
+        activeMonths: 10.0, // 飛灣曆15/03/01 延伸至飛灣機場通車
         demandScale: 0.48,
-        label: '2021 飛灣機場通車首年 (3月起營運)',
-        note: '2021/03/01 飛灣機場開幕並通車至飛灣機場，初期培養通勤與機場聯運客源。'
+        label: '飛灣曆 15年 飛灣機場通車首年 (3月起營運)',
+        note: '飛灣曆 15/03/01 飛灣機場開幕並通車至飛灣機場，初期培養通勤與機場聯運客源。'
       };
     }
     if (year === 2022) {
       return {
         activeMonths: 12.0, // 4月海莊、10月夏城完工
         demandScale: 0.72,
-        label: '2022 全線分段通車完工年',
-        note: '2022/04/01 通車至海莊、2022/10/03 飛灣線全線完工，運量逐季爬升。'
+        label: '飛灣曆 16年 全線分段通車完工年',
+        note: '飛灣曆 16/04/01 通車至海莊、16/10/03 飛灣線全線完工，運量逐季爬升。'
       };
     }
     if (year === 2023) {
       return {
         activeMonths: 12.0,
         demandScale: 0.86,
-        label: '2023 全線完整營運首年',
+        label: '飛灣曆 17年 全線完整營運首年',
         note: '全線貫通後首個完整會計年度，通勤與觀光旅次穩定成長，營運邁入損益兩平。'
       };
     }
@@ -670,25 +671,25 @@
       return {
         activeMonths: 12.0,
         demandScale: 0.96,
-        label: '2024 飛灣環狀線通車聯網年',
-        note: '2024/01/01 飛灣環狀線通車完成主要生活圈連結，轉乘路網效應帶動運量大增。'
+        label: '飛灣曆 18年 飛灣環狀線通車聯網年',
+        note: '飛灣曆 18/01/01 飛灣環狀線通車完成主要生活圈連結，轉乘路網效應帶動運量大增。'
       };
     }
     if (year === 2025) {
       return {
         activeMonths: 12.0,
         demandScale: 1.02,
-        label: '2025 都會核心擴張與綠色轉型年',
+        label: '飛灣曆 19年 都會核心擴張與綠色轉型年',
         note: '配合《海岸景觀復育法》與《綠色縫合計畫》展開沿線轉型與運量優化，載客量創階段新高。'
       };
     }
-    // 2026+
+    // 2026+ (飛灣曆 20年+)
     const extraGrowth = 1.0 + Math.max(0, year - 2026) * 0.025;
     return {
       activeMonths: 12.0,
       demandScale: 1.00 * extraGrowth,
-      label: `${year} 飛灣新都會區暨聯賽常態營運期`,
-      note: '2026/01 配合《飛灣新都會區計畫》與《全京綠色計畫》調整站名與路網，並結合巨蛋聯賽疏運，進入成熟獲利期。'
+      label: `飛灣曆 ${year - 2006}年 飛灣新都會區暨聯賽常態營運期`,
+      note: '飛灣曆 20/01 配合《飛灣新都會區計畫》與《全京綠色計畫》調整站名與路網，並結合巨蛋聯賽疏運，進入成熟獲利期。'
     };
   }
 
@@ -2004,11 +2005,12 @@
     const utcNow = Date.UTC(currentYear, currentMonth - 1, currentDay);
     const dayOfYear = Math.min(totalDaysInYear, Math.max(1, Math.floor((utcNow - utcStart) / 86400000) + 1));
     const ytdFraction = dayOfYear / totalDaysInYear;
-    const todayStr = `${currentYear}/${String(currentMonth).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
+    const todayStr = `飛灣曆 ${currentYear - 2006}/${String(currentMonth).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
     const isoDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
     return {
       refDate,
       currentYear,
+      fwYear: currentYear - 2006,
       currentMonth,
       currentDay,
       totalDaysInYear,
@@ -2063,7 +2065,7 @@
       const sDate = new Date(dateCtx.currentYear - 1, dateCtx.currentMonth - 1, dateCtx.currentDay);
       sDate.setDate(sDate.getDate() + 1);
       startUtc = Date.UTC(sDate.getFullYear(), sDate.getMonth(), sDate.getDate());
-      const sStr = `${sDate.getFullYear()}/${String(sDate.getMonth() + 1).padStart(2, '0')}/${String(sDate.getDate()).padStart(2, '0')}`;
+      const sStr = `飛灣曆 ${sDate.getFullYear() - 2006}/${String(sDate.getMonth() + 1).padStart(2, '0')}/${String(sDate.getDate()).padStart(2, '0')}`;
       periodLabel = isDailyAvg
         ? `近一年年平均日 (${sStr} – ${dateCtx.todayStr} 之平均單日)`
         : `近一年滾動統計 (${sStr} – ${dateCtx.todayStr})`;
@@ -2072,40 +2074,42 @@
       const sDate = new Date(dateCtx.currentYear, dateCtx.currentMonth - 2, dateCtx.currentDay);
       sDate.setDate(sDate.getDate() + 1);
       startUtc = Date.UTC(sDate.getFullYear(), sDate.getMonth(), sDate.getDate());
-      const sStr = `${sDate.getFullYear()}/${String(sDate.getMonth() + 1).padStart(2, '0')}/${String(sDate.getDate()).padStart(2, '0')}`;
+      const sStr = `飛灣曆 ${sDate.getFullYear() - 2006}/${String(sDate.getMonth() + 1).padStart(2, '0')}/${String(sDate.getDate()).padStart(2, '0')}`;
       periodLabel = `近一個月滾動統計 (${sStr} – ${dateCtx.todayStr})`;
     } else if (/^\d{4}-\d{2}$/.test(keyStr)) {
       const [yRaw, mRaw] = keyStr.split('-').map(Number);
       const y = Math.min(dateCtx.currentYear, Math.max(2020, yRaw));
+      const fwY = y - 2006;
       const maxM = (y === dateCtx.currentYear) ? dateCtx.currentMonth : 12;
       const m = Math.min(maxM, Math.max(1, mRaw));
       startUtc = Date.UTC(y, m - 1, 1);
       if (y === dateCtx.currentYear && m === dateCtx.currentMonth) {
         endUtc = Date.UTC(y, m - 1, dateCtx.currentDay);
         isYTD = true;
-        periodLabel = `${y} 年 ${String(m).padStart(2, '0')} 月至今 (${y}/${String(m).padStart(2, '0')}/01 – ${dateCtx.todayStr}，推演至當日)`;
+        periodLabel = `飛灣曆 ${fwY} 年 ${String(m).padStart(2, '0')} 月至今 (飛灣曆 ${fwY}/${String(m).padStart(2, '0')}/01 – ${dateCtx.todayStr}，推演至當日)`;
       } else {
         const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
         endUtc = Date.UTC(y, m - 1, lastDay);
-        periodLabel = `${y} 年 ${String(m).padStart(2, '0')} 月 (${y}/${String(m).padStart(2, '0')}/01 – ${y}/${String(m).padStart(2, '0')}/${String(lastDay).padStart(2, '0')})`;
+        periodLabel = `飛灣曆 ${fwY} 年 ${String(m).padStart(2, '0')} 月 (飛灣曆 ${fwY}/${String(m).padStart(2, '0')}/01 – ${fwY}/${String(m).padStart(2, '0')}/${String(lastDay).padStart(2, '0')})`;
       }
     } else {
       const y = Math.min(dateCtx.currentYear, Math.max(2020, parseInt(keyStr, 10) || dateCtx.currentYear));
+      const fwY = y - 2006;
       if (y === 2021) {
         startUtc = Date.UTC(2021, 2, 1); // 2021/03/01 通車
         endUtc = Date.UTC(2021, 11, 31);
-        periodLabel = '2021 年度 (2021/03/01 通車起 – 2021/12/31)';
+        periodLabel = '飛灣曆 15 年度 (飛灣曆 15/03/01 通車起 – 15/12/31)';
       } else if (y === dateCtx.currentYear) {
         startUtc = Date.UTC(y, 0, 1);
         endUtc = Date.UTC(y, dateCtx.currentMonth - 1, dateCtx.currentDay);
         isYTD = true;
-        periodLabel = `${y} 年度至今 (${y}/01/01 – ${dateCtx.todayStr}，推演至當日)`;
+        periodLabel = `飛灣曆 ${fwY} 年度至今 (飛灣曆 ${fwY}/01/01 – ${dateCtx.todayStr}，推演至當日)`;
       } else {
         startUtc = Date.UTC(y, 0, 1);
         endUtc = Date.UTC(y, 11, 31);
         periodLabel = y === 2020
-          ? '2020 年度 (2020/01/01 – 2020/12/31 籌備暨試運轉)'
-          : `${y} 全年度 (${y}/01/01 – ${y}/12/31)`;
+          ? '飛灣曆 14 年度 (飛灣曆 14/01/01 – 14/12/31 籌備暨試運轉)'
+          : `飛灣曆 ${fwY} 全年度 (飛灣曆 ${fwY}/01/01 – ${fwY}/12/31)`;
       }
     }
 
@@ -2508,9 +2512,10 @@
 
       reports[y] = {
         year: y,
+        fwYear: y - 2006,
         isYTD: isCurrentYTD,
         opDays,
-        asOfDateStr: isCurrentYTD ? dateCtx.todayStr : `${y}/12/31`,
+        asOfDateStr: isCurrentYTD ? dateCtx.todayStr : `飛灣曆 ${y - 2006}/12/31`,
         milestone: h,
         kpis: {
           annualTrips,
@@ -2724,7 +2729,7 @@
       year: targetYear,
       isYTD,
       opDays,
-      asOfDateStr: isYTD ? dateCtx.todayStr : `${targetYear}/12/31`,
+      asOfDateStr: isYTD ? dateCtx.todayStr : `飛灣曆 ${targetYear - 2006}/12/31`,
       schedType,
       overallOtpPct: ytdOtpAvg,
       scheduleFulfillmentPct,

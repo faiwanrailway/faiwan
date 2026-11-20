@@ -173,7 +173,7 @@
 <main class="container" style="padding-top: 28px; padding-bottom: 48px;">
   <article class="card controls-card">
     <div class="control-group">
-      <label for="sel-year">統計年度（2020 年起，自動延展至今年）</label>
+      <label for="sel-year">統計年度（飛灣曆 14 年起，自動延展至今年）</label>
       <select id="sel-year"></select>
     </div>
     <div class="control-group">
@@ -274,10 +274,10 @@
     const opt = document.createElement('option');
     opt.value = String(y);
     if (y === dateCtx.currentYear) {
-      opt.textContent = `${y} 年（截至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
+      opt.textContent = `飛灣曆 ${y - 2006} 年（截至 ${dateCtx.todayStr} · 累計 ${dateCtx.dayOfYear} 日）`;
       opt.selected = true;
     } else {
-      opt.textContent = `${y} 年（${yf.label}）`;
+      opt.textContent = `飛灣曆 ${y - 2006} 年（${yf.label}）`;
     }
     selYear.appendChild(opt);
   }
@@ -397,7 +397,7 @@
       seedStr = pSim.seedIndicator;
       totalDaysLabel = `累計 ${pSim.totalDays} 個營運日`;
       extraMain = `${pSim.totalDays} 日`;
-      subInText = pSim.isYTD ? `統計至 ${pSim.asOfDateStr}` : `${year} 全年度累計`;
+      subInText = pSim.isYTD ? `統計至 ${pSim.asOfDateStr}` : `飛灣曆 ${year - 2006} 全年度累計`;
       subOutText = `僅計最終目的地出站（不含轉乘）`;
       document.getElementById('kpi-extra-label').textContent = '統計有效天數／最高負荷站';
       document.getElementById('milestone-banner').innerHTML =

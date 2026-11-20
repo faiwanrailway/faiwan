@@ -2534,7 +2534,7 @@
 
                             <div style="display:flex; gap:6px; align-items:center;">
 
-                                <input type="number" id="story-flywan-year" value="2026" min="1900" max="2100"
+                                <input type="number" id="story-flywan-year" value="20" min="1" max="200"
 
                                     onchange="updateFlywanDateUI()"
 
@@ -2592,7 +2592,7 @@
 
                     <div id="story-flywan-date-badge" style="background:#090d1a; border:1px solid #1e293b; border-radius:6px; padding:6px 10px; margin-bottom:12px; font-size:12px; color:#cbd5e1; display:flex; justify-content:space-between; align-items:center;">
 
-                        <span id="story-flywan-date-text">飛灣曆 2026年 第1月 第1週 第1天 (週一)</span>
+                        <span id="story-flywan-date-text">飛灣曆 20年 第1月 第1週 第1天 (週一)</span>
 
                         <span id="story-flywan-sched-badge" style="background:#0284c7; color:#fff; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">適用：平日時刻表</span>
 
@@ -4319,7 +4319,7 @@
 
                     badgeColor: '#db2777',
 
-                    fullText: `飛灣曆 ${year}年 年初假期週 第${d}天 (連假)`
+                    fullText: `飛灣曆 ${year - 2006}年 年初假期週 第${d}天 (連假)`
 
                 };
 
@@ -4403,7 +4403,7 @@
 
                     badgeColor: badgeColor,
 
-                    fullText: `飛灣曆 ${year}年 第${m}月 第${weekInMonth}週 第${dayInWeek}天 (${m}月${d}日・${weekDayName}${festDesc})`
+                    fullText: `飛灣曆 ${year - 2006}年 第${m}月 第${weekInMonth}週 第${dayInWeek}天 (${m}月${d}日・${weekDayName}${festDesc})`
 
                 };
 
@@ -4617,7 +4617,7 @@
 
             }
 
-            yearEl.value = fy;
+            yearEl.value = fy - 2006;
 
             monthEl.value = String(fm);
 
@@ -4709,7 +4709,7 @@
 
 
 
-            const y = parseInt(yearEl.value, 10) || 2026;
+            const y = (parseInt(yearEl.value, 10) || 20) + 2006;
 
             const m = parseInt(monthEl.value, 10) || 0;
 
@@ -4964,7 +4964,7 @@
                 const monthEl = document.getElementById('story-flywan-month');
                 const dayEl = document.getElementById('story-flywan-day');
                 const calInfo = getFlywanCalendarInfo(
-                    yearEl ? yearEl.value : 2026,
+                    yearEl ? ((parseInt(yearEl.value, 10) || 20) + 2006) : 2026,
                     monthEl ? monthEl.value : 1,
                     dayEl ? dayEl.value : 1
                 );
@@ -5056,7 +5056,7 @@
 
             const calInfo = getFlywanCalendarInfo(
 
-                yearEl ? yearEl.value : 2026,
+                yearEl ? ((parseInt(yearEl.value, 10) || 20) + 2006) : 2026,
 
                 monthEl ? monthEl.value : 1,
 

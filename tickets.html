@@ -409,26 +409,26 @@
   const STATIONS_DATA = [
     { code: 'FR01', name: '飛灣工業區', km: 0.0 },
     { code: 'FR02', name: '飛灣港', km: 7.3 },
-    { code: 'FR03', name: '物流中心', km: 8.5 },
-    { code: 'FR04', name: '飛灣郵輪港', km: 9.7 },
-    { code: 'FR05', name: '濱江商務區', km: 16.9 },
-    { code: 'FR06', name: '市民廣場', km: 18.4 },
-    { code: 'FR07', name: '文化中心', km: 19.7 },
-    { code: 'FR08', name: '飛灣新站', km: 21.6 },
-    { code: 'FR09', name: '科創園', km: 23.9 },
-    { code: 'FR10', name: '飛灣學區', km: 25.1 },
-    { code: 'FR11', name: '飛灣大道', km: 26.8 },
-    { code: 'FR12', name: '飛灣公園', km: 28.4 },
-    { code: 'FR13', name: '錦湖', km: 29.8 },
-    { code: 'FR14', name: '鷺島', km: 30.3 },
-    { code: 'FR15', name: '空港新城', km: 33.1 },
-    { code: 'FR16', name: '飛灣機場', km: 38.0 },
-    { code: 'FR17', name: '翡翠花園', km: 43.2 },
-    { code: 'FR18', name: '紫荊苑', km: 46.4 },
-    { code: 'FR19', name: '御景新村', km: 54.8 },
-    { code: 'FR20', name: '自然保育中心', km: 56.2 },
-    { code: 'FR21', name: '綾路北站', km: 58.0 },
-    { code: 'FR22', name: '全京大道', km: 59.2 }
+    { code: 'FR03', name: '物流中心', km: 8.6 },
+    { code: 'FR04', name: '飛灣郵輪港', km: 9.8 },
+    { code: 'FR05', name: '濱江商務區', km: 17.0 },
+    { code: 'FR06', name: '市民廣場', km: 18.5 },
+    { code: 'FR07', name: '文化中心', km: 19.8 },
+    { code: 'FR08', name: '飛灣新站', km: 21.7 },
+    { code: 'FR09', name: '科創園', km: 24.0 },
+    { code: 'FR10', name: '飛灣學區', km: 25.2 },
+    { code: 'FR11', name: '飛灣大道', km: 26.9 },
+    { code: 'FR12', name: '飛灣公園', km: 28.5 },
+    { code: 'FR13', name: '錦湖', km: 29.9 },
+    { code: 'FR14', name: '鷺島', km: 30.4 },
+    { code: 'FR15', name: '空港新城', km: 33.2 },
+    { code: 'FR16', name: '飛灣機場', km: 38.1 },
+    { code: 'FR17', name: '翡翠花園', km: 43.3 },
+    { code: 'FR18', name: '紫荊苑', km: 46.5 },
+    { code: 'FR19', name: '御景新村', km: 54.7 },
+    { code: 'FR20', name: '自然保育中心', km: 56.1 },
+    { code: 'FR21', name: '綾路北站', km: 57.9 },
+    { code: 'FR22', name: '全京大道', km: 59.1 }
   ];
 
   // 快速列車特定停靠站
@@ -515,8 +515,8 @@
         day: dayOfYear,
         holidayName: '年初假期週',
         scheduleType: 'holiday_long',
-        text: `${year}年 年初假期週 第${dayOfYear}天 (${weekdayNames[weekdayIdx]} [連假 - 年初假期週])`,
-        short: `${year}年 年初假期週 第${dayOfYear}天`
+        text: `${year - 2006}年 年初假期週 第${dayOfYear}天 (${weekdayNames[weekdayIdx]} [連假 - 年初假期週])`,
+        short: `${year - 2006}年 年初假期週 第${dayOfYear}天`
       };
     }
 
@@ -547,8 +547,8 @@
       weekday: weekdayNames[weekdayIdx],
       holidayName: fest ? fest.name : (isRest ? '休息日' : ''),
       scheduleType: schedType,
-      text: `${year}年 第${month}月 第${weekInMonth}週 第${dayInWeek}天 (${weekdayNames[weekdayIdx]}${tag}) - 該月第${dayInMonth}日`,
-      short: `${year}年${month}月${dayInMonth}日${fest ? '・' + fest.name : ''}`
+      text: `${year - 2006}年 第${month}月 第${weekInMonth}週 第${dayInWeek}天 (${weekdayNames[weekdayIdx]}${tag}) - 該月第${dayInMonth}日`,
+      short: `${year - 2006}年${month}月${dayInMonth}日${fest ? '・' + fest.name : ''}`
     };
   }
 
